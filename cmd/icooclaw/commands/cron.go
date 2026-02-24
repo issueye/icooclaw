@@ -11,23 +11,23 @@ import (
 
 var cronCmd = &cobra.Command{
 	Use:   "cron",
-	Short: "Cron task management",
-	Long: `Manage scheduled tasks.
+	Short: "定时任务管理",
+	Long: `管理定时任务。
 
-Subcommands:
-  add <name> <cron> <msg>    Add a new scheduled task
-  remove <name>              Remove a scheduled task
-  list                       List all scheduled tasks`,
+子命令:
+  add <名称> <cron> <消息>    添加新的定时任务
+  remove <名称>              删除定时任务
+  list                       列出所有定时任务`,
 }
 
 var cronAddCmd = &cobra.Command{
-	Use:   "add <name> <cron> <msg>",
-	Short: "Add a new scheduled task",
-	Long: `Add a new scheduled task with a name, cron expression, and message.
+	Use:   "add <名称> <cron> <消息>",
+	Short: "添加新的定时任务",
+	Long: `添加带有名称、cron 表达式和消息的新定时任务。
 
-Example:
+示例:
   icooclaw cron add mytask "0 * * * *" "Hello from cron"
-  icooclaw cron add daily "0 9 * * *" "Good morning!"`,
+  icooclaw cron add daily "0 9 * * *" "早安!"`,
 	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
@@ -38,11 +38,11 @@ Example:
 }
 
 var cronRemoveCmd = &cobra.Command{
-	Use:   "remove <name>",
-	Short: "Remove a scheduled task",
-	Long: `Remove a scheduled task by name.
+	Use:   "remove <名称>",
+	Short: "删除定时任务",
+	Long: `根据名称删除定时任务。
 
-Example:
+示例:
   icooclaw cron remove mytask`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -53,10 +53,10 @@ Example:
 
 var cronListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all scheduled tasks",
-	Long: `List all scheduled tasks with their status and next run time.
+	Short: "列出所有定时任务",
+	Long: `列出所有定时任务及其状态和下次运行时间。
 
-Example:
+示例:
   icooclaw cron list`,
 	Run: func(cmd *cobra.Command, args []string) {
 		listCronTasks()
@@ -74,7 +74,7 @@ func addCronTask(name, cronExpr, message string) {
 	// Validate cron expression
 	cronParser := scheduler.NewCronParser()
 	if !cronParser.IsValid(cronExpr) {
-		fmt.Printf("Error: Invalid cron expression: %s\n", cronExpr)
+		fmt.Printf("错误: 无效的 cron 表达式: %s\n", cronExpr)
 		return
 	}
 
@@ -87,39 +87,39 @@ func addCronTask(name, cronExpr, message string) {
 		ChatID:      "default",
 		Enabled:     true,
 		NextRunAt:   time.Now(),
-		Description: "Created via CLI",
+		Description: "通过 CLI 创建",
 	}
 
 	// Add to scheduler
 	if err := schedulerInst.AddTask(task); err != nil {
-		fmt.Printf("Error: Failed to add task: %v\n", err)
+		fmt.Printf("错误: 添加任务失败: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Task '%s' added successfully\n", name)
+	fmt.Printf("任务 '%s' 添加成功\n", name)
 	fmt.Printf("  Cron: %s\n", cronExpr)
-	fmt.Printf("  Message: %s\n", message)
+	fmt.Printf("  消息: %s\n", message)
 }
 
 func removeCronTask(name string) {
 	// Remove from scheduler
 	if err := schedulerInst.RemoveTask(name); err != nil {
-		fmt.Printf("Error: Failed to remove task: %v\n", err)
+		fmt.Printf("错误: 删除任务失败: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Task '%s' removed successfully\n", name)
+	fmt.Printf("任务 '%s' 删除成功\n", name)
 }
 
 func listCronTasks() {
 	tasks := schedulerInst.ListTasks()
 
 	if len(tasks) == 0 {
-		fmt.Println("No scheduled tasks found.")
+		fmt.Println("未找到定时任务。")
 		return
 	}
 
-	fmt.Println("Scheduled tasks:")
+	fmt.Println("定时任务:")
 	fmt.Println("")
 
 	for _, name := range tasks {
@@ -128,22 +128,22 @@ func listCronTasks() {
 			continue
 		}
 
-		status := "disabled"
+		status := "已禁用"
 		if task.Enabled {
-			status = "enabled"
+			status = "已启用"
 		}
 
-		nextRun := "N/A"
+		nextRun := "无"
 		if next, ok := schedulerInst.GetTaskNextRun(name); ok {
 			nextRun = next.Format("2006-01-02 15:04:05")
 		}
 
-		fmt.Printf("  Name: %s\n", name)
-		fmt.Printf("  Status: %s\n", status)
+		fmt.Printf("  名称: %s\n", name)
+		fmt.Printf("  状态: %s\n", status)
 		fmt.Printf("  Cron: %s\n", task.CronExpr)
-		fmt.Printf("  Message: %s\n", task.Message)
-		fmt.Printf("  Next run: %s\n", nextRun)
-		fmt.Printf("  Last run: %s\n", task.LastRunAt.Format("2006-01-02 15:04:05"))
+		fmt.Printf("  消息: %s\n", task.Message)
+		fmt.Printf("  下次运行: %s\n", nextRun)
+		fmt.Printf("  上次运行: %s\n", task.LastRunAt.Format("2006-01-02 15:04:05"))
 		fmt.Println("")
 	}
 }

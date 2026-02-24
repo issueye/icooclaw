@@ -7,15 +7,15 @@ import (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run <msg>",
-	Short: "Run a single message",
-	Long: `Send a single message to the AI agent and print the response.
+	Use:   "run <消息>",
+	Short: "运行单条消息",
+	Long: `向 AI 代理发送单条消息并打印响应。
 
-This command is useful for quick one-off interactions with the AI agent.
+此命令用于与 AI 代理的快速一次性交互。
 
-Example:
-  icooclaw run "Hello, how are you?"
-  icooclaw run "Summarize the following: ..."`,
+示例:
+  icooclaw run "你好，最近怎么样？"
+  icooclaw run "请总结以下内容: ..."`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		message := ""
@@ -44,16 +44,16 @@ func runSingleMessage(message string) {
 	go agentInstance.Run(ctx, messageBus)
 
 	// Send message
-	logger.Info("Sending message to agent", "content", message)
+	logger.Info("正在发送消息给代理", "content", message)
 
 	resp, err := agentInstance.ProcessMessage(ctx, message)
 	if err != nil {
-		logger.Error("Failed to process message", "error", err)
-		fmt.Printf("Error: %v\n", err)
+		logger.Error("处理消息失败", "error", err)
+		fmt.Printf("错误: %v\n", err)
 		return
 	}
 
-	fmt.Println("\nResponse:")
+	fmt.Println("\n回复:")
 	fmt.Println(resp)
 
 	// Cleanup

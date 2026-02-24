@@ -37,16 +37,15 @@ var (
 // RootCmd represents the root command
 var rootCmd = &cobra.Command{
 	Use:   "icooclaw",
-	Short: "icooclaw - AI Agent CLI",
-	Long: `icooclaw is an AI agent CLI tool that provides various commands
-for interacting with AI agents, managing scheduled tasks, and more.
+	Short: "icooclaw - AI 代理 CLI 工具",
+	Long: `icooclaw 是一个 AI 代理 CLI 工具，提供多种命令用于与 AI 代理交互、管理定时任务等。
 
-Examples:
-  icooclaw serve        # Start the web server (WebSocket/Webhook)
-  icooclaw chat         # Start interactive chat (REPL)
-  icooclaw run "hello"  # Run a single message
-  icooclaw cron list    # List scheduled tasks
-  icooclaw config get   # Get configuration`,
+示例:
+  icooclaw serve        # 启动 Web 服务器 (WebSocket/Webhook)
+  icooclaw chat         # 启动交互式聊天 (REPL)
+  icooclaw run "你好"   # 运行单条消息
+  icooclaw cron list    # 列出定时任务
+  icooclaw config get   # 获取配置`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip initialization for help, version, and completion commands
 		if cmd.Name() == "help" || cmd.Name() == "version" || cmd.Name() == "completion" {
@@ -138,14 +137,14 @@ func handleSignals(cancel context.CancelFunc) {
 
 	go func() {
 		<-sigCh
-		fmt.Println("\nReceived interrupt signal. Shutting down...")
+		fmt.Println("\n收到中断信号。正在关闭...")
 		cancel()
 	}()
 }
 
 // cleanup performs cleanup operations
 func cleanup() {
-	logger.Info("Shutting down...")
+	logger.Info("正在关闭...")
 
 	// Stop WebSocket channel
 	if channelManager != nil {
@@ -159,13 +158,13 @@ func cleanup() {
 		schedulerInst.Stop()
 	}
 
-	logger.Info("Shutdown complete")
+	logger.Info("关闭完成")
 }
 
 // printProviders prints available providers
 func printProviders() {
 	providers := providerReg.List()
-	fmt.Println("Available providers:")
+	fmt.Println("可用的提供商:")
 	for _, name := range providers {
 		p, _ := providerReg.Get(name)
 		fmt.Printf("  - %s: %s\n", name, p.GetDefaultModel())
@@ -174,9 +173,9 @@ func printProviders() {
 
 func Execute() error {
 	// Add persistent flags
-	rootCmd.PersistentFlags().StringP("config", "c", "", "Config file path")
-	rootCmd.PersistentFlags().StringP("log-level", "l", "", "Log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().StringP("config", "c", "", "配置文件路径")
+	rootCmd.PersistentFlags().StringP("log-level", "l", "", "日志级别 (debug, info, warn, error)")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "详细输出")
 
 	// Bind flags to viper
 	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))

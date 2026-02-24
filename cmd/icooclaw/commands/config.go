@@ -9,20 +9,20 @@ import (
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Configuration management",
-	Long: `Manage configuration settings.
+	Short: "配置管理",
+	Long: `管理配置设置。
 
-Subcommands:
-  get <key>             Get a configuration value
-  set <key> <value>    Set a configuration value`,
+子命令:
+  get <key>             获取配置值
+  set <key> <value>    设置配置值`,
 }
 
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
-	Short: "Get a configuration value",
-	Long: `Get a configuration value by key.
+	Short: "获取配置值",
+	Long: `通过键获取配置值。
 
-Example:
+示例:
   icooclaw config get log.level
   icooclaw config get agents.default_provider`,
 	Args: cobra.ExactArgs(1),
@@ -34,11 +34,11 @@ Example:
 
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
-	Short: "Set a configuration value",
-	Long: `Set a configuration value by key.
-Note: This only sets the value in memory. To persist, save to config file.
+	Short: "设置配置值",
+	Long: `通过键设置配置值。
+注意: 这只设置内存中的值。要持久化，请保存到配置文件。
 
-Example:
+示例:
   icooclaw config set log.level debug
   icooclaw config set agents.default_provider openai`,
 	Args: cobra.ExactArgs(2),
@@ -58,7 +58,7 @@ func init() {
 func getConfig(key string) {
 	value := viper.Get(key)
 	if value == nil {
-		fmt.Printf("Key not found: %s\n", key)
+		fmt.Printf("未找到键: %s\n", key)
 		return
 	}
 
@@ -78,6 +78,6 @@ func setConfig(key, value string) {
 		viper.Set(key, value)
 	}
 
-	fmt.Printf("Set %s = %s\n", key, value)
-	fmt.Println("Note: This change is only in memory. Restart the application for changes to take effect.")
+	fmt.Printf("已设置 %s = %s\n", key, value)
+	fmt.Println("注意: 此更改仅在内存中。重启应用程序以使更改生效。")
 }

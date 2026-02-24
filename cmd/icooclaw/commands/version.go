@@ -17,14 +17,14 @@ var (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Display version information",
-	Long: `Display the version information for icooclaw.
-This includes the version number, commit hash, build date, and build information.`,
+	Short: "显示版本信息",
+	Long: `显示 icooclaw 的版本信息。
+包括版本号、提交哈希、构建日期和构建信息。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("icooclaw version %s\n", Version)
-		fmt.Printf("  commit: %s\n", Commit)
-		fmt.Printf("  date: %s\n", Date)
-		fmt.Printf("  built by: %s\n", BuiltBy)
+		fmt.Printf("icooclaw 版本 %s\n", Version)
+		fmt.Printf("  提交: %s\n", Commit)
+		fmt.Printf("  日期: %s\n", Date)
+		fmt.Printf("  构建者: %s\n", BuiltBy)
 		os.Exit(0)
 	},
 }

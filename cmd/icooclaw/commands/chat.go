@@ -17,19 +17,19 @@ import (
 
 var chatCmd = &cobra.Command{
 	Use:   "chat",
-	Short: "Start interactive chat (REPL)",
-	Long: `Start an interactive chat session with the AI agent.
-This opens a REPL (Read-Eval-Print Loop) where you can type messages
-and receive responses from the AI agent.
+	Short: "启动交互式聊天 (REPL)",
+	Long: `启动与 AI 代理的交互式聊天会话。
+这将打开一个 REPL (读取-求值-打印循环)，您可以在其中输入消息
+并接收 AI 代理的响应。
 
-Commands within chat:
-  help, /help, ?     - Show help message
-  quit, exit, q     - Exit the program
-  model <name>       - Switch to a different model
-  model <provider>/<model> - Switch to provider's model
-  providers, /p      - List available providers
-  history, /hist     - Show command history
-  clear, /c, cls     - Clear screen`,
+聊天中的命令:
+  help, /help, ?     - 显示帮助信息
+  quit, exit, q      - 退出程序
+  model <name>       - 切换到不同的模型
+  model <provider>/<model> - 切换到提供商的模型
+  providers, /p      - 列出可用的提供商
+  history, /hist     - 显示命令历史
+  clear, /c, cls    - 清屏`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runChat()
 	},
@@ -43,7 +43,7 @@ func runChat() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		fmt.Println("\nReceived interrupt signal. Exiting...")
+		fmt.Println("\n收到中断信号。正在退出...")
 		cancel()
 	}()
 
@@ -87,7 +87,7 @@ func NewCLI(agentInstance *agent.Agent, providerReg *provider.Registry, logger *
 
 // Run 运行 CLI
 func (c *CLI) Run(ctx context.Context) {
-	c.logger.Info("CLI started. Type 'help' for commands, 'quit' or 'exit' to exit.")
+	c.logger.Info("CLI 已启动。输入 'help' 查看命令，输入 'quit' 或 'exit' 退出。")
 
 	// 打印欢迎信息
 	c.printWelcome()
@@ -129,7 +129,7 @@ func (c *CLI) handleCommand(ctx context.Context, input string) error {
 	lower := strings.ToLower(input)
 	if lower == "quit" || lower == "exit" || lower == "q" {
 		c.running = false
-		fmt.Println("Goodbye!")
+		fmt.Println("再见!")
 		return nil
 	}
 
@@ -184,7 +184,7 @@ func (c *CLI) handleSlashCommand(ctx context.Context, input string) error {
 		if len(args) > 0 {
 			return c.switchModel(args[0])
 		}
-		return fmt.Errorf("Usage: /model <model_name>")
+		return fmt.Errorf("用法: /model <模型名称>")
 	case "/providers", "/p":
 		c.printProviders()
 	case "/clear", "/c":
@@ -192,7 +192,7 @@ func (c *CLI) handleSlashCommand(ctx context.Context, input string) error {
 	case "/history":
 		c.printHistory()
 	default:
-		return fmt.Errorf("Unknown command: %s", cmd)
+		return fmt.Errorf("未知命令: %s", cmd)
 	}
 
 	return nil
@@ -200,7 +200,7 @@ func (c *CLI) handleSlashCommand(ctx context.Context, input string) error {
 
 // sendMessage 发送消息
 func (c *CLI) sendMessage(ctx context.Context, input string) error {
-	c.logger.Info("Sending message to agent", "content", input)
+	c.logger.Info("正在发送消息给代理", "content", input)
 
 	// 直接调用 agent 处理消息
 	resp, err := c.agent.ProcessMessage(ctx, input)
@@ -224,76 +224,76 @@ func (c *CLI) switchModel(model string) error {
 		if p, err := c.providerReg.Get(providerName); err == nil {
 			// 创建新的 Agent 使用指定模型
 			_ = p
-			c.logger.Info("Switched to model", "provider", providerName, "model", modelName)
-			fmt.Printf("Switched to model: %s (via %s)\n", modelName, providerName)
+			c.logger.Info("已切换模型", "provider", providerName, "model", modelName)
+			fmt.Printf("已切换模型: %s (通过 %s)\n", modelName, providerName)
 			return nil
 		}
-		return fmt.Errorf("Provider not found: %s", providerName)
+		return fmt.Errorf("未找到提供商: %s", providerName)
 	}
 
 	// 尝试在当前 provider 中切换模型
-	fmt.Printf("Model: %s\n", model)
-	c.logger.Info("Switched to model", "model", model)
+	fmt.Printf("模型: %s\n", model)
+	c.logger.Info("已切换模型", "model", model)
 	return nil
 }
 
 // printWelcome 打印欢迎信息
 func (c *CLI) printWelcome() {
 	fmt.Println("========================================")
-	fmt.Println("       icooclaw CLI - Interactive Mode")
+	fmt.Println("       icooclaw CLI - 交互模式")
 	fmt.Println("========================================")
 	fmt.Println()
-	fmt.Println("Commands:")
-	fmt.Println("  help, /help    - Show this help message")
-	fmt.Println("  quit, exit    - Exit the program")
-	fmt.Println("  model <name>  - Switch model")
-	fmt.Println("  providers     - List available providers")
-	fmt.Println("  history       - Show command history")
-	fmt.Println("  clear         - Clear screen")
+	fmt.Println("命令:")
+	fmt.Println("  help, /help    - 显示帮助信息")
+	fmt.Println("  quit, exit    - 退出程序")
+	fmt.Println("  model <名称>  - 切换模型")
+	fmt.Println("  providers     - 列出可用的提供商")
+	fmt.Println("  history       - 显示命令历史")
+	fmt.Println("  clear         - 清屏")
 	fmt.Println()
-	fmt.Println("Just type your message to chat with the AI!")
+	fmt.Println("直接输入消息与 AI 聊天!")
 	fmt.Println("========================================")
 }
 
 // printHelp 打印帮助信息
 func (c *CLI) printHelp() {
-	fmt.Println("Available commands:")
-	fmt.Println("  help, /help, ?     - Show this help message")
-	fmt.Println("  quit, exit, q       - Exit the program")
-	fmt.Println("  model <name>        - Switch to a different model")
-	fmt.Println("  model <provider>/<model> - Switch to provider's model")
-	fmt.Println("  providers, /p       - List available providers")
-	fmt.Println("  history, /hist      - Show command history")
-	fmt.Println("  clear, /c, cls      - Clear screen")
+	fmt.Println("可用命令:")
+	fmt.Println("  help, /help, ?       - 显示帮助信息")
+	fmt.Println("  quit, exit, q        - 退出程序")
+	fmt.Println("  model <名称>         - 切换到不同的模型")
+	fmt.Println("  model <提供商>/<模型> - 切换到提供商的模型")
+	fmt.Println("  providers, /p        - 列出可用的提供商")
+	fmt.Println("  history, /hist       - 显示命令历史")
+	fmt.Println("  clear, /c, cls       - 清屏")
 	fmt.Println()
-	fmt.Println("Just type your message to chat with the AI!")
+	fmt.Println("直接输入消息与 AI 聊天!")
 }
 
 // printSlashHelp 打印斜杠命令帮助
 func (c *CLI) printSlashHelp() {
-	fmt.Println("Slash Commands:")
-	fmt.Println("  /help, /h      - Show this help")
-	fmt.Println("  /model, /m     - Switch model")
-	fmt.Println("  /providers, /p - List providers")
-	fmt.Println("  /clear, /c     - Clear screen")
-	fmt.Println("  /history       - Show history")
+	fmt.Println("斜杠命令:")
+	fmt.Println("  /help, /h       - 显示帮助")
+	fmt.Println("  /model, /m      - 切换模型")
+	fmt.Println("  /providers, /p  - 列出提供商")
+	fmt.Println("  /clear, /c      - 清屏")
+	fmt.Println("  /history        - 显示历史")
 }
 
 // printProviders 打印可用 Provider
 func (c *CLI) printProviders() {
 	providers := c.providerReg.List()
-	fmt.Println("Available providers:")
+	fmt.Println("可用的提供商:")
 	for _, name := range providers {
 		p, err := c.providerReg.Get(name)
 		if err == nil {
-			fmt.Printf("  - %s (default model: %s)\n", name, p.GetDefaultModel())
+			fmt.Printf("  - %s (默认模型: %s)\n", name, p.GetDefaultModel())
 		}
 	}
 }
 
 // printHistory 打印历史记录
 func (c *CLI) printHistory() {
-	fmt.Println("Command history:")
+	fmt.Println("命令历史:")
 	for i, cmd := range c.history {
 		fmt.Printf("  %d: %s\n", i+1, cmd)
 	}
