@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/icooclaw/icooclaw/internal/agent/tools"
 	"github.com/icooclaw/icooclaw/internal/bus"
@@ -22,6 +23,7 @@ type Agent struct {
 	memory   *MemoryStore
 	skills   *SkillsLoader
 	config   config.AgentSettings
+	bus      *bus.MessageBus
 	logger   *slog.Logger
 }
 
@@ -116,6 +118,7 @@ func (a *Agent) Init(ctx context.Context) error {
 
 // Run 运行Agent
 func (a *Agent) Run(ctx context.Context, messageBus *bus.MessageBus) {
+	a.bus = messageBus
 	// 初始化
 	if err := a.Init(ctx); err != nil {
 		a.logger.Error("Failed to initialize agent", "error", err)
@@ -171,12 +174,39 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 		return
 	}
 
-	// 运行Agent Loop
-	loop := NewLoop(a, session, a.logger)
+	// 获取 client_id (如果是 WebSocket)
+	clientID, _ := msg.Metadata["client_id"].(string)
+
+	// 运行 Agent Loop (带流式回调)
+	onChunk := func(chunk string) {
+		if a.bus != nil {
+			a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+				Type:      "chunk",
+				Channel:   msg.Channel,
+				ChatID:    msg.ChatID,
+				Content:   chunk,
+				Timestamp: time.Now(),
+				Metadata:  map[string]interface{}{"client_id": clientID},
+			})
+		}
+	}
+
+	loop := NewLoopWithStream(a, session, a.logger, onChunk)
 	response, toolCalls, err := loop.Run(ctx, messages, systemPrompt)
 	if err != nil {
 		a.logger.Error("Agent loop failed", "error", err)
 		return
+	}
+
+	// 发送流式结束
+	if a.bus != nil {
+		a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+			Type:      "chunk_end",
+			Channel:   msg.Channel,
+			ChatID:    msg.ChatID,
+			Timestamp: time.Now(),
+			Metadata:  map[string]interface{}{"client_id": clientID},
+		})
 	}
 
 	// 保存助手消息

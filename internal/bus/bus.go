@@ -21,6 +21,7 @@ type InboundMessage struct {
 // OutboundMessage 发送消息
 type OutboundMessage struct {
 	ID        string
+	Type      string // "message", "chunk", "chunk_end", "tool_call", "error"
 	Channel   string
 	ChatID    string
 	Content   string
@@ -30,12 +31,13 @@ type OutboundMessage struct {
 
 // MessageBus 异步消息队列
 type MessageBus struct {
-	inbound     chan InboundMessage
-	outbound    chan OutboundMessage
-	subscribers map[string]chan InboundMessage
-	mu          sync.RWMutex
-	logger      *slog.Logger
-	bufferSize  int
+	inbound             chan InboundMessage
+	outbound            chan OutboundMessage
+	subscribers         map[string]chan InboundMessage
+	outboundSubscribers map[string]chan OutboundMessage
+	mu                  sync.RWMutex
+	logger              *slog.Logger
+	bufferSize          int
 }
 
 // NewMessageBus 创建消息总线
@@ -46,11 +48,12 @@ func NewMessageBus(bufferSize ...int) *MessageBus {
 	}
 
 	return &MessageBus{
-		inbound:     make(chan InboundMessage, size),
-		outbound:    make(chan OutboundMessage, size),
-		subscribers: make(map[string]chan InboundMessage),
-		logger:      slog.Default(),
-		bufferSize:  size,
+		inbound:             make(chan InboundMessage, size),
+		outbound:            make(chan OutboundMessage, size),
+		subscribers:         make(map[string]chan InboundMessage),
+		outboundSubscribers: make(map[string]chan OutboundMessage),
+		logger:              slog.Default(),
+		bufferSize:          size,
 	}
 }
 
@@ -95,8 +98,42 @@ func (b *MessageBus) UnsubscribeInbound(channel string) {
 	}
 }
 
+// SubscribeOutbound 订阅发送消息
+func (b *MessageBus) SubscribeOutbound(channel string) <-chan OutboundMessage {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, ok := b.outboundSubscribers[channel]; !ok {
+		b.outboundSubscribers[channel] = make(chan OutboundMessage, b.bufferSize)
+	}
+	return b.outboundSubscribers[channel]
+}
+
+// UnsubscribeOutbound 取消订阅发送消息
+func (b *MessageBus) UnsubscribeOutbound(channel string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if ch, ok := b.outboundSubscribers[channel]; ok {
+		close(ch)
+		delete(b.outboundSubscribers, channel)
+	}
+}
+
 // PublishOutbound 发布发送消息
 func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	// 优先分发给订阅者
+	for _, ch := range b.outboundSubscribers {
+		select {
+		case ch <- msg:
+		default:
+			// 忽略阻塞的订阅者或进行日志记录
+		}
+	}
+
 	select {
 	case b.outbound <- msg:
 		b.logger.Debug("Published outbound message", "channel", msg.Channel, "chat_id", msg.ChatID)
@@ -104,8 +141,9 @@ func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) e
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		b.logger.Warn("Outbound channel full, dropping message")
-		return ErrChannelFull
+		// 如果主通道满了，但订阅者可能已经收到了，这里为了简单返回成功或 Warn
+		b.logger.Warn("Outbound channel full")
+		return nil
 	}
 }
 
@@ -150,6 +188,11 @@ func (b *MessageBus) Close() {
 		close(ch)
 	}
 	b.subscribers = make(map[string]chan InboundMessage)
+
+	for _, ch := range b.outboundSubscribers {
+		close(ch)
+	}
+	b.outboundSubscribers = make(map[string]chan OutboundMessage)
 }
 
 // 错误定义

@@ -1,8 +1,10 @@
 package provider
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,6 +49,25 @@ func (p *OpenRouterProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRe
 	return p.sendRequest(ctx, httpReq)
 }
 
+// ChatStream 实现ChatStream方法
+func (p *OpenRouterProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// 添加OpenRouter特定的请求头
+	httpReq.Header.Set("HTTP-Referer", "https://github.com/icooclaw")
+	httpReq.Header.Set("X-Title", "icooclaw")
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
+}
+
 // ============ OpenAI Provider ============
 
 // OpenAIProvider OpenAI Provider 实现
@@ -81,6 +102,24 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	httpReq.Header.Set("OpenAI-Beta", "assistants=v2")
 
 	return p.sendRequest(ctx, httpReq)
+}
+
+// ChatStream 实现ChatStream方法
+func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// OpenAI 特定请求头
+	httpReq.Header.Set("OpenAI-Beta", "assistants=v2")
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
 }
 
 // ============ Anthropic Provider ============
@@ -228,6 +267,153 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	return p.convertResponse(anthResp), nil
 }
 
+// ChatStream 实现ChatStream方法
+func (p *AnthropicProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	// 转换消息格式
+	messages := make([]AnthropicMessage, 0, len(req.Messages))
+	for _, msg := range req.Messages {
+		if msg.Role == "system" {
+			messages = append([]AnthropicMessage{{Role: "system", Content: msg.Content}}, messages...)
+		} else {
+			messages = append(messages, AnthropicMessage{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		}
+	}
+
+	maxTokens := req.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = 4096
+	}
+
+	anthReq := AnthropicRequest{
+		Model:       p.Model,
+		Messages:    messages,
+		MaxTokens:   maxTokens,
+		Temperature: req.Temperature,
+		TopP:        req.TopP,
+		Tools:       req.Tools,
+		Stream:      true,
+	}
+
+	body, err := json.Marshal(anthReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := strings.TrimSuffix(p.APIBase, "/") + "/messages"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", p.APIKey)
+	httpReq.Header.Set("anthropic-version", p.Version)
+
+	return p.sendAnthropicStreamRequest(ctx, httpReq, callback)
+}
+
+// sendAnthropicStreamRequest 处理 Anthropic 专有的 SSE 流
+func (p *AnthropicProvider) sendAnthropicStreamRequest(ctx context.Context, req *http.Request, callback StreamCallback) error {
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error: %s %s", resp.Status, string(body))
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	var lastID string
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return fmt.Errorf("failed to read stream: %w", err)
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "event:") {
+			// Anthropic SSE 包含 event 和 data 两行
+			eventType := strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			dataLine, err := reader.ReadString('\n')
+			if err != nil {
+				break
+			}
+			if !strings.HasPrefix(dataLine, "data:") {
+				continue
+			}
+			data := strings.TrimSpace(strings.TrimPrefix(dataLine, "data:"))
+
+			switch eventType {
+			case "message_start":
+				var start struct {
+					Message struct {
+						ID string `json:"id"`
+					} `json:"message"`
+				}
+				json.Unmarshal([]byte(data), &start)
+				lastID = start.Message.ID
+
+			case "content_block_delta":
+				var delta struct {
+					Delta struct {
+						Text string `json:"text"`
+					} `json:"delta"`
+				}
+				if err := json.Unmarshal([]byte(data), &delta); err == nil {
+					callback(StreamChunk{
+						ID:      lastID,
+						Content: delta.Delta.Text,
+					})
+				}
+
+			case "message_delta":
+				var delta struct {
+					Delta struct {
+						StopReason string `json:"stop_reason"`
+					} `json:"delta"`
+					Usage struct {
+						OutputTokens int `json:"output_tokens"`
+					} `json:"usage"`
+				}
+				if err := json.Unmarshal([]byte(data), &delta); err == nil {
+					finishReason := delta.Delta.StopReason
+					if finishReason == "tool_use" {
+						finishReason = "tool_calls"
+					}
+					callback(StreamChunk{
+						ID:           lastID,
+						FinishReason: finishReason,
+						Usage: &Usage{
+							CompletionTokens: delta.Usage.OutputTokens,
+						},
+					})
+				}
+
+			case "message_stop":
+				return nil
+
+			case "error":
+				return fmt.Errorf("anthropic stream error: %s", data)
+			}
+		}
+	}
+
+	return nil
+}
+
 // convertResponse 转换 Anthropic 响应为标准格式
 func (p *AnthropicProvider) convertResponse(anthResp AnthropicResponse) *ChatResponse {
 	var content string
@@ -312,6 +498,21 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 	return p.sendRequest(ctx, httpReq)
 }
 
+// ChatStream 实现ChatStream方法
+func (p *DeepSeekProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
+}
+
 // ============ Custom Provider ============
 
 // CustomProvider 自定义端点 Provider 实现
@@ -352,6 +553,26 @@ func (p *CustomProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	return p.sendRequest(ctx, httpReq)
 }
 
+// ChatStream 实现ChatStream方法
+func (p *CustomProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// Custom 端点可能不需要 Bearer token
+	if p.APIKey != "" && p.APIKey != "no-key" {
+		httpReq.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
+}
+
 // ============ Ollama Provider ============
 
 // OllamaProvider Ollama 本地 LLM Provider 实现
@@ -390,6 +611,24 @@ func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	return p.sendRequest(ctx, httpReq)
 }
 
+// ChatStream 实现ChatStream方法
+func (p *OllamaProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// Ollama 不需要 Authorization 头
+	httpReq.Header.Del("Authorization")
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
+}
+
 // ============ Azure OpenAI Provider ============
 
 // AzureOpenAIProvider Azure OpenAI Provider 实现
@@ -410,7 +649,7 @@ func NewAzureOpenAIProvider(apiKey, endpoint, deployment, apiVersion string) *Az
 	}
 	return &AzureOpenAIProvider{
 		BaseProvider: NewBaseProvider("azure-openai", apiKey, apiBase, deployment),
-		APIVersion:  apiVersion,
+		APIVersion:   apiVersion,
 	}
 }
 
@@ -462,6 +701,35 @@ func (p *AzureOpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatR
 	return &chatResp, nil
 }
 
+// ChatStream 实现ChatStream方法
+func (p *AzureOpenAIProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	// Azure 使用 deployment 名称作为模型
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	// 构建 URL，包含 API 版本
+	url := fmt.Sprintf("%s?api-version=%s", p.APIBase, p.APIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	if p.APIKey != "" {
+		httpReq.Header.Set("api-key", p.APIKey)
+	}
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
+}
+
 // ============ LocalAI Provider ============
 
 // LocalAIProvider LocalAI Provider 实现
@@ -499,6 +767,24 @@ func (p *LocalAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespo
 	return p.sendRequest(ctx, httpReq)
 }
 
+// ChatStream 实现ChatStream方法
+func (p *LocalAIProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// LocalAI 不需要 Authorization 头
+	httpReq.Header.Del("Authorization")
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
+}
+
 // ============通配 AI (OneAPI) Provider ============
 
 // OneAPIProvider OneAPI 通配 AI 接口 Provider
@@ -531,6 +817,21 @@ func (p *OneAPIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	}
 
 	return p.sendRequest(ctx, httpReq)
+}
+
+// ChatStream 实现ChatStream方法
+func (p *OneAPIProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
 }
 
 // ============ OpenAI Compatible Provider 通用模板 ============
@@ -578,4 +879,24 @@ func (p *OpenAICompatibleProvider) Chat(ctx context.Context, req ChatRequest) (*
 	}
 
 	return p.sendRequest(ctx, httpReq)
+}
+
+// ChatStream 实现ChatStream方法
+func (p *OpenAICompatibleProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	req.Stream = true
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// 添加额外的请求头
+	for key, value := range p.ExtraHeaders {
+		httpReq.Header.Set(key, value)
+	}
+
+	return p.sendStreamRequest(ctx, httpReq, callback)
 }

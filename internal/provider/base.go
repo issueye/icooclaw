@@ -1,8 +1,10 @@
 package provider
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -84,9 +86,22 @@ type Choice struct {
 	FinishReason string  `json:"finish_reason"`
 }
 
+// StreamChunk 流式响应片段
+type StreamChunk struct {
+	ID               string `json:"id"`
+	Content          string `json:"content"`
+	ReasoningContent string `json:"reasoning_content,omitempty"`
+	FinishReason     string `json:"finish_reason,omitempty"`
+	Usage            *Usage `json:"usage,omitempty"`
+}
+
+// StreamCallback 流式回调函数
+type StreamCallback func(chunk StreamChunk) error
+
 // Provider LLM Provider接口
 type Provider interface {
 	Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error)
+	ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error
 	GetDefaultModel() string
 	GetName() string
 }
@@ -126,6 +141,11 @@ func (p *BaseProvider) GetName() string {
 // Chat 实现Provider接口
 func (p *BaseProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+// ChatStream 实现Provider接口
+func (p *BaseProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+	return fmt.Errorf("not implemented")
 }
 
 // buildRequest 构建请求
@@ -173,4 +193,75 @@ func (p *BaseProvider) sendRequest(ctx context.Context, req *http.Request) (*Cha
 	}
 
 	return &chatResp, nil
+}
+
+// sendStreamRequest 发送流式请求并处理 SSE
+func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request, callback StreamCallback) error {
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error: %s %s", resp.Status, string(body))
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return fmt.Errorf("failed to read stream: %w", err)
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "data:") {
+			continue
+		}
+
+		data := strings.TrimPrefix(line, "data:")
+		data = strings.TrimSpace(data)
+
+		if data == "[DONE]" {
+			break
+		}
+
+		// 解析 OpenAI 格式的流式块
+		var chunk struct {
+			ID      string `json:"id"`
+			Choices []struct {
+				Delta struct {
+					Content          string `json:"content"`
+					ReasoningContent string `json:"reasoning_content"`
+				} `json:"delta"`
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+			Usage *Usage `json:"usage"`
+		}
+
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			// 忽略解析失败的行，可能是非 JSON 或格式不匹配
+			continue
+		}
+
+		if len(chunk.Choices) > 0 {
+			c := chunk.Choices[0]
+			streamChunk := StreamChunk{
+				ID:               chunk.ID,
+				Content:          c.Delta.Content,
+				ReasoningContent: c.Delta.ReasoningContent,
+				FinishReason:     c.FinishReason,
+				Usage:            chunk.Usage,
+			}
+			if err := callback(streamChunk); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

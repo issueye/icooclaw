@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/icooclaw/icooclaw/internal/agent/tools"
 	"github.com/icooclaw/icooclaw/internal/provider"
 	"github.com/icooclaw/icooclaw/internal/storage"
 )
 
+// OnChunkFunc 流式 token 回调
+type OnChunkFunc func(chunk string)
+
 // Loop Agent Loop实现ReAct模式的对话循环
 type Loop struct {
 	agent   *Agent
 	session *storage.Session
 	logger  *slog.Logger
+	onChunk OnChunkFunc
 }
 
 // NewLoop 创建Agent Loop
@@ -24,6 +29,16 @@ func NewLoop(agent *Agent, session *storage.Session, logger *slog.Logger) *Loop 
 		agent:   agent,
 		session: session,
 		logger:  logger,
+	}
+}
+
+// NewLoopWithStream 创建支持流式的 Agent Loop
+func NewLoopWithStream(agent *Agent, session *storage.Session, logger *slog.Logger, onChunk OnChunkFunc) *Loop {
+	return &Loop{
+		agent:   agent,
+		session: session,
+		logger:  logger,
+		onChunk: onChunk,
 	}
 }
 
@@ -75,35 +90,59 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 		l.logger.Debug("Sending request to LLM", "iteration", iteration, "message_count", len(messages))
 
 		// 调用LLM
-		resp, err := l.agent.Provider().Chat(ctx, req)
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to call LLM: %w", err)
+		var content string
+		var toolCalls []provider.ToolCall
+		var reasoningContent string
+
+		if l.onChunk != nil {
+			var fullContent strings.Builder
+			err := l.agent.Provider().ChatStream(ctx, req, func(chunk provider.StreamChunk) error {
+				if chunk.Content != "" {
+					fullContent.WriteString(chunk.Content)
+					l.onChunk(chunk.Content)
+				}
+				if chunk.ReasoningContent != "" {
+					reasoningContent += chunk.ReasoningContent
+				}
+				return nil
+			})
+			if err != nil {
+				return "", nil, fmt.Errorf("failed to call LLM stream: %w", err)
+			}
+			content = fullContent.String()
+		} else {
+			resp, err := l.agent.Provider().Chat(ctx, req)
+			if err != nil {
+				return "", nil, fmt.Errorf("failed to call LLM: %w", err)
+			}
+
+			// 检查响应
+			if len(resp.Choices) == 0 {
+				return "", nil, fmt.Errorf("no choices in response")
+			}
+
+			choice := resp.Choices[0]
+			content = choice.Message.Content
+			toolCalls = choice.Message.ToolCalls
+			reasoningContent = choice.Message.ReasoningContent
 		}
 
-		// 检查响应
-		if len(resp.Choices) == 0 {
-			return "", nil, fmt.Errorf("no choices in response")
-		}
-
-		choice := resp.Choices[0]
-		content := choice.Message.Content
-
-		// 检查finish reason
-		if choice.FinishReason == "stop" {
+		// 检查 finish reason
+		if len(toolCalls) == 0 && (l.onChunk == nil || content != "") {
 			l.logger.Info("Agent loop completed", "iterations", iteration+1)
 			return content, nil, nil
 		}
 
 		// 检查tool_calls
-		if len(choice.Message.ToolCalls) > 0 {
-			l.logger.Info("Executing tools", "count", len(choice.Message.ToolCalls))
+		if len(toolCalls) > 0 {
+			l.logger.Info("Executing tools", "count", len(toolCalls))
 
 			// 添加助手消息（包含tool_calls）
-			toolCallsJSON, _ := json.Marshal(choice.Message.ToolCalls)
-			l.session.AddMessage("assistant", content, string(toolCallsJSON), "", "", choice.Message.ReasoningContent)
+			toolCallsJSON, _ := json.Marshal(toolCalls)
+			l.session.AddMessage("assistant", content, string(toolCallsJSON), "", "", reasoningContent)
 
 			// 执行工具
-			for _, call := range choice.Message.ToolCalls {
+			for _, call := range toolCalls {
 				// 转换为 tools.ToolCall
 				toolCall := tools.ToolCall{
 					ID:   call.ID,
@@ -124,8 +163,13 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 				// 添加工具结果消息
 				l.session.AddMessage("tool", resultContent, "", result.ToolCallID, call.Function.Name, "")
 
-				// 添加到消息列表
-				messages = append(messages, choice.Message)
+				// 更新消息列表以便下一次迭代
+				messages = append(messages, provider.Message{
+					Role:             "assistant",
+					Content:          content,
+					ToolCalls:        toolCalls,
+					ReasoningContent: reasoningContent,
+				})
 				messages = append(messages, provider.Message{
 					Role:       "tool",
 					Content:    resultContent,
@@ -137,7 +181,6 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 			continue
 		}
 
-		// 其他finish reason
 		return content, nil, nil
 	}
 

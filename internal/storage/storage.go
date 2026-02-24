@@ -79,6 +79,38 @@ func (s *Storage) GetSessionMessages(sessionID uint, limit int) ([]Message, erro
 	return messages, err
 }
 
+// GetMessages 获取分页消息
+func (s *Storage) GetMessages(sessionID string, limit, offset int) ([]Message, error) {
+	var messages []Message
+	err := s.db.Where("session_id = ?", sessionID).Order("timestamp ASC").Limit(limit).Offset(offset).Find(&messages).Error
+	return messages, err
+}
+
+// GetSessions 获取会话列表
+func (s *Storage) GetSessions(userID, channel string) ([]Session, error) {
+	var sessions []Session
+	db := s.db
+	if userID != "" {
+		db = db.Where("user_id = ?", userID)
+	}
+	if channel != "" {
+		db = db.Where("channel = ?", channel)
+	}
+	err := db.Order("updated_at DESC").Find(&sessions).Error
+	return sessions, err
+}
+
+// DeleteSession 删除会话
+func (s *Storage) DeleteSession(sessionID string) error {
+	// 删除相关的消息
+	err := s.db.Where("session_id = ?", sessionID).Delete(&Message{}).Error
+	if err != nil {
+		return err
+	}
+	// 删除会话本身
+	return s.db.Where("id = ?", sessionID).Delete(&Session{}).Error
+}
+
 // Task operations
 
 // CreateTask 创建任务

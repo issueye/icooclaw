@@ -7,6 +7,8 @@ import (
 
 	"github.com/icooclaw/icooclaw/internal/bus"
 	"github.com/icooclaw/icooclaw/internal/config"
+	"github.com/icooclaw/icooclaw/internal/storage"
+	"gorm.io/gorm"
 )
 
 // Manager 通道管理器
@@ -39,7 +41,8 @@ func NewManager(bus *bus.MessageBus, cfg config.ChannelsConfig, db interface{}, 
 func (m *Manager) registerFromConfig() {
 	// WebSocket 通道
 	if m.config.WebSocket.Enabled {
-		wsChannel := NewWebSocketChannel(m.config.WebSocket, m.bus, m.logger)
+		store := storage.NewStorage(m.db.(*gorm.DB))
+		wsChannel := NewWebSocketChannel(m.config.WebSocket, m.bus, store, m.logger)
 		m.Register("websocket", wsChannel)
 	}
 
