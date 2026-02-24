@@ -262,6 +262,8 @@ func (c *WebSocketChannel) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/v1/sessions", c.corsWrapper(c.handleRestSessions))
 	mux.HandleFunc("/api/v1/sessions/", c.corsWrapper(c.handleRestSessionDetail)) // 处理 /api/v1/sessions/:id/...
 	mux.HandleFunc("/api/v1/providers", c.corsWrapper(c.handleRestProviders))
+	mux.HandleFunc("/api/v1/skills", c.corsWrapper(c.handleRestSkills))
+	mux.HandleFunc("/api/v1/skills/", c.corsWrapper(c.handleRestSkillDetail))
 	mux.HandleFunc("/api/v1/health", c.corsWrapper(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -608,6 +610,93 @@ func (c *WebSocketChannel) handleRestProviders(w http.ResponseWriter, r *http.Re
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(info)
+}
+
+// handleRestSkills 处理技能列表
+func (c *WebSocketChannel) handleRestSkills(w http.ResponseWriter, r *http.Request) {
+	if c.storage == nil {
+		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		// 获取所有技能
+		skills, err := c.storage.GetAllSkills()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"skills": skills,
+		})
+	case "POST":
+		// 创建新技能
+		var skill storage.Skill
+		if err := json.NewDecoder(r.Body).Decode(&skill); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		skill.Source = "user"
+		if err := c.storage.CreateSkill(&skill); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(skill)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleRestSkillDetail 处理单个技能
+func (c *WebSocketChannel) handleRestSkillDetail(w http.ResponseWriter, r *http.Request) {
+	if c.storage == nil {
+		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		return
+	}
+
+	// 解析 ID
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/v1/skills/")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid skill ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		skill, err := c.storage.GetSkillByID(uint(id))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(skill)
+	case "PUT":
+		var skill storage.Skill
+		if err := json.NewDecoder(r.Body).Decode(&skill); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		skill.ID = uint(id)
+		if err := c.storage.UpdateSkill(&skill); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(skill)
+	case "DELETE":
+		if err := c.storage.DeleteSkill(uint(id)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"deleted"}`))
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func (c *WebSocketChannel) handleMessage(w http.ResponseWriter, r *http.Request) {

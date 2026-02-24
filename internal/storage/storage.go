@@ -187,6 +187,13 @@ func (s *Storage) DeleteSkill(id uint) error {
 	return s.db.Delete(&Skill{}, id).Error
 }
 
+// GetSkillByID 通过ID获取技能
+func (s *Storage) GetSkillByID(id uint) (*Skill, error) {
+	var skill Skill
+	err := s.db.First(&skill, id).Error
+	return &skill, err
+}
+
 // Memory operations
 
 // CreateMemory 创建记忆
