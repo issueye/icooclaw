@@ -90,6 +90,48 @@ func (r *Registry) RegisterFromConfig(cfg config.ProvidersConfig) error {
 		r.Register("custom", NewCustomProvider(cfg.Custom.APIKey, cfg.Custom.APIBase, cfg.Custom.Model))
 	}
 
+	// 注册Ollama
+	if cfg.Ollama.Enabled {
+		r.Register("ollama", NewOllamaProvider(cfg.Ollama.APIBase, cfg.Ollama.Model))
+	}
+
+	// 注册Azure OpenAI
+	if cfg.AzureOpenAI.Enabled {
+		r.Register("azure-openai", NewAzureOpenAIProvider(
+			cfg.AzureOpenAI.APIKey,
+			cfg.AzureOpenAI.Endpoint,
+			cfg.AzureOpenAI.Deployment,
+			cfg.AzureOpenAI.APIVersion,
+		))
+	}
+
+	// 注册LocalAI
+	if cfg.LocalAI.Enabled {
+		r.Register("localai", NewLocalAIProvider(cfg.LocalAI.APIBase, cfg.LocalAI.Model))
+	}
+
+	// 注册OneAPI
+	if cfg.OneAPI.Enabled {
+		r.Register("oneapi", NewOneAPIProvider(cfg.OneAPI.APIKey, cfg.OneAPI.APIBase, cfg.OneAPI.Model))
+	}
+
+	// 注册多个 OpenAI 兼容的 LLM
+	for i, comp := range cfg.Compatible {
+		if !comp.Enabled {
+			continue
+		}
+		name := comp.Name
+		if name == "" {
+			name = fmt.Sprintf("compatible-%d", i+1)
+		}
+		provider := NewOpenAICompatibleProvider(name, comp.APIKey, comp.APIBase, comp.Model)
+		// 添加额外的请求头
+		for k, v := range comp.Headers {
+			provider.SetHeader(k, v)
+		}
+		r.Register(name, provider)
+	}
+
 	// 如果没有注册任何provider，至少注册一个默认的
 	if len(r.providers) == 0 {
 		return fmt.Errorf("no provider enabled")

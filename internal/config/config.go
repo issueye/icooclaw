@@ -25,11 +25,16 @@ type Config struct {
 
 // ProvidersConfig Provider配置
 type ProvidersConfig struct {
-	OpenRouter ProviderSettings `mapstructure:"openrouter"`
-	OpenAI     ProviderSettings `mapstructure:"openai"`
-	Anthropic  ProviderSettings `mapstructure:"anthropic"`
-	DeepSeek   ProviderSettings `mapstructure:"deepseek"`
-	Custom     ProviderSettings `mapstructure:"custom"`
+	OpenRouter    ProviderSettings    `mapstructure:"openrouter"`
+	OpenAI        ProviderSettings    `mapstructure:"openai"`
+	Anthropic     ProviderSettings    `mapstructure:"anthropic"`
+	DeepSeek      ProviderSettings    `mapstructure:"deepseek"`
+	Custom        ProviderSettings    `mapstructure:"custom"`
+	Ollama        OllamaSettings     `mapstructure:"ollama"`
+	AzureOpenAI   AzureSettings      `mapstructure:"azure_openai"`
+	LocalAI       ProviderSettings    `mapstructure:"localai"`
+	OneAPI        ProviderSettings    `mapstructure:"oneapi"`
+	Compatible    []CompatibleSettings `mapstructure:"compatible"` // 支持多个 OpenAI 兼容的 LLM
 }
 
 // ProviderSettings 单个Provider设置
@@ -38,6 +43,32 @@ type ProviderSettings struct {
 	APIKey  string `mapstructure:"api_key"`
 	APIBase string `mapstructure:"api_base"`
 	Model   string `mapstructure:"model"`
+}
+
+// OllamaSettings Ollama 设置
+type OllamaSettings struct {
+	Enabled bool   `mapstructure:"enabled"`
+	APIBase string `mapstructure:"api_base"` // 如 http://localhost:11434
+	Model   string `mapstructure:"model"`    // 如 llama2, codellama 等
+}
+
+// AzureSettings Azure OpenAI 设置
+type AzureSettings struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	APIKey     string `mapstructure:"api_key"`
+	Endpoint   string `mapstructure:"endpoint"`   // 如 https://xxx.openai.azure.com
+	Deployment string `mapstructure:"deployment"` // 部署名称
+	APIVersion string `mapstructure:"api_version"` // 如 2024-02-15-preview
+}
+
+// CompatibleSettings OpenAI 兼容 LLM 设置（支持额外请求头）
+type CompatibleSettings struct {
+	Enabled   bool              `mapstructure:"enabled"`
+	Name      string           `mapstructure:"name"`      // Provider 名称
+	APIKey    string           `mapstructure:"api_key"`
+	APIBase   string           `mapstructure:"api_base"` // 如 http://localhost:8000/v1
+	Model     string           `mapstructure:"model"`   // 默认模型
+	Headers   map[string]string `mapstructure:"headers"` // 额外请求头
 }
 
 // ChannelsConfig 通道配置

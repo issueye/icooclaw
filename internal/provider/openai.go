@@ -351,3 +351,231 @@ func (p *CustomProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 
 	return p.sendRequest(ctx, httpReq)
 }
+
+// ============ Ollama Provider ============
+
+// OllamaProvider Ollama 本地 LLM Provider 实现
+type OllamaProvider struct {
+	*BaseProvider
+}
+
+// NewOllamaProvider 创建 Ollama Provider
+func NewOllamaProvider(apiBase, model string) *OllamaProvider {
+	if apiBase == "" {
+		apiBase = "http://localhost:11434"
+	}
+	if model == "" {
+		model = "llama2"
+	}
+	return &OllamaProvider{
+		BaseProvider: NewBaseProvider("ollama", "", apiBase, model),
+	}
+}
+
+// Chat 实现 Chat 方法 - Ollama 使用 OpenAI 兼容格式
+func (p *OllamaProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	// 设置模型
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ollama 不需要 Authorization 头
+	httpReq.Header.Del("Authorization")
+
+	return p.sendRequest(ctx, httpReq)
+}
+
+// ============ Azure OpenAI Provider ============
+
+// AzureOpenAIProvider Azure OpenAI Provider 实现
+type AzureOpenAIProvider struct {
+	*BaseProvider
+	APIVersion string // Azure API 版本
+}
+
+// NewAzureOpenAIProvider 创建 Azure OpenAI Provider
+func NewAzureOpenAIProvider(apiKey, endpoint, deployment, apiVersion string) *AzureOpenAIProvider {
+	if apiVersion == "" {
+		apiVersion = "2024-02-15-preview"
+	}
+	// Azure 使用特殊的 URL 格式
+	apiBase := strings.TrimSuffix(endpoint, "/")
+	if deployment != "" {
+		apiBase += "/openai/deployments/" + deployment
+	}
+	return &AzureOpenAIProvider{
+		BaseProvider: NewBaseProvider("azure-openai", apiKey, apiBase, deployment),
+		APIVersion:  apiVersion,
+	}
+}
+
+// Chat 实现 Chat 方法
+func (p *AzureOpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	// Azure 使用 deployment 名称作为模型
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	// 构建 URL，包含 API 版本
+	url := fmt.Sprintf("%s?api-version=%s", p.APIBase, p.APIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(body)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	if p.APIKey != "" {
+		httpReq.Header.Set("api-key", p.APIKey)
+	}
+
+	resp, err := p.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s %s", resp.Status, string(respBody))
+	}
+
+	var chatResp ChatResponse
+	if err := json.Unmarshal(respBody, &chatResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &chatResp, nil
+}
+
+// ============ LocalAI Provider ============
+
+// LocalAIProvider LocalAI Provider 实现
+type LocalAIProvider struct {
+	*BaseProvider
+}
+
+// NewLocalAIProvider 创建 LocalAI Provider
+func NewLocalAIProvider(apiBase, model string) *LocalAIProvider {
+	if apiBase == "" {
+		apiBase = "http://localhost:8080"
+	}
+	if model == "" {
+		model = "gpt-3.5-turbo"
+	}
+	return &LocalAIProvider{
+		BaseProvider: NewBaseProvider("localai", "", apiBase, model),
+	}
+}
+
+// Chat 实现 Chat 方法
+func (p *LocalAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// LocalAI 不需要 Authorization 头
+	httpReq.Header.Del("Authorization")
+
+	return p.sendRequest(ctx, httpReq)
+}
+
+// ============通配 AI (OneAPI) Provider ============
+
+// OneAPIProvider OneAPI 通配 AI 接口 Provider
+type OneAPIProvider struct {
+	*BaseProvider
+}
+
+// NewOneAPIProvider 创建 OneAPI Provider
+func NewOneAPIProvider(apiKey, apiBase, model string) *OneAPIProvider {
+	if apiBase == "" {
+		apiBase = "https://api.oneapi.icu/v1"
+	}
+	if model == "" {
+		model = "gpt-3.5-turbo"
+	}
+	return &OneAPIProvider{
+		BaseProvider: NewBaseProvider("oneapi", apiKey, apiBase, model),
+	}
+}
+
+// Chat 实现 Chat 方法
+func (p *OneAPIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.sendRequest(ctx, httpReq)
+}
+
+// ============ OpenAI Compatible Provider 通用模板 ============
+
+// OpenAICompatibleProvider 通用的 OpenAI 兼容 Provider
+// 支持任何实现了 OpenAI ChatCompletions API 的服务
+type OpenAICompatibleProvider struct {
+	*BaseProvider
+	ExtraHeaders map[string]string // 额外的请求头
+}
+
+// NewOpenAICompatibleProvider 创建 OpenAI 兼容 Provider
+func NewOpenAICompatibleProvider(name, apiKey, apiBase, model string) *OpenAICompatibleProvider {
+	if apiBase == "" {
+		apiBase = "http://localhost:8000/v1"
+	}
+	if model == "" {
+		model = "gpt-3.5-turbo"
+	}
+	return &OpenAICompatibleProvider{
+		BaseProvider: NewBaseProvider(name, apiKey, apiBase, model),
+		ExtraHeaders: make(map[string]string),
+	}
+}
+
+// SetHeader 设置额外的请求头
+func (p *OpenAICompatibleProvider) SetHeader(key, value string) {
+	p.ExtraHeaders[key] = value
+}
+
+// Chat 实现 Chat 方法
+func (p *OpenAICompatibleProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	httpReq, err := p.buildRequest(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 添加额外的请求头
+	for key, value := range p.ExtraHeaders {
+		httpReq.Header.Set(key, value)
+	}
+
+	return p.sendRequest(ctx, httpReq)
+}
