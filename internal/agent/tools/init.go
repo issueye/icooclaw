@@ -108,6 +108,20 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 		logger.Debug("Registered tool: message")
 	}
 
+	// 注册 Grep 搜索工具
+	if toolConfig.AllowedRead {
+		registry.Register(NewGrepTool(toolConfig))
+		logger.Debug("Registered tool: grep")
+		registry.Register(NewFindTool(toolConfig))
+		logger.Debug("Registered tool: find")
+		registry.Register(NewTreeTool(toolConfig))
+		logger.Debug("Registered tool: tree")
+		registry.Register(NewReadPartTool(toolConfig))
+		logger.Debug("Registered tool: read_part")
+		registry.Register(NewLineCountTool(toolConfig))
+		logger.Debug("Registered tool: wc")
+	}
+
 	logger.Info("Tools initialized", "count", registry.Count())
 
 	return registry

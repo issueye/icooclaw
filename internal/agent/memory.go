@@ -18,6 +18,8 @@ type MemoryConfig struct {
 	SummaryEnabled         bool `mapstructure:"summary_enabled"`
 	AutoSave               bool `mapstructure:"auto_save"`
 	MaxMemoryAge           int  `mapstructure:"max_memory_age"`
+	MaxSessionMemories     int  `mapstructure:"max_session_memories"`
+	MaxUserMemories        int  `mapstructure:"max_user_memories"`
 }
 
 // MemoryStore 长期记忆系统
@@ -32,6 +34,33 @@ type MemoryStore struct {
 	lastConsolidation    map[uint]time.Time // session ID -> last consolidation time
 }
 
+// SessionMemory 会话级别记忆
+type SessionMemory struct {
+	SessionID uint
+	Key       string
+	Content   string
+	Tags      []string
+}
+
+// UserMemory 用户级别记忆
+type UserMemory struct {
+	UserID    string
+	Key       string
+	Content   string
+	Tags      []string
+}
+
+// MemoryStats 记忆统计
+type MemoryStats struct {
+	Total       int64 `json:"total"`
+	Memory      int64 `json:"memory"`
+	History     int64 `json:"history"`
+	Session     int64 `json:"session"`
+	User        int64 `json:"user"`
+	Pinned      int64 `json:"pinned"`
+	Expired     int64 `json:"expired"`
+}
+
 // NewMemoryStore 创建记忆存储
 func NewMemoryStoreWithConfig(storage *storage.Storage, logger *slog.Logger, cfg MemoryConfig) *MemoryStore {
 	if cfg.ConsolidationThreshold == 0 {
@@ -39,6 +68,12 @@ func NewMemoryStoreWithConfig(storage *storage.Storage, logger *slog.Logger, cfg
 	}
 	if cfg.MaxMemoryAge == 0 {
 		cfg.MaxMemoryAge = 30
+	}
+	if cfg.MaxSessionMemories == 0 {
+		cfg.MaxSessionMemories = 100
+	}
+	if cfg.MaxUserMemories == 0 {
+		cfg.MaxUserMemories = 500
 	}
 
 	return &MemoryStore{
@@ -48,6 +83,16 @@ func NewMemoryStoreWithConfig(storage *storage.Storage, logger *slog.Logger, cfg
 		sessionMessageCounts: make(map[uint]int),
 		lastConsolidation:    make(map[uint]time.Time),
 	}
+}
+
+// NewMemoryStore 创建记忆存储（兼容旧接口）
+func NewMemoryStore(storage *storage.Storage, logger *slog.Logger) *MemoryStore {
+	return NewMemoryStoreWithConfig(storage, logger, MemoryConfig{
+		ConsolidationThreshold: 50,
+		MaxMemoryAge:           30,
+		MaxSessionMemories:     100,
+		MaxUserMemories:        500,
+	})
 }
 
 // Load 加载记忆
@@ -424,4 +469,319 @@ func (m *MemoryStore) GetContextualMemory(sessionID uint, userID string) (*Conte
 	}
 
 	return &ctx, nil
+}
+
+// SaveSessionMemory 保存会话级别记忆
+func (m *MemoryStore) SaveSessionMemory(sessionID uint, key, content string, tags ...string) error {
+	sessionIDPtr := &sessionID
+	memory := &storage.Memory{
+		Type:      "session",
+		Key:       fmt.Sprintf("session_%d_%s", sessionID, key),
+		Content:   content,
+		SessionID: sessionIDPtr,
+		Tags:      "," + strings.Join(tags, ",") + ",",
+	}
+	return m.storage.CreateMemory(memory)
+}
+
+// GetSessionMemories 获取会话级别记忆
+func (m *MemoryStore) GetSessionMemories(sessionID uint) ([]storage.Memory, error) {
+	return m.storage.GetMemoriesBySessionID(sessionID)
+}
+
+// SaveUserMemory 保存用户级别记忆
+func (m *MemoryStore) SaveUserMemory(userID, key, content string, tags ...string) error {
+	memory := &storage.Memory{
+		Type:     "user",
+		Key:      fmt.Sprintf("user_%s_%s", userID, key),
+		Content:  content,
+		UserID:   userID,
+		Tags:     "," + strings.Join(tags, ",") + ",",
+	}
+	return m.storage.CreateMemory(memory)
+}
+
+// GetUserMemories 获取用户级别记忆
+func (m *MemoryStore) GetUserMemories(userID string) ([]storage.Memory, error) {
+	return m.storage.GetMemoriesByUserID(userID)
+}
+
+// SavePinnedMemory 保存置顶记忆
+func (m *MemoryStore) SavePinnedMemory(key, content string) error {
+	memory := &storage.Memory{
+		Type:       "memory",
+		Key:        key,
+		Content:    content,
+		IsPinned:   true,
+		Importance: 10,
+	}
+	return m.storage.CreateMemory(memory)
+}
+
+// GetPinnedMemories 获取所有置顶记忆
+func (m *MemoryStore) GetPinnedMemories() ([]storage.Memory, error) {
+	return m.storage.GetPinnedMemories()
+}
+
+// DeleteSessionMemory 删除会话记忆
+func (m *MemoryStore) DeleteSessionMemory(sessionID uint, key string) error {
+	fullKey := fmt.Sprintf("session_%d_%s", sessionID, key)
+	memory, err := m.storage.GetMemoryByKey(fullKey)
+	if err != nil {
+		return err
+	}
+	return m.storage.SoftDeleteMemory(memory.ID)
+}
+
+// DeleteUserMemory 删除用户记忆
+func (m *MemoryStore) DeleteUserMemory(userID, key string) error {
+	fullKey := fmt.Sprintf("user_%s_%s", userID, key)
+	memory, err := m.storage.GetMemoryByKey(fullKey)
+	if err != nil {
+		return err
+	}
+	return m.storage.SoftDeleteMemory(memory.ID)
+}
+
+// ClearSessionMemories 清除会话所有记忆
+func (m *MemoryStore) ClearSessionMemories(sessionID uint) error {
+	return m.storage.ClearSessionMemories(sessionID)
+}
+
+// ClearUserMemories 清除用户所有记忆
+func (m *MemoryStore) ClearUserMemories(userID string) error {
+	return m.storage.ClearUserMemories(userID)
+}
+
+// GetDetailedMemoryStats 获取详细记忆统计信息
+func (m *MemoryStore) GetDetailedMemoryStats() (*MemoryStats, error) {
+	stats := &MemoryStats{}
+
+	// 统计总数
+	memories, err := m.storage.GetAllMemories()
+	if err != nil {
+		return nil, err
+	}
+
+	// 过滤未删除的记忆
+	var validMemories []storage.Memory
+	for _, mem := range memories {
+		if !mem.IsDeleted {
+			validMemories = append(validMemories, mem)
+		}
+	}
+
+	stats.Total = int64(len(validMemories))
+
+	// 按类型统计
+	for _, mem := range validMemories {
+		switch mem.Type {
+		case "memory":
+			stats.Memory++
+		case "history":
+			stats.History++
+		case "session":
+			stats.Session++
+		case "user":
+			stats.User++
+		}
+		if mem.IsPinned {
+			stats.Pinned++
+		}
+	}
+
+	// 统计过期记忆
+	expired, err := m.storage.GetExpiredMemories()
+	if err == nil {
+		stats.Expired = int64(len(expired))
+	}
+
+	return stats, nil
+}
+
+// SearchWithFilters 带过滤条件的搜索
+func (m *MemoryStore) SearchWithFilters(query string, memType string, sessionID *uint, userID string, tags []string, limit int) ([]storage.Memory, error) {
+	// 基础搜索
+	memories, err := m.storage.SearchMemories(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 过滤结果
+	var filtered []storage.Memory
+	for _, mem := range memories {
+		// 类型过滤
+		if memType != "" && mem.Type != memType {
+			continue
+		}
+		// 会话过滤
+		if sessionID != nil && (mem.SessionID == nil || *mem.SessionID != *sessionID) {
+			continue
+		}
+		// 用户过滤
+		if userID != "" && mem.UserID != userID {
+			continue
+		}
+		// 标签过滤
+		if len(tags) > 0 {
+			memTags := mem.GetTags()
+			hasTag := false
+			for _, tag := range tags {
+				for _, memTag := range memTags {
+					if tag == memTag {
+						hasTag = true
+						break
+					}
+				}
+				if hasTag {
+					break
+				}
+			}
+			if !hasTag {
+				continue
+			}
+		}
+		filtered = append(filtered, mem)
+	}
+
+	// 限制数量
+	if limit > 0 && len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+
+	return filtered, nil
+}
+
+// CleanupExpiredMemories 清理过期记忆
+func (m *MemoryStore) CleanupExpiredMemories() (int, error) {
+	expired, err := m.storage.GetExpiredMemories()
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, mem := range expired {
+		if err := m.storage.SoftDeleteMemory(mem.ID); err != nil {
+			m.logger.Warn("Failed to delete expired memory", "id", mem.ID, "error", err)
+			continue
+		}
+		count++
+	}
+
+	m.logger.Info("Cleaned up expired memories", "count", count)
+	return count, nil
+}
+
+// EnforceSessionLimit 强制会话记忆数量限制
+func (m *MemoryStore) EnforceSessionLimit(sessionID uint) error {
+	memories, err := m.storage.GetMemoriesBySessionID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	if len(memories) > m.config.MaxSessionMemories {
+		// 删除最旧的非置顶记忆
+		var toDelete []uint
+		for _, mem := range memories {
+			if !mem.IsPinned {
+				toDelete = append(toDelete, mem.ID)
+				if len(memories)-len(toDelete) <= m.config.MaxSessionMemories {
+					break
+				}
+			}
+		}
+		if len(toDelete) > 0 {
+			return m.storage.BatchDeleteMemories(toDelete)
+		}
+	}
+	return nil
+}
+
+// EnforceUserLimit 强制用户记忆数量限制
+func (m *MemoryStore) EnforceUserLimit(userID string) error {
+	memories, err := m.storage.GetMemoriesByUserID(userID)
+	if err != nil {
+		return err
+	}
+
+	if len(memories) > m.config.MaxUserMemories {
+		// 删除最旧的非置顶记忆
+		var toDelete []uint
+		for _, mem := range memories {
+			if !mem.IsPinned {
+				toDelete = append(toDelete, mem.ID)
+				if len(memories)-len(toDelete) <= m.config.MaxUserMemories {
+					break
+				}
+			}
+		}
+		if len(toDelete) > 0 {
+			return m.storage.BatchDeleteMemories(toDelete)
+		}
+	}
+	return nil
+}
+
+// StartCleanupScheduler 启动定期清理调度器
+func (m *MemoryStore) StartCleanupScheduler(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				// 清理过期记忆
+				if _, err := m.CleanupExpiredMemories(); err != nil {
+					m.logger.Error("Failed to cleanup expired memories", "error", err)
+				}
+				// 清理旧历史
+				before := time.Now().AddDate(0, 0, -m.config.MaxMemoryAge)
+				if err := m.CleanOldHistory(before); err != nil {
+					m.logger.Error("Failed to clean old history", "error", err)
+				}
+			}
+		}
+	}()
+}
+
+// GetRelevantMemoriesForSession 获取会话相关记忆
+func (m *MemoryStore) GetRelevantMemoriesForSession(sessionID uint, query string, limit int) ([]string, error) {
+	// 1. 获取会话级别记忆
+	sessionMemories, err := m.storage.GetMemoriesBySessionID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 搜索相关内容
+	searchResults, err := m.storage.SearchMemories(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. 合并结果，优先使用会话级别记忆
+	var results []string
+
+	// 添加会话记忆
+	for _, mem := range sessionMemories {
+		if !mem.IsDeleted {
+			results = append(results, fmt.Sprintf("[会话记忆] %s", mem.Content))
+		}
+	}
+
+	// 添加搜索结果
+	for _, mem := range searchResults {
+		if !mem.IsDeleted && mem.Type != "session" {
+			results = append(results, fmt.Sprintf("[%s] %s", mem.Type, mem.Content))
+		}
+	}
+
+	// 限制数量
+	if limit > 0 && len(results) > limit {
+		results = results[:limit]
+	}
+
+	return results, nil
 }

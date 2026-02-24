@@ -2,9 +2,11 @@ package storage
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
-	"gorm.io/driver/sqlite"
+	sqlite "github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -14,9 +16,24 @@ var DB *gorm.DB
 
 // InitDB 初始化数据库
 func InitDB(dsn string) (*gorm.DB, error) {
+	// 确保数据库目录存在
+	dbPath := dsn
+	if !filepath.IsAbs(dsn) {
+		absPath, err := filepath.Abs(dsn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get absolute path: %w", err)
+		}
+		dbPath = absPath
+	}
+
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	}
+
 	var err error
 
-	DB, err = gorm.Open(sqlite.Open(dsn), &gorm.Config{
+	DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
