@@ -1,0 +1,70 @@
+# icooclaw 配置文件示例
+
+[database]
+path = "./data/icooclaw.db"
+
+[log]
+level = "info"
+format = "text"
+
+workspace = "~/.icooclaw/workspace"
+
+# OpenRouter 配置 (推荐用于 Claude, GPT 等多种模型)
+[providers.openrouter]
+enabled = true
+api_key = "sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+model = "anthropic/claude-sonnet-4-20250514"
+
+# OpenAI 配置
+[providers.openai]
+enabled = false
+api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+model = "gpt-4o"
+
+# Anthropic 配置
+[providers.anthropic]
+enabled = false
+api_key = "sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+model = "claude-sonnet-4-20250514"
+
+# DeepSeek 配置
+[providers.deepseek]
+enabled = false
+api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+model = "deepseek-chat"
+
+# Custom Provider (用于本地模型如 vLLM, LM Studio, Ollama 等)
+[providers.custom]
+enabled = false
+api_key = "no-key"
+api_base = "http://localhost:8000/v1"
+model = "qwen2.5"
+
+# Agent 默认配置
+[agents.defaults]
+name = "icooclaw"
+model = "anthropic/claude-sonnet-4-20250514"
+temperature = 0.7
+max_tokens = 4096
+memory_window = 10
+system_prompt = "You are a helpful AI assistant."
+
+# 默认 Provider 名称
+agents.default_provider = "openrouter"
+
+# WebSocket 通道配置
+[channels.websocket]
+enabled = false
+host = "0.0.0.0"
+port = 8080
+
+# 工具配置
+[tools]
+enabled = true
+allow_file_read = true
+allow_file_write = true
+allow_file_edit = true
+allow_file_delete = true
+allow_exec = false  # 默认关闭，需要手动开启以保证安全
+workspace = "~/.icooclaw/workspace"
+exec_timeout = 30  # Shell命令超时时间（秒）
