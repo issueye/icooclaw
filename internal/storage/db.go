@@ -34,7 +34,7 @@ func InitDB(dsn string) (*gorm.DB, error) {
 	var err error
 
 	DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Debug),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect database: %w", err)

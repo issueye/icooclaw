@@ -1,2 +1,4 @@
 nanobot/*
 *.exe
+config.toml
+*.db

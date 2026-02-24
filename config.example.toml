@@ -40,6 +40,26 @@ api_key = "no-key"
 api_base = "http://localhost:8000/v1"
 model = "qwen2.5"
 
+# OpenAI 兼容 Provider (支持额外请求头，可配置多个)
+# 使用 [[providers.compatible]] 数组语法
+[[providers.compatible]]
+enabled = false
+name = "local-llm"                     # Provider 名称
+api_key = "no-key"                    # API 密钥
+api_base = "http://localhost:8000/v1" # API 基础地址
+model = "qwen2.5"                     # 默认模型
+[providers.compatible.headers]        # 额外请求头（可选）
+# X-Custom-Header = "value"
+
+[[providers.compatible]]
+enabled = false
+name = "custom-api"
+api_key = "sk-xxxxxxxxxxxxxxxx"
+api_base = "https://api.example.com/v1"
+model = "gpt-4"
+[providers.compatible.headers]
+# X-API-Version = "2024-01"
+
 # Agent 默认配置
 [agents.defaults]
 name = "icooclaw"
