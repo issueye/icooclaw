@@ -89,6 +89,9 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 
 		l.logger.Debug("Sending request to LLM", "iteration", iteration, "message_count", len(messages))
 
+		// 记录发送给 LLM 的完整请求
+		l.logLLMRequest(iteration, req, systemPrompt)
+
 		// 调用LLM
 		var content string
 		var toolCalls []provider.ToolCall
@@ -178,6 +181,9 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 			reasoningContent = choice.Message.ReasoningContent
 		}
 
+		// 记录 LLM 响应
+		l.logLLMResponse(iteration, content, toolCalls, reasoningContent)
+
 		// 检查 finish reason
 		if len(toolCalls) == 0 && (l.onChunk == nil || content != "") {
 			l.logger.Info("Agent loop completed", "iterations", iteration+1)
@@ -204,6 +210,10 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 					},
 				}
 				result := l.agent.Tools().Execute(ctx, toolCall)
+
+				// 记录工具执行
+				l.logToolExecution(call.Function.Name, call.Function.Arguments, result)
+
 				var resultContent string
 				if result.Error != nil {
 					resultContent = fmt.Sprintf("Error: %v", result.Error)
@@ -236,4 +246,59 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 	}
 
 	return "", nil, fmt.Errorf("max iterations exceeded")
+}
+
+// logLLMRequest 记录发送给 LLM 的请求
+func (l *Loop) logLLMRequest(iteration int, req provider.ChatRequest, systemPrompt string) {
+	messagesJSON, _ := json.MarshalIndent(req.Messages, "", "  ")
+	toolsJSON, _ := json.MarshalIndent(req.Tools, "", "  ")
+
+	l.logger.Info("=== LLM Request ===",
+		"iteration", iteration,
+		"model", req.Model,
+		"temperature", req.Temperature,
+		"max_tokens", req.MaxTokens,
+		"message_count", len(req.Messages),
+		"tool_count", len(req.Tools))
+
+	l.logger.Debug("System Prompt", "content", systemPrompt)
+	l.logger.Debug("Messages", "messages", string(messagesJSON))
+	if len(req.Tools) > 0 {
+		l.logger.Debug("Tools", "tools", string(toolsJSON))
+	}
+}
+
+// logLLMResponse 记录 LLM 的响应
+func (l *Loop) logLLMResponse(iteration int, content string, toolCalls []provider.ToolCall, reasoningContent string) {
+	l.logger.Info("=== LLM Response ===",
+		"iteration", iteration,
+		"content_length", len(content),
+		"tool_call_count", len(toolCalls),
+		"reasoning_length", len(reasoningContent))
+
+	if content != "" {
+		l.logger.Debug("Response Content", "content", content)
+	}
+	if reasoningContent != "" {
+		l.logger.Debug("Reasoning Content", "reasoning", reasoningContent)
+	}
+	if len(toolCalls) > 0 {
+		toolCallsJSON, _ := json.MarshalIndent(toolCalls, "", "  ")
+		l.logger.Debug("Tool Calls", "tool_calls", string(toolCallsJSON))
+	}
+}
+
+// logToolExecution 记录工具执行
+func (l *Loop) logToolExecution(toolName string, arguments string, result tools.ToolResult) {
+	l.logger.Info("=== Tool Execution ===",
+		"tool_name", toolName,
+		"tool_call_id", result.ToolCallID,
+		"has_error", result.Error != nil)
+
+	l.logger.Debug("Tool Arguments", "arguments", arguments)
+	if result.Error != nil {
+		l.logger.Debug("Tool Error", "error", result.Error.Error())
+	} else {
+		l.logger.Debug("Tool Result", "result", result.Content)
+	}
 }

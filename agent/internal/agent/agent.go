@@ -150,7 +150,11 @@ func (a *Agent) Run(ctx context.Context, messageBus *bus.MessageBus) {
 
 // handleMessage 处理消息
 func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
-	a.logger.Info("Handling message", "channel", msg.Channel, "chat_id", msg.ChatID, "content", msg.Content)
+	a.logger.Info("Handling message",
+		"channel", msg.Channel,
+		"chat_id", msg.ChatID,
+		"user_id", msg.UserID,
+		"content", msg.Content)
 
 	// 获取或创建会话
 	session, err := a.storage.GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)

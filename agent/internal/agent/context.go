@@ -32,11 +32,18 @@ func (cb *ContextBuilder) Build(ctx context.Context) ([]provider.Message, string
 	// 1. 获取系统提示词
 	systemPrompt := cb.buildSystemPrompt()
 
+	// 记录系统提示词
+	cb.logger.Debug("=== System Prompt ===", "content", systemPrompt)
+
 	// 2. 获取历史消息
 	messages, err := cb.buildMessages()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to build messages: %w", err)
 	}
+
+	// 记录历史消息
+	messagesJSON, _ := json.MarshalIndent(messages, "", "  ")
+	cb.logger.Debug("=== Context Messages ===", "count", len(messages), "messages", string(messagesJSON))
 
 	return messages, systemPrompt, nil
 }
