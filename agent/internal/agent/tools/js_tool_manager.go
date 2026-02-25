@@ -40,12 +40,64 @@ func (t *CreateJSTool) Name() string {
 func (t *CreateJSTool) Description() string {
 	return `动态创建新的 JavaScript 工具。使用此工具可以在运行时创建新的工具并立即使用。
 
-创建的工具将保存在工作区的 tools 目录中，并在后续会话中自动加载。
+## 内置对象
 
-使用示例:
+脚本中可以使用以下内置对象：
+
+### console - 控制台输出
+- console.log(...args) - 输出信息
+- console.info(...args) - 输出信息
+- console.debug(...args) - 输出调试信息
+- console.warn(...args) - 输出警告
+- console.error(...args) - 输出错误
+- console.table(data) - 表格形式输出
+
+### JSON - JSON 操作
+- JSON.stringify(obj) - 对象转字符串
+- JSON.parse(str) - 字符串转对象
+- JSON.pretty(obj) - 格式化输出
+
+### Base64 - 编码解码
+- Base64.encode(str) - Base64 编码
+- Base64.decode(str) - Base64 解码
+
+### fs - 文件系统（需要设置 permissions.fileRead/fileWrite/fileDelete）
+- fs.readFile(path) - 读取文件内容
+- fs.writeFile(path, content) - 写入文件
+- fs.appendFile(path, content) - 追加内容
+- fs.exists(path) - 检查文件是否存在
+- fs.deleteFile(path) - 删除文件
+- fs.mkdir(path) - 创建目录
+- fs.rmdir(path) - 删除目录
+- fs.listDir(path) - 列出目录内容
+- fs.copyFile(src, dst) - 复制文件
+- fs.moveFile(src, dst) - 移动文件
+
+### http - HTTP 客户端（需要设置 permissions.network）
+- http.get(url) - GET 请求
+- http.post(url, body) - POST 请求
+- http.postJSON(url, body) - POST JSON 请求
+- http.request(method, url, body, headers) - 自定义请求
+- http.download(url, savePath) - 下载文件
+
+### shell - 命令执行（需要设置 permissions.exec）
+- shell.exec(command) - 执行命令
+- shell.execWithTimeout(command, timeout) - 带超时执行
+- shell.execInDir(command, workDir) - 在指定目录执行
+
+### utils - 工具函数
+- utils.now() - 当前时间字符串
+- utils.timestamp() - 当前时间戳
+- utils.formatTime(ts, layout) - 格式化时间
+- utils.sleep(ms) - 休眠毫秒
+- utils.env(key) - 获取环境变量
+- utils.cwd() - 当前工作目录
+
+## 使用示例
 - 创建一个简单的问候工具
 - 创建一个数据转换工具
-- 创建一个 API 调用包装工具`
+- 创建一个 API 调用包装工具
+- 创建一个文件处理工具`
 }
 
 // Parameters 获取参数定义
@@ -68,6 +120,32 @@ func (t *CreateJSTool) Parameters() map[string]interface{} {
 			"code": map[string]interface{}{
 				"type":        "string",
 				"description": "JavaScript 执行函数代码。必须定义 execute(params) 函数，params 为参数对象，返回字符串结果。",
+			},
+			"permissions": map[string]interface{}{
+				"type":        "object",
+				"description": "工具权限配置，控制脚本可以访问的功能",
+				"properties": map[string]interface{}{
+					"fileRead": map[string]interface{}{
+						"type":        "boolean",
+						"description": "允许读取文件，可使用 fs.readFile、fs.exists 等",
+					},
+					"fileWrite": map[string]interface{}{
+						"type":        "boolean",
+						"description": "允许写入文件，可使用 fs.writeFile、fs.appendFile 等",
+					},
+					"fileDelete": map[string]interface{}{
+						"type":        "boolean",
+						"description": "允许删除文件，可使用 fs.deleteFile、fs.rmdir 等",
+					},
+					"network": map[string]interface{}{
+						"type":        "boolean",
+						"description": "允许网络访问，可使用 http.get、http.post 等",
+					},
+					"exec": map[string]interface{}{
+						"type":        "boolean",
+						"description": "允许执行命令，可使用 shell.exec 等",
+					},
+				},
 			},
 			"overwrite": map[string]interface{}{
 				"type":        "boolean",
@@ -100,6 +178,9 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 		overwrite = ow
 	}
 
+	// 解析权限配置
+	permissions := parsePermissions(params["permissions"])
+
 	// 验证名称
 	if err := validateToolName(name); err != nil {
 		return "", err
@@ -120,7 +201,7 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 	}
 
 	// 生成完整的工具脚本
-	script := generateToolScript(name, description, parameters, code)
+	script := generateToolScript(name, description, parameters, code, permissions)
 
 	// 确保工具目录存在
 	toolsDir := filepath.Join(t.config.Workspace, t.config.ToolsDir)
@@ -142,9 +223,16 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 	// 动态注册工具
 	if t.config.Registry != nil {
 		jsConfig := &JSToolConfig{
-			Workspace: t.config.Workspace,
-			MaxMemory: 10 * 1024 * 1024,
-			Timeout:   30,
+			Workspace:       t.config.Workspace,
+			MaxMemory:       10 * 1024 * 1024,
+			Timeout:         30,
+			AllowFileRead:   permissions.FileRead,
+			AllowFileWrite:  permissions.FileWrite,
+			AllowFileDelete: permissions.FileDelete,
+			AllowNetwork:    permissions.Network,
+			AllowExec:       permissions.Exec,
+			ExecTimeout:     30,
+			HTTPTimeout:     30,
 		}
 
 		loader := NewJSToolLoader(jsConfig, nil)
@@ -160,16 +248,72 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 		t.config.mu.Unlock()
 	}
 
+	// 构建权限说明
+	var permDesc []string
+	if permissions.FileRead {
+		permDesc = append(permDesc, "fileRead")
+	}
+	if permissions.FileWrite {
+		permDesc = append(permDesc, "fileWrite")
+	}
+	if permissions.FileDelete {
+		permDesc = append(permDesc, "fileDelete")
+	}
+	if permissions.Network {
+		permDesc = append(permDesc, "network")
+	}
+	if permissions.Exec {
+		permDesc = append(permDesc, "exec")
+	}
+
 	result := map[string]interface{}{
-		"success": true,
-		"name":    name,
-		"file":    scriptPath,
-		"message": fmt.Sprintf("Tool '%s' created successfully and is now available for use", name),
-		"usage":   fmt.Sprintf("You can now use the tool '%s' in subsequent requests", name),
+		"success":     true,
+		"name":        name,
+		"file":        scriptPath,
+		"message":     fmt.Sprintf("Tool '%s' created successfully and is now available for use", name),
+		"usage":       fmt.Sprintf("You can now use the tool '%s' in subsequent requests", name),
+		"permissions": permDesc,
 	}
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return string(resultJSON), nil
+}
+
+// toolPermissions 工具权限
+type toolPermissions struct {
+	FileRead   bool
+	FileWrite  bool
+	FileDelete bool
+	Network    bool
+	Exec       bool
+}
+
+// parsePermissions 解析权限配置
+func parsePermissions(v interface{}) toolPermissions {
+	perms := toolPermissions{}
+	if v == nil {
+		return perms
+	}
+
+	if m, ok := v.(map[string]interface{}); ok {
+		if val, ok := m["fileRead"].(bool); ok {
+			perms.FileRead = val
+		}
+		if val, ok := m["fileWrite"].(bool); ok {
+			perms.FileWrite = val
+		}
+		if val, ok := m["fileDelete"].(bool); ok {
+			perms.FileDelete = val
+		}
+		if val, ok := m["network"].(bool); ok {
+			perms.Network = val
+		}
+		if val, ok := m["exec"].(bool); ok {
+			perms.Exec = val
+		}
+	}
+
+	return perms
 }
 
 // ToDefinition 转换为工具定义
@@ -237,25 +381,25 @@ func validateJSCode(code string) error {
 		return fmt.Errorf("code must define an 'execute(params)' function")
 	}
 
-	// 危险模式检查
+	// 危险模式检查（移除 fs.、http. 等，因为这些现在由脚本引擎安全提供）
 	dangerousPatterns := []string{
 		"require(",
 		"import ",
 		"eval(",
-		"Function(",
+		"new Function(",
 		"process.",
 		"global.",
 		"__dirname",
 		"__filename",
 		"child_process",
-		"fs.",
-		"os.",
-		"net.",
-		"http.",
-		"https.",
-		"fetch(",
-		"XMLHttpRequest",
-		"WebSocket",
+		"os.Exit",
+		"os.Remove",
+		"os.Create",
+		"os.Open",
+		"os.Read",
+		"os.Write",
+		"net.Listen",
+		"net.Dial",
 	}
 
 	for _, pattern := range dangerousPatterns {
@@ -268,23 +412,55 @@ func validateJSCode(code string) error {
 }
 
 // generateToolScript 生成完整的工具脚本
-func generateToolScript(name, description string, parameters interface{}, code string) string {
+func generateToolScript(name, description string, parameters interface{}, code string, permissions toolPermissions) string {
 	paramsJSON, _ := json.MarshalIndent(parameters, "    ", "    ")
+
+	// 构建权限注释
+	var permLines []string
+	if permissions.FileRead {
+		permLines = append(permLines, " *   - fileRead: 允许读取文件")
+	}
+	if permissions.FileWrite {
+		permLines = append(permLines, " *   - fileWrite: 允许写入文件")
+	}
+	if permissions.FileDelete {
+		permLines = append(permLines, " *   - fileDelete: 允许删除文件")
+	}
+	if permissions.Network {
+		permLines = append(permLines, " *   - network: 允许网络访问")
+	}
+	if permissions.Exec {
+		permLines = append(permLines, " *   - exec: 允许执行命令")
+	}
+
+	permissionsComment := ""
+	if len(permLines) > 0 {
+		permissionsComment = "\n * 权限:\n" + strings.Join(permLines, "\n")
+	}
 
 	return fmt.Sprintf(`/**
  * 工具名称: %s
  * 描述: %s
- * 自动生成时间: 由 AI 动态创建
+ * 自动生成时间: 由 AI 动态创建%s
  */
 
 var tool = {
     name: "%s",
     description: "%s",
-    parameters: %s
+    parameters: %s,
+    permissions: {
+        fileRead: %v,
+        fileWrite: %v,
+        fileDelete: %v,
+        network: %v,
+        exec: %v
+    }
 };
 
 %s
-`, name, description, name, description, string(paramsJSON), code)
+`, name, description, permissionsComment, name, description, string(paramsJSON),
+		permissions.FileRead, permissions.FileWrite, permissions.FileDelete,
+		permissions.Network, permissions.Exec, code)
 }
 
 // ListJSToolsConfig 列出 JS 工具的配置

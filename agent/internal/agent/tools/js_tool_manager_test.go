@@ -295,7 +295,8 @@ func TestValidateJSCode(t *testing.T) {
 		{"has require", "function execute(params) { require('fs'); }", true},
 		{"has eval", "function execute(params) { eval('code'); }", true},
 		{"has process", "function execute(params) { process.exit(); }", true},
-		{"has fetch", "function execute(params) { fetch('url'); }", true},
+		{"has os.Exit", "function execute(params) { os.Exit(1); }", true},
+		{"has import", "function execute(params) { import fs from 'fs'; }", true},
 	}
 
 	for _, tt := range tests {
@@ -323,10 +324,13 @@ func TestGenerateToolScript(t *testing.T) {
 			},
 		},
 		"function execute(params) { return params.input; }",
+		toolPermissions{FileRead: true, Network: true},
 	)
 
 	assert.Contains(t, script, "test_tool")
 	assert.Contains(t, script, "A test tool")
 	assert.Contains(t, script, "function execute")
 	assert.Contains(t, script, "var tool =")
+	assert.Contains(t, script, "fileRead: true")
+	assert.Contains(t, script, "network: true")
 }

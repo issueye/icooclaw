@@ -10,13 +10,22 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"github.com/icooclaw/icooclaw/internal/script"
 )
 
 // JSToolConfig JavaScript 工具配置
 type JSToolConfig struct {
-	Workspace string
-	MaxMemory int64
-	Timeout   int
+	Workspace       string
+	MaxMemory       int64
+	Timeout         int
+	AllowFileRead   bool
+	AllowFileWrite  bool
+	AllowFileDelete bool
+	AllowExec       bool
+	AllowNetwork    bool
+	ExecTimeout     int
+	HTTPTimeout     int
+	AllowedDomains  []string
 }
 
 // JSTool JavaScript 工具
@@ -26,8 +35,10 @@ type JSTool struct {
 	parameters  map[string]interface{}
 	script      string
 	vm          *goja.Runtime
+	engine      *script.Engine
 	config      *JSToolConfig
 	logger      *slog.Logger
+	useEngine   bool
 }
 
 // JSToolDefinition JS 工具定义（从脚本中解析）
@@ -35,7 +46,17 @@ type JSToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Parameters  map[string]interface{} `json:"parameters"`
+	Permissions *JSToolPermissions     `json:"permissions"`
 	Execute     string                 `json:"execute"`
+}
+
+// JSToolPermissions JS 工具权限
+type JSToolPermissions struct {
+	FileRead   bool `json:"fileRead"`
+	FileWrite  bool `json:"fileWrite"`
+	FileDelete bool `json:"fileDelete"`
+	Network    bool `json:"network"`
+	Exec       bool `json:"exec"`
 }
 
 // NewJSTool 创建 JavaScript 工具
@@ -50,31 +71,64 @@ func NewJSTool(def JSToolDefinition, config *JSToolConfig, logger *slog.Logger) 
 		logger = slog.Default()
 	}
 
-	vm := goja.New()
-	vm.SetMaxCallStackSize(100)
-	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+	// 从工具定义中获取权限配置
+	if def.Permissions != nil {
+		config.AllowFileRead = def.Permissions.FileRead
+		config.AllowFileWrite = def.Permissions.FileWrite
+		config.AllowFileDelete = def.Permissions.FileDelete
+		config.AllowNetwork = def.Permissions.Network
+		config.AllowExec = def.Permissions.Exec
+	}
+
+	// 检查是否需要增强功能
+	useEngine := config.AllowFileRead || config.AllowFileWrite || config.AllowFileDelete ||
+		config.AllowExec || config.AllowNetwork
 
 	tool := &JSTool{
 		name:        def.Name,
 		description: def.Description,
 		parameters:  def.Parameters,
 		script:      def.Execute,
-		vm:          vm,
 		config:      config,
 		logger:      logger,
+		useEngine:   useEngine,
 	}
 
-	tool.setupEnvironment()
+	if useEngine {
+		// 使用增强脚本引擎
+		engineConfig := &script.Config{
+			Workspace:       config.Workspace,
+			AllowFileRead:   config.AllowFileRead,
+			AllowFileWrite:  config.AllowFileWrite,
+			AllowFileDelete: config.AllowFileDelete,
+			AllowExec:       config.AllowExec,
+			AllowNetwork:    config.AllowNetwork,
+			ExecTimeout:     config.ExecTimeout,
+			HTTPTimeout:     config.HTTPTimeout,
+			MaxMemory:       config.MaxMemory,
+			AllowedDomains:  config.AllowedDomains,
+		}
+		engine := script.NewEngine(engineConfig, logger.With("tool", def.Name))
+		tool.engine = engine
+		tool.vm = engine.GetVM()
+	} else {
+		// 使用基础模式
+		vm := goja.New()
+		vm.SetMaxCallStackSize(100)
+		vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+		tool.vm = vm
+		tool.setupBasicEnvironment()
+	}
 
-	if _, err := vm.RunString(tool.script); err != nil {
+	if _, err := tool.vm.RunString(tool.script); err != nil {
 		return nil, fmt.Errorf("failed to compile script: %w", err)
 	}
 
 	return tool, nil
 }
 
-// setupEnvironment 设置 JS 运行环境
-func (t *JSTool) setupEnvironment() {
+// setupBasicEnvironment 设置基础 JS 运行环境（无增强功能）
+func (t *JSTool) setupBasicEnvironment() {
 	console := &jsConsole{logger: t.logger.With("tool", t.name)}
 	t.vm.Set("console", console)
 
@@ -292,6 +346,25 @@ func (l *JSToolLoader) parseScript(script string) (JSToolDefinition, error) {
 		}
 		if params, ok := m["parameters"].(map[string]interface{}); ok {
 			def.Parameters = params
+		}
+		// 解析权限配置
+		if perms, ok := m["permissions"].(map[string]interface{}); ok {
+			def.Permissions = &JSToolPermissions{}
+			if v, ok := perms["fileRead"].(bool); ok {
+				def.Permissions.FileRead = v
+			}
+			if v, ok := perms["fileWrite"].(bool); ok {
+				def.Permissions.FileWrite = v
+			}
+			if v, ok := perms["fileDelete"].(bool); ok {
+				def.Permissions.FileDelete = v
+			}
+			if v, ok := perms["network"].(bool); ok {
+				def.Permissions.Network = v
+			}
+			if v, ok := perms["exec"].(bool); ok {
+				def.Permissions.Exec = v
+			}
 		}
 	}
 
