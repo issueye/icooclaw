@@ -67,12 +67,12 @@
           <span class="flex-1 truncate">{{ session.title || "新对话" }}</span>
 
           <!-- 删除按钮 -->
-          <button
+          <span
             @click.stop="$emit('delete', session.id)"
-            class="opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#ef4444] p-0.5 rounded"
+            class="opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#ef4444] p-0.5 rounded cursor-pointer"
           >
             <Trash2Icon :size="12" />
-          </button>
+          </span>
         </button>
       </div>
 

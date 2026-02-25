@@ -265,8 +265,9 @@ func (c *WebSocketChannel) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/v1/skills", c.corsWrapper(c.handleRestSkills))
 	mux.HandleFunc("/api/v1/skills/", c.corsWrapper(c.handleRestSkillDetail))
 	mux.HandleFunc("/api/v1/health", c.corsWrapper(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		w.Write([]byte(`{"status":"ok"}`))
 	}))
 
 	c.server = &http.Server{
@@ -447,7 +448,7 @@ func (c *WebSocketChannel) processOutbound(ctx context.Context) {
 func (c *WebSocketChannel) corsWrapper(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {

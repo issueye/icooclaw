@@ -1,10 +1,10 @@
 // 聊天 Store - 使用 Pinia 管理聊天状态
 
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import api from '../services/api';
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import api from "../services/api";
 
-const STORAGE_KEY = 'icooclaw_chat_sessions';
+const STORAGE_KEY = "icooclaw_chat_sessions";
 
 function loadSessions() {
   try {
@@ -24,24 +24,26 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-export const useChatStore = defineStore('chat', () => {
+export const useChatStore = defineStore("chat", () => {
   // ===== 状态 =====
   const sessions = ref(loadSessions());
   const currentSessionId = ref(null);
   const isLoading = ref(false);
   const apiBase = ref(api.getApiBaseUrl());
-  const wsUrl = ref(localStorage.getItem('icooclaw_ws_url') || 'ws://localhost:8080/ws');
-  const userId = ref(localStorage.getItem('icooclaw_user_id') || 'user-1');
+  const wsUrl = ref(
+    localStorage.getItem("icooclaw_ws_url") || "ws://localhost:17100/ws",
+  );
+  const userId = ref(localStorage.getItem("icooclaw_user_id") || "user-1");
 
   // ===== 计算属性 =====
-  const currentSession = computed(() =>
-    sessions.value.find(s => s.id === currentSessionId.value) || null
+  const currentSession = computed(
+    () => sessions.value.find((s) => s.id === currentSessionId.value) || null,
   );
 
   const currentMessages = computed(() => currentSession.value?.messages || []);
 
   // ===== 会话操作 =====
-  function createSession(title = '新对话') {
+  function createSession(title = "新对话") {
     const session = {
       id: generateId(),
       chatId: generateId(),
@@ -62,7 +64,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function deleteSession(id) {
-    const idx = sessions.value.findIndex(s => s.id === id);
+    const idx = sessions.value.findIndex((s) => s.id === id);
     if (idx !== -1) {
       sessions.value.splice(idx, 1);
       saveSessions(sessions.value);
@@ -73,7 +75,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function updateSessionTitle(id, title) {
-    const session = sessions.value.find(s => s.id === id);
+    const session = sessions.value.find((s) => s.id === id);
     if (session) {
       session.title = title;
       session.updatedAt = Date.now();
@@ -87,7 +89,7 @@ export const useChatStore = defineStore('chat', () => {
 
     const msg = {
       id: generateId(),
-      role: 'user',
+      role: "user",
       content,
       timestamp: Date.now(),
     };
@@ -96,7 +98,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 自动更新标题
     if (currentSession.value.messages.length === 1) {
-      const title = content.slice(0, 30) + (content.length > 30 ? '...' : '');
+      const title = content.slice(0, 30) + (content.length > 30 ? "..." : "");
       updateSessionTitle(currentSession.value.id, title);
     }
 
@@ -109,8 +111,8 @@ export const useChatStore = defineStore('chat', () => {
 
     const msg = {
       id: generateId(),
-      role: 'assistant',
-      content: '',
+      role: "assistant",
+      content: "",
       timestamp: Date.now(),
       streaming: true,
     };
@@ -124,7 +126,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!currentSession.value) return;
     const msgs = currentSession.value.messages;
     const lastMsg = msgs[msgs.length - 1];
-    if (lastMsg && lastMsg.role === 'assistant') {
+    if (lastMsg && lastMsg.role === "assistant") {
       lastMsg.content += content;
       saveSessions(sessions.value);
     }
@@ -134,7 +136,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!currentSession.value) return;
     const msgs = currentSession.value.messages;
     const lastMsg = msgs[msgs.length - 1];
-    if (lastMsg && lastMsg.role === 'assistant') {
+    if (lastMsg && lastMsg.role === "assistant") {
       if (content !== undefined) lastMsg.content = content;
       lastMsg.streaming = false;
       saveSessions(sessions.value);
@@ -158,23 +160,23 @@ export const useChatStore = defineStore('chat', () => {
   function setApiBase(base) {
     apiBase.value = base;
     api.setApiBaseUrl(base);
-    localStorage.setItem('icooclaw_api_base', base);
+    localStorage.setItem("icooclaw_api_base", base);
   }
 
   function setWsUrl(url) {
     wsUrl.value = url;
-    localStorage.setItem('icooclaw_ws_url', url);
+    localStorage.setItem("icooclaw_ws_url", url);
   }
 
   function setUserId(id) {
     userId.value = id;
-    localStorage.setItem('icooclaw_user_id', id);
+    localStorage.setItem("icooclaw_user_id", id);
   }
 
   // ===== 初始化 =====
   // 确保有一个会话
   if (sessions.value.length === 0) {
-    createSession('新对话');
+    createSession("新对话");
   } else if (!currentSessionId.value) {
     currentSessionId.value = sessions.value[0].id;
   }

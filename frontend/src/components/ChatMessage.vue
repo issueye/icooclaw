@@ -17,7 +17,7 @@
 
     <!-- 消息内容 -->
     <div
-      class="flex flex-col max-w-[80%]"
+      class="flex flex-col max-w-[70%]"
       :class="isUser ? 'items-end' : 'items-start'"
     >
       <div

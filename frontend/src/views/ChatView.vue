@@ -37,7 +37,7 @@
         <!-- 欢迎空状态 -->
         <div
           v-if="chatStore.currentMessages.length === 0"
-          class="text-center px-4 max-w-lg"
+          class="text-center px-4 max-w-2xl"
         >
           <div
             class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#7c6af7] to-[#5b4fcf] flex items-center justify-center shadow-xl shadow-[#7c6af7]/20"
@@ -65,7 +65,7 @@
         </div>
 
         <!-- 消息列表 -->
-        <div v-else class="max-w-3xl mx-auto w-full">
+        <div v-else class="w-full">
           <ChatMessage
             v-for="msg in chatStore.currentMessages"
             :key="msg.id"
@@ -75,7 +75,7 @@
       </div>
 
       <!-- 输入区 -->
-      <div class="max-w-3xl mx-auto w-full">
+      <div class="w-full">
         <ChatInput
           ref="chatInputRef"
           :disabled="chatStore.isLoading"
