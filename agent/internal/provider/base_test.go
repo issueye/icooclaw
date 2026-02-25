@@ -28,7 +28,7 @@ func TestMessage_WithToolCalls(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "test_func",
-			Arguments: []byte(`{"key":"value"}`),
+			Arguments: `{"key":"value"}`,
 		},
 	}
 
@@ -62,7 +62,7 @@ func TestToolCall_Structure(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "test_func",
-			Arguments: []byte(`{"arg":123}`),
+			Arguments: `{"arg":123}`,
 		},
 	}
 

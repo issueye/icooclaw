@@ -2,6 +2,7 @@ package tools
 
 import (
 	"log/slog"
+	"path/filepath"
 
 	"github.com/icooclaw/icooclaw/internal/channel"
 	"github.com/icooclaw/icooclaw/internal/config"
@@ -120,6 +121,17 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 		logger.Debug("Registered tool: read_part")
 		registry.Register(NewLineCountTool(toolConfig))
 		logger.Debug("Registered tool: wc")
+	}
+
+	// 加载 JavaScript 工具
+	toolsDir := filepath.Join(cfg.Workspace, "tools")
+	jsConfig := &JSToolConfig{
+		Workspace: cfg.Workspace,
+		MaxMemory: 10 * 1024 * 1024,
+		Timeout:   30,
+	}
+	if err := RegisterJSTools(registry, toolsDir, jsConfig, logger); err != nil {
+		logger.Warn("Failed to load JS tools", "error", err)
 	}
 
 	logger.Info("Tools initialized", "count", registry.Count())

@@ -1,6 +1,10 @@
 package tools
 
 import (
+	"log/slog"
+	"os"
+	"path/filepath"
+
 	"github.com/icooclaw/icooclaw/internal/config"
 )
 
@@ -9,10 +13,16 @@ type ToolRegistry struct {
 	registry   *Registry
 	config     *config.ToolsConfig
 	toolConfig *FileToolConfig
+	logger     *slog.Logger
 }
 
 // NewToolRegistry 创建工具注册表
 func NewToolRegistry(cfg *config.Config) *ToolRegistry {
+	return NewToolRegistryWithLogger(cfg, slog.Default())
+}
+
+// NewToolRegistryWithLogger 创建带日志的工具注册表
+func NewToolRegistryWithLogger(cfg *config.Config, logger *slog.Logger) *ToolRegistry {
 	registry := NewRegistry()
 
 	// 创建文件工具配置
@@ -42,6 +52,7 @@ func NewToolRegistry(cfg *config.Config) *ToolRegistry {
 		registry:   registry,
 		config:     &cfg.Tools,
 		toolConfig: toolConfig,
+		logger:     logger,
 	}
 }
 
@@ -63,4 +74,30 @@ func (t *ToolRegistry) UpdateFileConfig(allowedRead, allowedWrite bool, workspac
 
 	// 重新注册文件工具
 	// 注意：这里简化处理，实际应该更新现有工具的配置
+}
+
+// LoadJSTools 从目录加载 JavaScript 工具
+func (t *ToolRegistry) LoadJSTools(dir string) error {
+	// 确保目录存在
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		t.logger.Info("Created JS tools directory", "path", dir)
+		return nil
+	}
+
+	jsConfig := &JSToolConfig{
+		Workspace: t.toolConfig.Workspace,
+		MaxMemory: 10 * 1024 * 1024,
+		Timeout:   30,
+	}
+
+	return RegisterJSTools(t.registry, dir, jsConfig, t.logger)
+}
+
+// LoadJSToolsFromWorkspace 从工作区加载 JavaScript 工具
+func (t *ToolRegistry) LoadJSToolsFromWorkspace() error {
+	toolsDir := filepath.Join(t.toolConfig.Workspace, "tools")
+	return t.LoadJSTools(toolsDir)
 }
