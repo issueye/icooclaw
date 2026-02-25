@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/icooclaw/icooclaw/internal/bus"
 	"github.com/icooclaw/icooclaw/internal/config"
 	"github.com/icooclaw/icooclaw/internal/storage"
@@ -250,29 +252,45 @@ func (c *WebSocketChannel) Start(ctx context.Context) error {
 
 	addr := host + ":"
 
-	// 创建 HTTP 服务器
-	mux := http.NewServeMux()
+	// 创建 chi 路由器
+	r := chi.NewRouter()
+
+	// 全局中间件
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	// CORS 中间件
+	r.Use(c.corsMiddleware)
 
 	// WebSocket 端点
-	mux.HandleFunc("/ws", c.handleWebSocket)
+	r.Get("/ws", c.handleWebSocket)
 
 	// REST API v1
-	mux.HandleFunc("/api/v1/chat", c.corsWrapper(c.handleRestChat))
-	mux.HandleFunc("/api/v1/chat/stream", c.corsWrapper(c.handleRestChatStream))
-	mux.HandleFunc("/api/v1/sessions", c.corsWrapper(c.handleRestSessions))
-	mux.HandleFunc("/api/v1/sessions/", c.corsWrapper(c.handleRestSessionDetail)) // 处理 /api/v1/sessions/:id/...
-	mux.HandleFunc("/api/v1/providers", c.corsWrapper(c.handleRestProviders))
-	mux.HandleFunc("/api/v1/skills", c.corsWrapper(c.handleRestSkills))
-	mux.HandleFunc("/api/v1/skills/", c.corsWrapper(c.handleRestSkillDetail))
-	mux.HandleFunc("/api/v1/health", c.corsWrapper(func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/api/v1/chat", c.handleRestChat)
+	r.Post("/api/v1/chat/stream", c.handleRestChatStream)
+	r.Get("/api/v1/sessions", c.handleRestSessions)
+	r.Route("/api/v1/sessions/{id}", func(r chi.Router) {
+		r.Get("/", c.handleRestSessionDetail)
+		r.Get("/messages", c.handleRestSessionDetail)
+	})
+	r.Get("/api/v1/providers", c.handleRestProviders)
+	r.Get("/api/v1/skills", c.handleRestSkills)
+	r.Route("/api/v1/skills/{id}", func(r chi.Router) {
+		r.Get("/", c.handleRestSkillDetail)
+		r.Put("/", c.handleRestSkillDetail)
+		r.Delete("/", c.handleRestSkillDetail)
+	})
+	r.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
-	}))
+	})
 
 	c.server = &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      r,
 		ReadTimeout:  60 * time.Second,
 		WriteTimeout: 60 * time.Second,
 	}
@@ -445,8 +463,9 @@ func (c *WebSocketChannel) processOutbound(ctx context.Context) {
 }
 
 // corsWrapper CORS 包装器
-func (c *WebSocketChannel) corsWrapper(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+// corsMiddleware CORS 中间件
+func (c *WebSocketChannel) corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -456,8 +475,8 @@ func (c *WebSocketChannel) corsWrapper(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		h(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // REST API Handlers

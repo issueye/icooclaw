@@ -35,7 +35,7 @@
                         <input
                             v-model="wsUrl"
                             type="text"
-                            placeholder="ws://localhost:17100/ws"
+                            placeholder="ws://localhost:8080/ws"
                             class="w-full px-4 py-2.5 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
                         />
                     </div>

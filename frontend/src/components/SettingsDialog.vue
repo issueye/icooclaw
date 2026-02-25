@@ -46,7 +46,7 @@
                         <input
                             v-model="localConfig.wsUrl"
                             type="text"
-                            placeholder="ws://localhost:17100/ws"
+                            placeholder="ws://localhost:8080/ws"
                             class="w-full bg-[#1e1e1e] border border-[#2a2a2a] text-[#f0f0f0] text-sm px-4 py-2.5 rounded-xl outline-none placeholder-[#606060] focus:border-[#7c6af7]/60 transition-colors"
                         />
                         <p class="text-xs text-[#606060]">

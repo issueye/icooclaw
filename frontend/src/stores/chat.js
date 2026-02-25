@@ -31,7 +31,7 @@ export const useChatStore = defineStore("chat", () => {
   const isLoading = ref(false);
   const apiBase = ref(api.getApiBaseUrl());
   const wsUrl = ref(
-    localStorage.getItem("icooclaw_ws_url") || "ws://localhost:17100/ws",
+    localStorage.getItem("icooclaw_ws_url") || "ws://localhost:8080/ws",
   );
   const userId = ref(localStorage.getItem("icooclaw_user_id") || "user-1");
 
