@@ -1,6 +1,69 @@
 # JavaScript 工具系统
 
-Agent 支持通过 JavaScript 脚本动态添加工具。在工作区的 `tools` 目录下放置 `.js` 或 `.tool` 文件即可自动加载。
+Agent 支持通过 JavaScript 脚本动态添加工具。有两种方式：
+1. 在工作区的 `tools` 目录下放置 `.js` 或 `.tool` 文件（启动时自动加载）
+2. 使用 `create_tool` 工具在运行时动态创建
+
+## 动态工具管理
+
+### 创建工具 (create_tool)
+
+使用 `create_tool` 工具可以在运行时动态创建新的 JavaScript 工具：
+
+```json
+{
+  "name": "my_tool",
+  "description": "我的自定义工具",
+  "code": "function execute(params) {\n    return JSON.stringify({result: params.input});\n}",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "input": {
+        "type": "string",
+        "description": "输入文本"
+      }
+    },
+    "required": ["input"]
+  }
+}
+```
+
+参数说明：
+- `name` - 工具名称（必需）：只能包含字母、数字和下划线，不能以数字开头，2-50 字符
+- `description` - 工具描述（必需）
+- `code` - JavaScript 执行函数代码（必需）：必须定义 `execute(params)` 函数
+- `parameters` - 参数定义（可选，JSON Schema 格式）
+- `overwrite` - 是否覆盖已存在的工具（可选，默认 false）
+
+**安全性限制**：
+- 代码不能使用 `require()`、`import`、`eval()`、`Function()` 等
+- 不能访问 `process`、`fs`、`http`、`net` 等模块
+- 不能使用 `fetch()`、`XMLHttpRequest`、`WebSocket` 等网络 API
+
+### 列出工具 (list_tools)
+
+使用 `list_tools` 工具列出所有可用工具：
+
+```json
+{}
+```
+
+返回结果包含：
+- `builtin_tools` - 内置工具列表
+- `dynamic_tools` - 动态创建的工具列表
+- `create_example` - 创建工具示例
+
+### 删除工具 (delete_tool)
+
+使用 `delete_tool` 工具删除动态创建的工具：
+
+```json
+{
+  "name": "my_tool"
+}
+```
+
+注意：只能删除通过 `create_tool` 创建的工具，不能删除内置工具。
 
 ## 工具脚本格式
 

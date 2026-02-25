@@ -3,6 +3,7 @@ package tools
 import (
 	"log/slog"
 	"path/filepath"
+	"sync"
 
 	"github.com/icooclaw/icooclaw/internal/channel"
 	"github.com/icooclaw/icooclaw/internal/config"
@@ -122,6 +123,32 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 		registry.Register(NewLineCountTool(toolConfig))
 		logger.Debug("Registered tool: wc")
 	}
+
+	// 注册 JS 工具管理工具
+	var mu sync.RWMutex
+	createToolConfig := &CreateJSToolConfig{
+		Workspace: cfg.Workspace,
+		ToolsDir:  "tools",
+		Registry:  registry,
+	}
+	registry.Register(NewCreateJSTool(createToolConfig))
+	logger.Debug("Registered tool: create_tool")
+
+	listToolConfig := &ListJSToolsConfig{
+		Workspace: cfg.Workspace,
+		ToolsDir:  "tools",
+	}
+	registry.Register(NewListJSTools(listToolConfig))
+	logger.Debug("Registered tool: list_tools")
+
+	deleteToolConfig := &DeleteJSToolConfig{
+		Workspace: cfg.Workspace,
+		ToolsDir:  "tools",
+		Registry:  registry,
+		mu:        &mu,
+	}
+	registry.Register(NewDeleteJSTool(deleteToolConfig))
+	logger.Debug("Registered tool: delete_tool")
 
 	// 加载 JavaScript 工具
 	toolsDir := filepath.Join(cfg.Workspace, "tools")
