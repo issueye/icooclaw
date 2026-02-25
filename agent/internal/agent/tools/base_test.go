@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -163,7 +162,7 @@ func TestRegistry_Execute(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "test_tool",
-			Arguments: []byte(`{}`),
+			Arguments: `{}`,
 		},
 	}
 
@@ -196,7 +195,7 @@ func TestRegistry_Execute_WithParams(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "test_tool",
-			Arguments: []byte(`{"name":"World"}`),
+			Arguments: `{"name":"World"}`,
 		},
 	}
 
@@ -213,7 +212,7 @@ func TestRegistry_Execute_InvalidTool(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "non_existing",
-			Arguments: []byte(`{}`),
+			Arguments: `{}`,
 		},
 	}
 
@@ -242,7 +241,7 @@ func TestRegistry_Execute_InvalidArgs(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "test_tool",
-			Arguments: []byte(`invalid json`),
+			Arguments: `invalid json`,
 		},
 	}
 
@@ -276,15 +275,14 @@ func TestToolCall_Structure(t *testing.T) {
 		Type: "function",
 		Function: ToolCallFunction{
 			Name:      "test_func",
-			Arguments: json.RawMessage(`{"key":"value"}`),
+			Arguments: `{"key":"value"}`,
 		},
 	}
 
 	assert.Equal(t, "call_123", call.ID)
 	assert.Equal(t, "function", call.Type)
 	assert.Equal(t, "test_func", call.Function.Name)
-	// Compare as string since json.RawMessage has custom equality
-	assert.Equal(t, string(json.RawMessage(`{"key":"value"}`)), string(call.Function.Arguments))
+	assert.Equal(t, `{"key":"value"}`, call.Function.Arguments)
 }
 
 // TestToolResult tests for ToolResult struct

@@ -92,8 +92,8 @@ type ToolCall struct {
 
 // ToolCallFunction 工具调用函数
 type ToolCallFunction struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 // ToolResult 工具结果
@@ -163,7 +163,7 @@ func (r *Registry) Execute(ctx context.Context, call interface{}) ToolResult {
 	case ToolCall:
 		toolCallID = c.ID
 		toolName = c.Function.Name
-		arguments = c.Function.Arguments
+		arguments = json.RawMessage(c.Function.Arguments)
 	default:
 		return ToolResult{
 			ToolCallID: "",

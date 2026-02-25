@@ -430,7 +430,7 @@ func (p *AnthropicProvider) convertResponse(anthResp AnthropicResponse) *ChatRes
 				Type: "function",
 				Function: ToolCallFunction{
 					Name:      block.Name,
-					Arguments: argsBytes,
+					Arguments: string(argsBytes),
 				},
 			})
 		}

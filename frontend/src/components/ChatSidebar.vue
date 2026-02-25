@@ -116,7 +116,7 @@ const props = defineProps({
   collapsed: { type: Boolean, default: false },
 });
 
-defineEmits(["new", "select", "delete", "toggle"]);
+const emit = defineEmits(["new", "select", "delete", "toggle"]);
 
 const statusText = computed(
   () =>
@@ -129,6 +129,6 @@ const statusText = computed(
 );
 
 function handleNewChat() {
-  // emit new chat event
+  emit("new");
 }
 </script>

@@ -31,8 +31,8 @@ type ToolCall struct {
 
 // ToolCallFunction 工具调用函数
 type ToolCallFunction struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 // ToolDefinition 工具定义
@@ -86,13 +86,23 @@ type Choice struct {
 	FinishReason string  `json:"finish_reason"`
 }
 
+// StreamToolCall 用于流式传输中的 tool_call 累积
+type StreamToolCall struct {
+	ID        string `json:"id"`
+	Type      string `json:"type"`
+	Index     int    `json:"index"`
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
+}
+
 // StreamChunk 流式响应片段
 type StreamChunk struct {
-	ID               string `json:"id"`
-	Content          string `json:"content"`
-	ReasoningContent string `json:"reasoning_content,omitempty"`
-	FinishReason     string `json:"finish_reason,omitempty"`
-	Usage            *Usage `json:"usage,omitempty"`
+	ID               string           `json:"id"`
+	Content          string           `json:"content"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	FinishReason     string           `json:"finish_reason,omitempty"`
+	Usage            *Usage           `json:"usage,omitempty"`
+	ToolCalls        []StreamToolCall `json:"tool_calls,omitempty"`
 }
 
 // StreamCallback 流式回调函数
@@ -234,9 +244,21 @@ func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request,
 		var chunk struct {
 			ID      string `json:"id"`
 			Choices []struct {
+				Index int `json:"index"`
 				Delta struct {
 					Content          string `json:"content"`
 					ReasoningContent string `json:"reasoning_content"`
+					ToolCalls        []struct {
+						ID       string `json:"id"`
+						Type     string `json:"type"`
+						Index    int    `json:"index"`
+						Function struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						} `json:"function"`
+					} `json:"tool_calls"`
+					Refusal      string          `json:"refusal"`
+					FunctionCall json.RawMessage `json:"function_call"`
 				} `json:"delta"`
 				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
@@ -250,12 +272,26 @@ func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request,
 
 		if len(chunk.Choices) > 0 {
 			c := chunk.Choices[0]
+
+			// 转换 tool_calls 到 StreamToolCall
+			var streamToolCalls []StreamToolCall
+			for _, tc := range c.Delta.ToolCalls {
+				streamToolCalls = append(streamToolCalls, StreamToolCall{
+					ID:        tc.ID,
+					Type:      tc.Type,
+					Index:     tc.Index,
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				})
+			}
+
 			streamChunk := StreamChunk{
 				ID:               chunk.ID,
 				Content:          c.Delta.Content,
 				ReasoningContent: c.Delta.ReasoningContent,
 				FinishReason:     c.FinishReason,
 				Usage:            chunk.Usage,
+				ToolCalls:        streamToolCalls,
 			}
 			if err := callback(streamChunk); err != nil {
 				return err

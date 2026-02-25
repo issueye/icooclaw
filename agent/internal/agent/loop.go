@@ -96,6 +96,13 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 
 		if l.onChunk != nil {
 			var fullContent strings.Builder
+			// 累积 tool_calls (按 index 分组) - 使用指针避免复制
+			toolCallsData := make(map[int]*struct {
+				id   string
+				typ  string
+				name string
+				args strings.Builder
+			})
 			err := l.agent.Provider().ChatStream(ctx, req, func(chunk provider.StreamChunk) error {
 				if chunk.Content != "" {
 					fullContent.WriteString(chunk.Content)
@@ -104,12 +111,56 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 				if chunk.ReasoningContent != "" {
 					reasoningContent += chunk.ReasoningContent
 				}
+				// 收集 tool_calls
+				for _, tc := range chunk.ToolCalls {
+					index := tc.Index
+					if existing, ok := toolCallsData[index]; ok {
+						// 累积 arguments (只有非空时才拼接)
+						if tc.Arguments != "" {
+							existing.args.WriteString(tc.Arguments)
+						}
+						// 更新 ID 和 Type (如果存在)
+						if tc.ID != "" {
+							existing.id = tc.ID
+						}
+						if tc.Type != "" {
+							existing.typ = tc.Type
+						}
+						if tc.Name != "" {
+							existing.name = tc.Name
+						}
+					} else {
+						tcData := &struct {
+							id   string
+							typ  string
+							name string
+							args strings.Builder
+						}{
+							id:   tc.ID,
+							typ:  tc.Type,
+							name: tc.Name,
+						}
+						tcData.args.WriteString(tc.Arguments)
+						toolCallsData[index] = tcData
+					}
+				}
 				return nil
 			})
 			if err != nil {
 				return "", nil, fmt.Errorf("failed to call LLM stream: %w", err)
 			}
 			content = fullContent.String()
+			// 转换为 slice
+			for _, tc := range toolCallsData {
+				toolCalls = append(toolCalls, provider.ToolCall{
+					ID:   tc.id,
+					Type: tc.typ,
+					Function: provider.ToolCallFunction{
+						Name:      tc.name,
+						Arguments: tc.args.String(),
+					},
+				})
+			}
 		} else {
 			resp, err := l.agent.Provider().Chat(ctx, req)
 			if err != nil {
