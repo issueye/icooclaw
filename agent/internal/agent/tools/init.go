@@ -128,7 +128,7 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 	var mu sync.RWMutex
 	createToolConfig := &CreateJSToolConfig{
 		Workspace: cfg.Workspace,
-		ToolsDir:  "tools",
+		ToolsDir:  cfg.Tools.JS.ToolsDir,
 		Registry:  registry,
 	}
 	registry.Register(NewCreateJSTool(createToolConfig))
@@ -136,14 +136,14 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 
 	listToolConfig := &ListJSToolsConfig{
 		Workspace: cfg.Workspace,
-		ToolsDir:  "tools",
+		ToolsDir:  cfg.Tools.JS.ToolsDir,
 	}
 	registry.Register(NewListJSTools(listToolConfig))
 	logger.Debug("Registered tool: list_tools")
 
 	deleteToolConfig := &DeleteJSToolConfig{
 		Workspace: cfg.Workspace,
-		ToolsDir:  "tools",
+		ToolsDir:  cfg.Tools.JS.ToolsDir,
 		Registry:  registry,
 		mu:        &mu,
 	}
@@ -151,14 +151,26 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 	logger.Debug("Registered tool: delete_tool")
 
 	// 加载 JavaScript 工具
-	toolsDir := filepath.Join(cfg.Workspace, "tools")
-	jsConfig := &JSToolConfig{
-		Workspace: cfg.Workspace,
-		MaxMemory: 10 * 1024 * 1024,
-		Timeout:   30,
-	}
-	if err := RegisterJSTools(registry, toolsDir, jsConfig, logger); err != nil {
-		logger.Warn("Failed to load JS tools", "error", err)
+	if cfg.Tools.JS.Enabled {
+		toolsDir := filepath.Join(cfg.Workspace, cfg.Tools.JS.ToolsDir)
+		jsConfig := &JSToolConfig{
+			Workspace:       cfg.Workspace,
+			MaxMemory:       cfg.Tools.JS.MaxMemory,
+			Timeout:         cfg.Tools.JS.Timeout,
+			AllowFileRead:   cfg.Tools.JS.Permissions.FileRead,
+			AllowFileWrite:  cfg.Tools.JS.Permissions.FileWrite,
+			AllowFileDelete: cfg.Tools.JS.Permissions.FileDelete,
+			AllowNetwork:    cfg.Tools.JS.Permissions.Network,
+			AllowExec:       cfg.Tools.JS.Permissions.Exec,
+			ExecTimeout:     cfg.Tools.JS.Permissions.ExecTimeout,
+			HTTPTimeout:     cfg.Tools.JS.Permissions.HTTPTimeout,
+			AllowedDomains:  cfg.Tools.JS.Permissions.AllowedDomains,
+		}
+		if err := RegisterJSTools(registry, toolsDir, jsConfig, logger); err != nil {
+			logger.Warn("Failed to load JS tools", "error", err)
+		}
+	} else {
+		logger.Info("JavaScript tools are disabled")
 	}
 
 	logger.Info("Tools initialized", "count", registry.Count())

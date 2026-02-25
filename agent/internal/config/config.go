@@ -25,16 +25,16 @@ type Config struct {
 
 // ProvidersConfig Provider配置
 type ProvidersConfig struct {
-	OpenRouter    ProviderSettings    `mapstructure:"openrouter"`
-	OpenAI        ProviderSettings    `mapstructure:"openai"`
-	Anthropic     ProviderSettings    `mapstructure:"anthropic"`
-	DeepSeek      ProviderSettings    `mapstructure:"deepseek"`
-	Custom        ProviderSettings    `mapstructure:"custom"`
-	Ollama        OllamaSettings     `mapstructure:"ollama"`
-	AzureOpenAI   AzureSettings      `mapstructure:"azure_openai"`
-	LocalAI       ProviderSettings    `mapstructure:"localai"`
-	OneAPI        ProviderSettings    `mapstructure:"oneapi"`
-	Compatible    []CompatibleSettings `mapstructure:"compatible"` // 支持多个 OpenAI 兼容的 LLM
+	OpenRouter  ProviderSettings     `mapstructure:"openrouter"`
+	OpenAI      ProviderSettings     `mapstructure:"openai"`
+	Anthropic   ProviderSettings     `mapstructure:"anthropic"`
+	DeepSeek    ProviderSettings     `mapstructure:"deepseek"`
+	Custom      ProviderSettings     `mapstructure:"custom"`
+	Ollama      OllamaSettings       `mapstructure:"ollama"`
+	AzureOpenAI AzureSettings        `mapstructure:"azure_openai"`
+	LocalAI     ProviderSettings     `mapstructure:"localai"`
+	OneAPI      ProviderSettings     `mapstructure:"oneapi"`
+	Compatible  []CompatibleSettings `mapstructure:"compatible"` // 支持多个 OpenAI 兼容的 LLM
 }
 
 // ProviderSettings 单个Provider设置
@@ -56,19 +56,19 @@ type OllamaSettings struct {
 type AzureSettings struct {
 	Enabled    bool   `mapstructure:"enabled"`
 	APIKey     string `mapstructure:"api_key"`
-	Endpoint   string `mapstructure:"endpoint"`   // 如 https://xxx.openai.azure.com
-	Deployment string `mapstructure:"deployment"` // 部署名称
+	Endpoint   string `mapstructure:"endpoint"`    // 如 https://xxx.openai.azure.com
+	Deployment string `mapstructure:"deployment"`  // 部署名称
 	APIVersion string `mapstructure:"api_version"` // 如 2024-02-15-preview
 }
 
 // CompatibleSettings OpenAI 兼容 LLM 设置（支持额外请求头）
 type CompatibleSettings struct {
-	Enabled   bool              `mapstructure:"enabled"`
-	Name      string           `mapstructure:"name"`      // Provider 名称
-	APIKey    string           `mapstructure:"api_key"`
-	APIBase   string           `mapstructure:"api_base"` // 如 http://localhost:8000/v1
-	Model     string           `mapstructure:"model"`   // 默认模型
-	Headers   map[string]string `mapstructure:"headers"` // 额外请求头
+	Enabled bool              `mapstructure:"enabled"`
+	Name    string            `mapstructure:"name"` // Provider 名称
+	APIKey  string            `mapstructure:"api_key"`
+	APIBase string            `mapstructure:"api_base"` // 如 http://localhost:8000/v1
+	Model   string            `mapstructure:"model"`    // 默认模型
+	Headers map[string]string `mapstructure:"headers"`  // 额外请求头
 }
 
 // ChannelsConfig 通道配置
@@ -130,6 +130,28 @@ type ToolsConfig struct {
 	AllowExec       bool                       `mapstructure:"allow_exec"`
 	Workspace       string                     `mapstructure:"workspace"`
 	ExecTimeout     int                        `mapstructure:"exec_timeout"`
+	JS              JSToolsConfig              `mapstructure:"js"`
+}
+
+// JSToolsConfig JavaScript 工具配置
+type JSToolsConfig struct {
+	Enabled     bool                `mapstructure:"enabled"`
+	ToolsDir    string              `mapstructure:"tools_dir"`
+	MaxMemory   int64               `mapstructure:"max_memory"`
+	Timeout     int                 `mapstructure:"timeout"`
+	Permissions JSPermissionsConfig `mapstructure:"permissions"`
+}
+
+// JSPermissionsConfig JS 工具权限配置
+type JSPermissionsConfig struct {
+	FileRead       bool     `mapstructure:"file_read"`
+	FileWrite      bool     `mapstructure:"file_write"`
+	FileDelete     bool     `mapstructure:"file_delete"`
+	Network        bool     `mapstructure:"network"`
+	Exec           bool     `mapstructure:"exec"`
+	HTTPTimeout    int      `mapstructure:"http_timeout"`
+	ExecTimeout    int      `mapstructure:"exec_timeout"`
+	AllowedDomains []string `mapstructure:"allowed_domains"`
 }
 
 // MCPServerConfig MCP服务器配置
@@ -200,6 +222,17 @@ func Load() (*Config, error) {
 	viper.SetDefault("memory.max_memory_age", 30)
 	viper.SetDefault("tools.allow_exec", false)
 	viper.SetDefault("tools.exec_timeout", 30)
+	viper.SetDefault("tools.js.enabled", true)
+	viper.SetDefault("tools.js.tools_dir", "tools")
+	viper.SetDefault("tools.js.max_memory", 10485760)
+	viper.SetDefault("tools.js.timeout", 30)
+	viper.SetDefault("tools.js.permissions.file_read", false)
+	viper.SetDefault("tools.js.permissions.file_write", false)
+	viper.SetDefault("tools.js.permissions.file_delete", false)
+	viper.SetDefault("tools.js.permissions.network", false)
+	viper.SetDefault("tools.js.permissions.exec", false)
+	viper.SetDefault("tools.js.permissions.http_timeout", 30)
+	viper.SetDefault("tools.js.permissions.exec_timeout", 30)
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {

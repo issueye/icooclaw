@@ -88,3 +88,45 @@ allow_file_delete = true
 allow_exec = false  # 默认关闭，需要手动开启以保证安全
 workspace = "~/.icooclaw/workspace"
 exec_timeout = 30  # Shell命令超时时间（秒）
+
+# JavaScript 工具配置
+[tools.js]
+enabled = true                    # 是否启用 JS 工具
+tools_dir = "tools"              # JS 工具目录（相对于 workspace）
+max_memory = 10485760           # 最大内存（字节），默认 10MB
+timeout = 30                     # 执行超时（秒）
+
+# JS 工具默认权限（可通过 create_tool 的 permissions 参数覆盖）
+[tools.js.permissions]
+file_read = false               # 允许读取文件
+file_write = false              # 允许写入文件
+file_delete = false             # 允许删除文件
+network = false                 # 允许网络访问
+exec = false                    # 允许执行命令
+http_timeout = 30              # HTTP 请求超时（秒）
+exec_timeout = 30               # 命令执行超时（秒）
+# allowed_domains = ["api.example.com"]  # 允许的域名白名单（空=允许所有）
+
+# 记忆配置
+[memory]
+consolidation_threshold = 50    # 消息数达到此值时整合
+summary_enabled = true          # 是否启用摘要
+auto_save = false               # 是否自动保存
+max_memory_age = 30            # 记忆最大保留天数
+
+# 调度器配置
+[scheduler]
+enabled = false                 # 是否启用调度器
+heartbeat_interval = 30        # 心跳间隔（分钟）
+
+# MCP (Model Context Protocol) 配置
+[mcp]
+enabled = false                 # 是否启用 MCP
+
+# MCP 服务器配置示例
+# [[mcp.servers]]
+# name = "example-server"
+# command = "node"
+# args = ["server.js"]
+# [mcp.servers.env]
+# API_KEY = "xxx"
