@@ -446,6 +446,7 @@ func (a *Agent) UpdateSoulFile(section, content string) error {
 	}
 
 	soulPath := filepath.Join(workspace, "SOUL.md")
+	a.logger.Debug("UpdateSoulFile called", "path", soulPath, "section", section, "content", content)
 	return a.updateTemplateFile(soulPath, section, content)
 }
 
@@ -457,15 +458,19 @@ func (a *Agent) UpdateUserFile(section, content string) error {
 	}
 
 	userPath := filepath.Join(workspace, "USER.md")
+	a.logger.Debug("UpdateUserFile called", "path", userPath, "section", section, "content", content)
 	return a.updateTemplateFile(userPath, section, content)
 }
 
 // updateTemplateFile 更新模板文件的指定部分
 func (a *Agent) updateTemplateFile(filePath, section, content string) error {
+	a.logger.Debug("updateTemplateFile called", "filePath", filePath)
+
 	// 读取现有内容
 	var fileContent string
 	if data, err := os.ReadFile(filePath); err == nil {
 		fileContent = string(data)
+		a.logger.Debug("read existing file", "size", len(data))
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read file: %w", err)
 	} else {
@@ -474,6 +479,7 @@ func (a *Agent) updateTemplateFile(filePath, section, content string) error {
 		fileContent += "此文件存储相关信息。\n\n"
 		fileContent += "## " + section + "\n\n"
 		fileContent += "<!-- 内容 -->\n"
+		a.logger.Debug("file does not exist, using default content")
 	}
 
 	// 更新指定部分
@@ -482,11 +488,15 @@ func (a *Agent) updateTemplateFile(filePath, section, content string) error {
 		return err
 	}
 
+	a.logger.Debug("updated content", "length", len(updatedContent))
+
 	// 写入文件
 	if err := os.WriteFile(filePath, []byte(updatedContent), 0644); err != nil {
+		a.logger.Error("failed to write file", "error", err)
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
+	a.logger.Info("file updated successfully", "filePath", filePath)
 	return nil
 }
 

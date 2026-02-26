@@ -13,7 +13,7 @@ type MemoryUpdateConfig struct {
 		UpdateSoulFile(section, content string) error
 		UpdateUserFile(section, content string) error
 	}
-	logger *slog.Logger
+	Logger *slog.Logger
 }
 
 // MemoryUpdateTool 记忆更新工具
@@ -24,8 +24,8 @@ type MemoryUpdateTool struct {
 
 // NewMemoryUpdateTool 创建记忆更新工具
 func NewMemoryUpdateTool(config *MemoryUpdateConfig) *MemoryUpdateTool {
-	if config.logger == nil {
-		config.logger = slog.Default()
+	if config.Logger == nil {
+		config.Logger = slog.Default()
 	}
 	return &MemoryUpdateTool{
 		config: config,
@@ -75,6 +75,14 @@ func (t *MemoryUpdateTool) Execute(ctx context.Context, params map[string]interf
 	section, _ := params["section"].(string)
 	content, _ := params["content"].(string)
 
+	// 添加调试日志
+	if t.config.Logger != nil {
+		t.config.Logger.Debug("memory_update called",
+			"file", file,
+			"section", section,
+			"content", content)
+	}
+
 	// 验证参数
 	if file == "" {
 		return "", fmt.Errorf("file parameter is required")
@@ -94,14 +102,26 @@ func (t *MemoryUpdateTool) Execute(ctx context.Context, params map[string]interf
 	case "soul":
 		err := t.config.Agent.UpdateSoulFile(section, content)
 		if err != nil {
+			if t.config.Logger != nil {
+				t.config.Logger.Error("failed to update soul file", "error", err)
+			}
 			return "", fmt.Errorf("failed to update soul file: %w", err)
+		}
+		if t.config.Logger != nil {
+			t.config.Logger.Debug("soul file updated successfully", "section", section, "content", content)
 		}
 		return fmt.Sprintf("已成功更新 SOUL.md 的 '%s' 部分为: %s", section, content), nil
 
 	case "user":
 		err := t.config.Agent.UpdateUserFile(section, content)
 		if err != nil {
+			if t.config.Logger != nil {
+				t.config.Logger.Error("failed to update user file", "error", err)
+			}
 			return "", fmt.Errorf("failed to update user file: %w", err)
+		}
+		if t.config.Logger != nil {
+			t.config.Logger.Debug("user file updated successfully", "section", section, "content", content)
 		}
 		return fmt.Sprintf("已成功更新 USER.md 的 '%s' 部分为: %s", section, content), nil
 

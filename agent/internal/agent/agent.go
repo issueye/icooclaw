@@ -88,7 +88,8 @@ func (a *Agent) SetTools(registry *tools.Registry) {
 
 	// 注册 memory_update 工具（用于更新 SOUL.md 和 USER.md）
 	memoryConfig := &tools.MemoryUpdateConfig{
-		Agent: a,
+		Agent:  a,
+		Logger: a.logger,
 	}
 	registry.Register(tools.NewMemoryUpdateTool(memoryConfig))
 	a.logger.Debug("Registered tool: memory_update")
