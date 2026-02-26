@@ -60,17 +60,17 @@ var rootCmd = &cobra.Command{
 func initComponents() error {
 	var err error
 
-	// 1. Initialize config
+	// 1. 初始化配置文件
 	cfg, err = config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// 2. Initialize logger (early so we can use it)
+	// 2. 初始化日志
 	logger = config.InitLogger(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output)
 	slog.SetDefault(logger)
 
-	// 3. Initialize workspace directory
+	// 3. 初始化工作空间目录
 	workspace := cfg.Workspace
 	if workspace == "" {
 		workspace = cfg.Tools.Workspace
@@ -82,30 +82,30 @@ func initComponents() error {
 		logger.Info("Workspace initialized", "path", workspace)
 	}
 
-	// 4. Initialize database
+	// 4. 初始化数据库
 	db, err = storage.InitDB(cfg.Database.Path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 	logger.Info("Database initialized", "path", cfg.Database.Path)
 
-	// 4. Initialize message bus
+	// 4. 初始化消息总线
 	messageBus = bus.NewMessageBus()
 	messageBus.SetLogger(logger)
 	logger.Info("Message bus initialized")
 
-	// 5. Initialize provider registry
+	// 5. 初始化提供者注册表
 	providerReg = provider.NewRegistry()
 	if err := providerReg.RegisterFromConfig(cfg.Providers); err != nil {
 		return fmt.Errorf("failed to register providers: %w", err)
 	}
 	logger.Info("Providers registered", "count", providerReg.Count())
 
-	// 6. Initialize channel manager
+	// 6. 初始化通道管理器
 	channelManager = channel.NewManager(messageBus, cfg.Channels, db, logger)
 	logger.Info("Channels registered", "count", channelManager.Count())
 
-	// 7. Create default agent
+	// 7. 创建默认代理
 	agentConfig := cfg.Agents.Defaults
 	defaultProviderName := cfg.Agents.DefaultProvider
 	if defaultProviderName == "" {
@@ -129,11 +129,11 @@ func initComponents() error {
 		workspace,
 	)
 
-	// 8. Initialize tools
+	// 8. 初始化工具
 	toolRegistry = tools.InitTools(cfg, logger, channelManager)
 	agentInstance.SetTools(toolRegistry)
 
-	// 9. Initialize scheduler
+	// 9. 初始化调度器
 	schedulerInst = scheduler.NewScheduler(messageBus, storage.NewStorage(db), cfg, logger)
 
 	return nil

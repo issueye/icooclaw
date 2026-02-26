@@ -363,6 +363,8 @@ func InitWorkspace(workspace string) error {
 		return fmt.Errorf("failed to expand workspace path: %w", err)
 	}
 
+	fmt.Println("工作目录", workspace)
+
 	if err := os.MkdirAll(workspace, 0755); err != nil {
 		return fmt.Errorf("failed to create workspace directory: %w", err)
 	}

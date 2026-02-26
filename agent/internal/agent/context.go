@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/icooclaw/icooclaw/internal/provider"
@@ -20,12 +19,6 @@ type ContextBuilder struct {
 	agent   *Agent
 	session *storage.Session
 	logger  *slog.Logger
-}
-
-// TemplateData 模板数据
-type TemplateData struct {
-	AgentName string // AI 名字
-	UserName  string // 用户称呼
 }
 
 // NewContextBuilder 创建上下文构建器
@@ -62,18 +55,15 @@ func (cb *ContextBuilder) Build(ctx context.Context) ([]provider.Message, string
 func (cb *ContextBuilder) buildSystemPrompt() string {
 	var parts []string
 
-	// 获取模板数据
-	templateData := cb.getTemplateData()
-
-	// 读取并渲染 SOUL.md 模板（AI 身份和人格）
-	soulContent := cb.renderTemplateFile("SOUL.md", templateData)
+	// 读取 SOUL.md 文件（AI 身份和人格）
+	soulContent := cb.readTemplateFile("SOUL.md")
 	if soulContent != "" {
 		parts = append(parts, "## 身份与人格")
 		parts = append(parts, soulContent)
 	}
 
-	// 读取并渲染 USER.md 模板（用户信息）
-	userContent := cb.renderTemplateFile("USER.md", templateData)
+	// 读取 USER.md 文件（用户信息）
+	userContent := cb.readTemplateFile("USER.md")
 	if userContent != "" {
 		parts = append(parts, "", "## 用户信息")
 		parts = append(parts, userContent)
@@ -119,22 +109,8 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 	return strings.Join(parts, "\n")
 }
 
-// getTemplateData 获取模板数据
-func (cb *ContextBuilder) getTemplateData() TemplateData {
-	data := TemplateData{
-		AgentName: cb.agent.Name(),
-		UserName:  "",
-	}
-
-	// 从会话元数据或记忆中获取用户称呼
-	// 这里可以扩展为从 storage 中读取用户名称
-	// 目前返回空字符串，让 AI 在首次对话时询问用户
-
-	return data
-}
-
-// renderTemplateFile 读取并渲染模板文件
-func (cb *ContextBuilder) renderTemplateFile(filename string, data TemplateData) string {
+// readTemplateFile 读取模板文件内容
+func (cb *ContextBuilder) readTemplateFile(filename string) string {
 	workspace := cb.agent.Workspace()
 	if workspace == "" {
 		return ""
@@ -142,7 +118,6 @@ func (cb *ContextBuilder) renderTemplateFile(filename string, data TemplateData)
 
 	templatePath := filepath.Join(workspace, "..", "templates", filename)
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-		// 尝试从当前工作目录
 		templatePath = filepath.Join("templates", filename)
 		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 			cb.logger.Debug("Template file not found", "file", filename)
@@ -150,27 +125,13 @@ func (cb *ContextBuilder) renderTemplateFile(filename string, data TemplateData)
 		}
 	}
 
-	// 读取模板内容
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
 		cb.logger.Warn("Failed to read template file", "file", templatePath, "error", err)
 		return ""
 	}
 
-	// 渲染模板
-	tmpl, err := template.New(filename).Parse(string(content))
-	if err != nil {
-		cb.logger.Warn("Failed to parse template", "file", filename, "error", err)
-		return string(content) // 返回未渲染的内容
-	}
-
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, data); err != nil {
-		cb.logger.Warn("Failed to render template", "file", filename, "error", err)
-		return string(content)
-	}
-
-	return buf.String()
+	return string(content)
 }
 
 // readMemoryFile 读取 workspace/memory/MEMORY.md 文件
@@ -334,7 +295,6 @@ func updateMarkdownSection(content, section, newContent string) (string, error) 
 		if strings.HasPrefix(trimmed, "##") {
 			if inSection && !updated {
 				// 到达下一个部分，需要插入新内容
-				// 找到当前部分结束位置（下一个 ## 或文件结尾）
 				result.WriteString(newContent)
 				result.WriteString("\n")
 				updated = true
@@ -346,6 +306,11 @@ func updateMarkdownSection(content, section, newContent string) (string, error) 
 				inSection = true
 				sectionFound = true
 			}
+
+			// 标题行始终写入
+			result.WriteString(line)
+			result.WriteString("\n")
+			continue
 		}
 
 		// 如果在目标部分内，跳过原有内容（保留注释外的）
