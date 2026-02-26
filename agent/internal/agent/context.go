@@ -110,12 +110,24 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 }
 
 // readTemplateFile 读取模板文件内容
+// 优先读取 workspace 目录下的文件，如果不存在则回退到 templates 目录
 func (cb *ContextBuilder) readTemplateFile(filename string) string {
 	workspace := cb.agent.Workspace()
 	if workspace == "" {
 		return ""
 	}
 
+	// 优先读取 workspace 目录下的文件
+	workspacePath := filepath.Join(workspace, filename)
+	if _, err := os.Stat(workspacePath); err == nil {
+		content, err := os.ReadFile(workspacePath)
+		if err == nil {
+			cb.logger.Debug("Read template from workspace", "file", filename, "path", workspacePath)
+			return string(content)
+		}
+	}
+
+	// 回退到 templates 目录
 	templatePath := filepath.Join(workspace, "..", "templates", filename)
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		templatePath = filepath.Join("templates", filename)
