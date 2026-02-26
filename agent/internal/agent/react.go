@@ -188,7 +188,10 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			logger.Warn("Hook OnLLMResponse error", "error", err)
 		}
 
-		logger.Info("LLM response", "iteration", iteration, "content_length", len(content), "tool_calls", len(toolCalls))
+		logger.Info("LLM response", "iteration", iteration, "content_length", len(content), "tool_calls", len(toolCalls), "content_preview", content[:min(200, len(content))])
+
+		// 调试：打印原始 toolCallsData
+		logger.Debug("toolCallsData debug", "count", len(streamState.toolCallsData), "data", streamState.toolCallsData)
 
 		// 检查是否需要执行工具
 		if len(toolCalls) == 0 {

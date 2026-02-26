@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/icooclaw/icooclaw/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -431,7 +432,7 @@ func TestExpandPath(t *testing.T) {
 				}
 			}()
 
-			result, err := expandPath(tt.input)
+			result, err := utils.ExpandPath(tt.input)
 			if tt.shouldError {
 				assert.Error(t, err)
 			} else {

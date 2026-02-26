@@ -410,6 +410,8 @@ func (a *Agent) UpdateSoulFile(section, content string) error {
 		return fmt.Errorf("workspace not set")
 	}
 
+	fmt.Println("工作目录[UpdateSoulFile]", workspace)
+
 	soulPath := filepath.Join(workspace, "SOUL.md")
 	a.logger.Debug("UpdateSoulFile called", "path", soulPath, "section", section, "content", content)
 	return a.updateTemplateFile(soulPath, section, content)

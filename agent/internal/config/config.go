@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
+	"github.com/icooclaw/icooclaw/pkg/utils"
 	"github.com/spf13/viper"
 )
 
@@ -218,11 +220,17 @@ func Load() (*Config, error) {
 		viper.AddConfigPath("./config")
 	}
 
+	// 如果是Linux系统，默认工作空间为$HOME/.icooclaw/workspace
+	if runtime.GOOS == "linux" {
+		viper.SetDefault("workspace", "$HOME/.icooclaw/workspace")
+	} else {
+		viper.SetDefault("workspace", "./workspace")
+	}
+
 	viper.SetDefault("database.path", "./data/icooclaw.db")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "text")
 	viper.SetDefault("log.output", "")
-	viper.SetDefault("workspace", "$HOME/.icooclaw/workspace")
 	viper.SetDefault("agents.default_provider", "openrouter")
 	viper.SetDefault("scheduler.enabled", false)
 	viper.SetDefault("scheduler.heartbeat_interval", 30)
@@ -358,12 +366,12 @@ var TemplatesDir string
 // InitWorkspace 初始化工作目录
 // 如果 workspace 目录不存在则创建，并将 templates 模板复制到 workspace 中
 func InitWorkspace(workspace string) error {
-	workspace, err := expandPath(workspace)
+	workspace, err := utils.ExpandPath(workspace)
 	if err != nil {
 		return fmt.Errorf("failed to expand workspace path: %w", err)
 	}
 
-	fmt.Println("工作目录", workspace)
+	fmt.Println("工作目录[InitWorkspace]", workspace)
 
 	if err := os.MkdirAll(workspace, 0755); err != nil {
 		return fmt.Errorf("failed to create workspace directory: %w", err)
@@ -374,30 +382,6 @@ func InitWorkspace(workspace string) error {
 	}
 
 	return nil
-}
-
-// expandPath 展开路径中的环境变量和 ~ 符号
-func expandPath(path string) (string, error) {
-	if path == "" {
-		return "", fmt.Errorf("path is empty")
-	}
-
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		path = filepath.Join(home, path[1:])
-	}
-
-	path = os.ExpandEnv(path)
-
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-
-	return absPath, nil
 }
 
 // copyTemplatesToWorkspace 将模板文件复制到 workspace 目录

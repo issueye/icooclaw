@@ -17,6 +17,7 @@ import (
 	"github.com/icooclaw/icooclaw/internal/provider"
 	"github.com/icooclaw/icooclaw/internal/scheduler"
 	"github.com/icooclaw/icooclaw/internal/storage"
+	"github.com/icooclaw/icooclaw/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
@@ -71,7 +72,14 @@ func initComponents() error {
 	slog.SetDefault(logger)
 
 	// 3. 初始化工作空间目录
-	workspace := cfg.Workspace
+	workspace, err := utils.ExpandPath(cfg.Workspace)
+	if err != nil {
+		return fmt.Errorf("failed to expand workspace path: %w", err)
+	}
+
+	// 4. 初始化工作空间目录
+	fmt.Println("工作目录[initComponents]", workspace)
+
 	if workspace == "" {
 		workspace = cfg.Tools.Workspace
 	}
