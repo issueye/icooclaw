@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Global variables for initialized components
+// 初始化组件的全局变量
 var (
 	cfg            *config.Config
 	logger         *slog.Logger
@@ -34,7 +34,7 @@ var (
 	toolRegistry   *tools.Registry
 )
 
-// RootCmd represents the root command
+// RootCmd 代表根命令
 var rootCmd = &cobra.Command{
 	Use:   "icooclaw",
 	Short: "icooclaw - AI 代理 CLI 工具",
@@ -47,7 +47,7 @@ var rootCmd = &cobra.Command{
   icooclaw cron list    # 列出定时任务
   icooclaw config get   # 获取配置`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip initialization for help, version, and completion commands
+		// 跳过 help、version 和 completion 命令的初始化
 		if cmd.Name() == "help" || cmd.Name() == "version" || cmd.Name() == "completion" {
 			return nil
 		}
@@ -55,7 +55,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// initComponents initializes all required components
+// initComponents 初始化所有必需的组件
 func initComponents() error {
 	var err error
 
@@ -125,12 +125,12 @@ func initComponents() error {
 	return nil
 }
 
-// getContext creates a cancellable context
+// getContext 创建一个可取消的上下文
 func getContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
 }
 
-// handleSignals sets up signal handling
+// handleSignals 设置信号处理
 func handleSignals(cancel context.CancelFunc) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -142,18 +142,18 @@ func handleSignals(cancel context.CancelFunc) {
 	}()
 }
 
-// cleanup performs cleanup operations
+// cleanup 执行清理操作
 func cleanup() {
 	logger.Info("正在关闭...")
 
-	// Stop WebSocket channel
+	// 停止 WebSocket 通道
 	if channelManager != nil {
 		if wsCh, err := channelManager.Get("websocket"); err == nil {
 			wsCh.Stop()
 		}
 	}
 
-	// Stop scheduler
+	// 停止调度器
 	if schedulerInst != nil && schedulerInst.IsRunning() {
 		schedulerInst.Stop()
 	}
@@ -161,7 +161,7 @@ func cleanup() {
 	logger.Info("关闭完成")
 }
 
-// printProviders prints available providers
+// printProviders 打印可用的提供商
 func printProviders() {
 	providers := providerReg.List()
 	fmt.Println("可用的提供商:")
@@ -172,12 +172,12 @@ func printProviders() {
 }
 
 func Execute() error {
-	// Add persistent flags
+	// 添加持久化标志
 	rootCmd.PersistentFlags().StringP("config", "c", "", "配置文件路径")
 	rootCmd.PersistentFlags().StringP("log-level", "l", "", "日志级别 (debug, info, warn, error)")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "详细输出")
 
-	// Bind flags to viper
+	// 绑定标志到 viper
 	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 	viper.BindPFlag("log.level", rootCmd.PersistentFlags().Lookup("log-level"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
