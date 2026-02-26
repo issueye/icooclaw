@@ -61,6 +61,18 @@ func (t *CreateJSTool) Description() string {
 - Base64.encode(str) - Base64 编码
 - Base64.decode(str) - Base64 解码
 
+### crypto - 加密工具（已内置）
+- crypto.md5(data) - MD5 哈希
+- crypto.sha1(data) - SHA1 哈希
+- crypto.sha256(data) - SHA256 哈希
+- crypto.hmacMD5(data, key) - HMAC-MD5
+- crypto.hmacSHA1(data, key) - HMAC-SHA1
+- crypto.hmacSHA256(data, key) - HMAC-SHA256
+- crypto.aesEncrypt(plaintext, key) - AES 加密
+- crypto.aesDecrypt(ciphertext, key) - AES 解密
+- crypto.base64Encode(data) / crypto.base64Decode(encoded) - Base64 编解码
+- crypto.hexEncode(data) / crypto.hexDecode(encoded) - Hex 编解码
+
 ### fs - 文件系统（需要设置 permissions.fileRead/fileWrite/fileDelete）
 - fs.readFile(path) - 读取文件内容
 - fs.writeFile(path, content) - 写入文件

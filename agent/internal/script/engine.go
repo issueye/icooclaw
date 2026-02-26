@@ -3,7 +3,15 @@ package script
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/md5"
+	"crypto/rand"
+	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -226,6 +234,9 @@ func (e *Engine) setupBuiltins() {
 
 	// 标准库扩展
 	e.setupStdLib()
+
+	// crypto 加密库
+	e.setupCrypto()
 }
 
 // setupStdLib 设置标准库扩展
@@ -256,7 +267,180 @@ func (e *Engine) setupStdLib() {
 			b, err := base64.StdEncoding.DecodeString(s)
 			return string(b), err
 		},
+		"encodeURL": func(s string) string {
+			return base64.URLEncoding.EncodeToString([]byte(s))
+		},
+		"decodeURL": func(s string) (string, error) {
+			b, err := base64.URLEncoding.DecodeString(s)
+			return string(b), err
+		},
 	})
+}
+
+// setupCrypto 设置加密库
+func (e *Engine) setupCrypto() {
+	cryptoObj := &crypto{}
+	e.SetGlobal("crypto", map[string]interface{}{
+		// HMAC
+		"hmacSHA1":   cryptoObj.HmacSHA1,
+		"hmacSHA256": cryptoObj.HmacSHA256,
+		"hmacMD5":    cryptoObj.HmacMD5,
+
+		// 哈希
+		"sha1":   cryptoObj.SHA1,
+		"sha256": cryptoObj.SHA256,
+		"md5":    cryptoObj.MD5,
+
+		// AES
+		"aesEncrypt": cryptoObj.AESEncrypt,
+		"aesDecrypt": cryptoObj.AESDecrypt,
+
+		// Base64
+		"base64Encode": cryptoObj.Base64Encode,
+		"base64Decode": cryptoObj.Base64Decode,
+
+		// Hex
+		"hexEncode": cryptoObj.HexEncode,
+		"hexDecode": cryptoObj.HexDecode,
+	})
+}
+
+// === crypto 加密对象 ===
+
+type crypto struct{}
+
+// HmacSHA1 生成 HMAC-SHA1
+func (c *crypto) HmacSHA1(data, key string) string {
+	h := hmac.New(sha1.New, []byte(key))
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// HmacSHA256 生成 HMAC-SHA256
+func (c *crypto) HmacSHA256(data, key string) string {
+	h := hmac.New(sha256.New, []byte(key))
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// HmacMD5 生成 HMAC-MD5
+func (c *crypto) HmacMD5(data, key string) string {
+	h := hmac.New(md5.New, []byte(key))
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// SHA1 生成 SHA1 哈希
+func (c *crypto) SHA1(data string) string {
+	h := sha1.New()
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// SHA256 生成 SHA256 哈希
+func (c *crypto) SHA256(data string) string {
+	h := sha256.New()
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// MD5 生成 MD5 哈希
+func (c *crypto) MD5(data string) string {
+	h := md5.New()
+	h.Write([]byte(data))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// AESEncrypt AES 加密
+// key 可以是 16, 24, 或 32 字节，分别对应 AES-128, AES-192, AES-256
+func (c *crypto) AESEncrypt(plaintext, key string) (string, error) {
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", err
+	}
+
+	// PKCS7 填充
+	blockSize := block.BlockSize()
+	plaintextBytes := []byte(plaintext)
+	padding := blockSize - len(plaintextBytes)%blockSize
+	for i := 0; i < padding; i++ {
+		plaintextBytes = append(plaintextBytes, byte(padding))
+	}
+
+	// CBC 模式
+	ciphertext := make([]byte, len(plaintextBytes))
+	iv := make([]byte, blockSize)
+	if _, err := rand.Read(iv); err != nil {
+		return "", err
+	}
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(ciphertext, plaintextBytes)
+
+	// 将 IV 放在前面
+	result := append(iv, ciphertext...)
+	return base64.StdEncoding.EncodeToString(result), nil
+}
+
+// AESDecrypt AES 解密
+func (c *crypto) AESDecrypt(ciphertextBase64, key string) (string, error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextBase64)
+	if err != nil {
+		return "", err
+	}
+
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", err
+	}
+
+	// 提取 IV
+	blockSize := block.BlockSize()
+	if len(ciphertext) < blockSize {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+	iv := ciphertext[:blockSize]
+	ciphertext = ciphertext[blockSize:]
+
+	// CBC 模式
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(ciphertext, ciphertext)
+
+	// 去除 PKCS7 填充
+	padding := int(ciphertext[len(ciphertext)-1])
+	if padding > blockSize || padding == 0 {
+		return "", fmt.Errorf("invalid padding")
+	}
+	ciphertext = ciphertext[:len(ciphertext)-padding]
+
+	return string(ciphertext), nil
+}
+
+// Base64Encode Base64 编码
+func (c *crypto) Base64Encode(data string) string {
+	return base64.StdEncoding.EncodeToString([]byte(data))
+}
+
+// Base64Decode Base64 解码
+func (c *crypto) Base64Decode(encoded string) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
+}
+
+// HexEncode Hex 编码
+func (c *crypto) HexEncode(data string) string {
+	return hex.EncodeToString([]byte(data))
+}
+
+// HexDecode Hex 解码
+func (c *crypto) HexDecode(encoded string) (string, error) {
+	decoded, err := hex.DecodeString(encoded)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
 }
 
 // resolvePath 解析路径

@@ -85,6 +85,13 @@ func (a *Agent) Tools() *tools.Registry {
 // SetTools 设置工具注册表
 func (a *Agent) SetTools(registry *tools.Registry) {
 	a.tools = registry
+
+	// 注册 memory_update 工具（用于更新 SOUL.md 和 USER.md）
+	memoryConfig := &tools.MemoryUpdateConfig{
+		Agent: a,
+	}
+	registry.Register(tools.NewMemoryUpdateTool(memoryConfig))
+	a.logger.Debug("Registered tool: memory_update")
 }
 
 // Storage 获取存储
@@ -195,21 +202,43 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	clientID, _ := msg.Metadata["client_id"].(string)
 
 	// 运行 Agent Loop (带流式回调)
-	onChunk := func(chunk string) {
+	onChunk := func(chunk, thinking string) {
 		if a.bus != nil {
-			a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-				Type:      "chunk",
-				Channel:   msg.Channel,
-				ChatID:    msg.ChatID,
-				Content:   chunk,
-				Timestamp: time.Now(),
-				Metadata:  map[string]interface{}{"client_id": clientID},
-			})
+			// 发送内容块
+			if chunk != "" {
+				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+					Type:      "chunk",
+					Channel:   msg.Channel,
+					ChatID:    msg.ChatID,
+					Content:   chunk,
+					Timestamp: time.Now(),
+					Metadata:  map[string]interface{}{"client_id": clientID},
+				})
+			}
+			// 发送思考内容更新
+			if thinking != "" {
+				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+					Type:      "thinking",
+					Channel:   msg.Channel,
+					ChatID:    msg.ChatID,
+					Thinking:  thinking,
+					Timestamp: time.Now(),
+					Metadata:  map[string]interface{}{"client_id": clientID},
+				})
+			}
 		}
 	}
 
-	loop := NewLoopWithStream(a, session, a.logger, onChunk)
-	response, toolCalls, err := loop.Run(ctx, messages, systemPrompt)
+	// 创建 ReAct 配置和 Hooks
+	config := NewReActConfig()
+	config.Provider = a.Provider()
+	config.Tools = a.Tools()
+	config.Session = session
+	config.Logger = a.logger
+	config.Hooks = &loopHooks{agent: a, onChunk: onChunk}
+
+	reactAgent := NewReActAgent(config)
+	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
 		a.logger.Error("Agent loop failed", "error", err)
 		return
@@ -228,7 +257,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 
 	// 保存助手消息
 	toolCallsJSON, _ := json.Marshal(toolCalls)
-	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", "")
+	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", reasoningContent)
 	if err != nil {
 		a.logger.Error("Failed to save assistant message", "error", err)
 	}
@@ -268,15 +297,22 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 	}
 
 	// 运行 Agent Loop
-	loop := NewLoop(a, session, a.logger)
-	response, toolCalls, err := loop.Run(ctx, messages, systemPrompt)
+	config := NewReActConfig()
+	config.Provider = a.Provider()
+	config.Tools = a.Tools()
+	config.Session = session
+	config.Logger = a.logger
+	config.Hooks = &DefaultHooks{}
+
+	reactAgent := NewReActAgent(config)
+	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("agent loop failed: %w", err)
 	}
 
 	// 保存助手消息
 	toolCallsJSON, _ := json.Marshal(toolCalls)
-	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", "")
+	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", reasoningContent)
 	if err != nil {
 		a.logger.Warn("Failed to save assistant message", "error", err)
 	}

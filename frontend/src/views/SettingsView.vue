@@ -1,14 +1,14 @@
 <template>
-    <div class="min-h-screen bg-[#0d0d0d] text-[#f0f0f0]">
+    <div class="w-full min-h-screen bg-bg-primary text-text-primary">
         <!-- Header -->
-        <header class="border-b border-[#2a2a2a] bg-[#151515]">
+        <header class="border-b border-border bg-[#151515]">
             <div
                 class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between"
             >
                 <div class="flex items-center gap-3">
                     <button
                         @click="router.back()"
-                        class="p-2 rounded-lg hover:bg-[#2a2a2a] transition-colors"
+                        class="p-2 rounded-lg `hover:bg-border transition-colors"
                     >
                         <ArrowLeftIcon :size="20" />
                     </button>
@@ -19,63 +19,59 @@
 
         <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
             <!-- 连接设置 -->
-            <section
-                class="bg-[#151515] rounded-xl border border-[#2a2a2a] p-6"
-            >
+            <section class="bg-[#151515] rounded-xl border border-border p-6">
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
-                    <SettingsIcon :size="20" class="text-[#7c6af7]" />
+                    <SettingsIcon :size="20" class="text-accent" />
                     连接设置
                 </h2>
 
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-[#909090] mb-2"
+                        <label class="block text-sm text-text-secondary mb-2"
                             >WebSocket 地址</label
                         >
                         <input
                             v-model="wsUrl"
                             type="text"
                             placeholder="ws://localhost:8080/ws"
-                            class="w-full px-4 py-2.5 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
                         />
                     </div>
 
                     <div>
-                        <label class="block text-sm text-[#909090] mb-2"
-                            >API 基础地址</label
-                        >
+                        <label class="block text-sm text-text-secondary mb-2">
+                            API 基础地址
+                        </label>
                         <input
                             v-model="apiBase"
                             type="text"
                             placeholder="http://localhost:8080"
-                            class="w-full px-4 py-2.5 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
                         />
                     </div>
 
                     <div>
-                        <label class="block text-sm text-[#909090] mb-2"
-                            >用户 ID</label
-                        >
+                        <label class="block text-sm text-text-secondary mb-2">
+                            用户 ID
+                        </label>
                         <input
                             v-model="userId"
                             type="text"
                             placeholder="user-1"
-                            class="w-full px-4 py-2.5 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
                         />
                     </div>
                 </div>
             </section>
 
             <!-- Provider 设置 -->
-            <section
-                class="bg-[#151515] rounded-xl border border-[#2a2a2a] p-6"
-            >
+            <section class="bg-[#151515] rounded-xl border border-border p-6">
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
-                    <BotIcon :size="20" class="text-[#7c6af7]" />
+                    <BotIcon :size="20" class="text-accent" />
                     LLM Provider
                 </h2>
 
-                <div v-if="loading" class="text-[#909090]">加载中...</div>
+                <div v-if="loading" class="text-text-secondary">加载中...</div>
 
                 <div
                     v-else-if="providers.length > 0"
@@ -84,18 +80,18 @@
                     <div
                         v-for="provider in providers"
                         :key="provider.name"
-                        class="p-3 bg-[#1e1e1e] rounded-lg border border-[#2a2a2a]"
+                        class="p-3 bg-bg-tertiary rounded-lg border border-border"
                     >
                         <div class="font-medium text-sm">
                             {{ provider.name }}
                         </div>
-                        <div class="text-xs text-[#909090] mt-1">
+                        <div class="text-xs text-text-secondary mt-1">
                             {{ provider.model }}
                         </div>
                     </div>
                 </div>
 
-                <div v-else class="text-[#909090] text-sm">
+                <div v-else class="text-text-secondary text-sm">
                     无法获取 Provider 信息，请检查后端服务是否运行
                 </div>
             </section>
@@ -103,33 +99,31 @@
             <!-- 技能管理入口 -->
             <section
                 @click="router.push('/skills')"
-                class="bg-[#151515] rounded-xl border border-[#2a2a2a] p-6 cursor-pointer hover:border-[#7c6af7]/50 transition-colors"
+                class="bg-[#151515] rounded-xl border border-border p-6 cursor-pointer hover:border-accent/50 transition-colors"
             >
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
-                    <SparklesIcon :size="20" class="text-[#7c6af7]" />
+                    <SparklesIcon :size="20" class="text-accent" />
                     技能管理
                     <ChevronRightIcon
                         :size="20"
-                        class="ml-auto text-[#909090]"
+                        class="ml-auto text-text-secondary"
                     />
                 </h2>
-                <p class="text-sm text-[#909090]">
+                <p class="text-sm text-text-secondary">
                     管理自定义技能，扩展 AI 助手能力
                 </p>
             </section>
 
             <!-- 状态信息 -->
-            <section
-                class="bg-[#151515] rounded-xl border border-[#2a2a2a] p-6"
-            >
+            <section class="bg-[#151515] rounded-xl border border-border p-6">
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
-                    <ActivityIcon :size="20" class="text-[#7c6af7]" />
+                    <ActivityIcon :size="20" class="text-accent" />
                     连接状态
                 </h2>
 
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
-                        <span class="text-[#909090]">API 状态</span>
+                        <span class="text-text-secondary">API 状态</span>
                         <span
                             :class="
                                 apiHealth === 'ok'
@@ -141,12 +135,14 @@
                         </span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="text-[#909090]">WebSocket</span>
-                        <span class="text-[#909090]">{{ wsStatus }}</span>
+                        <span class="text-text-secondary">WebSocket</span>
+                        <span class="text-text-secondary">{{ wsStatus }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="text-[#909090]">会话数量</span>
-                        <span class="text-[#909090]">{{ sessionCount }}</span>
+                        <span class="text-text-secondary">会话数量</span>
+                        <span class="text-text-secondary">{{
+                            sessionCount
+                        }}</span>
                     </div>
                 </div>
             </section>
@@ -155,13 +151,13 @@
             <div class="flex justify-end gap-3">
                 <button
                     @click="router.back()"
-                    class="px-6 py-2.5 rounded-lg border border-[#2a2a2a] hover:bg-[#1e1e1e] transition-colors"
+                    class="px-6 py-2.5 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
                 >
                     取消
                 </button>
                 <button
                     @click="handleSave"
-                    class="px-6 py-2.5 rounded-lg bg-[#7c6af7] hover:bg-[#6b5ce7] transition-colors font-medium"
+                    class="px-6 py-2.5 rounded-lg bg-accent hover:bg-[#6b5ce7] transition-colors font-medium"
                 >
                     保存设置
                 </button>

@@ -113,6 +113,7 @@ export const useChatStore = defineStore("chat", () => {
       id: generateId(),
       role: "assistant",
       content: "",
+      thinking: "",
       timestamp: Date.now(),
       streaming: true,
     };
@@ -128,6 +129,16 @@ export const useChatStore = defineStore("chat", () => {
     const lastMsg = msgs[msgs.length - 1];
     if (lastMsg && lastMsg.role === "assistant") {
       lastMsg.content += content;
+      saveSessions(sessions.value);
+    }
+  }
+
+  function updateThinking(content) {
+    if (!currentSession.value) return;
+    const msgs = currentSession.value.messages;
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg && lastMsg.role === "assistant") {
+      lastMsg.thinking = content;
       saveSessions(sessions.value);
     }
   }
@@ -201,6 +212,7 @@ export const useChatStore = defineStore("chat", () => {
     addUserMessage,
     addAIMessage,
     appendToLastAI,
+    updateThinking,
     finishLastAI,
     clearCurrentMessages,
     ensureSession,

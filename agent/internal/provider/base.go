@@ -301,3 +301,100 @@ func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request,
 
 	return nil
 }
+
+// ============ 思考内容解析器 ============
+
+// ThinkTagParser 思考内容标签解析器
+// 用于解析不同模型返回的思考内容标签
+type ThinkTagParser struct {
+	// 思考内容开始标签
+	StartTag string
+	// 思考内容结束标签
+	EndTag string
+}
+
+// 常见的思考标签解析器
+var (
+	// DeepSeek 使用的思考标签
+	DeepSeekParser = &ThinkTagParser{
+		StartTag: "<think>",
+		EndTag:   "</think>",
+	}
+
+	// Kimi 使用的思考标签
+	KimiParser = &ThinkTagParser{
+		StartTag: "<|start_header_id|>reasoning<|end_header_id|>",
+		EndTag:   "<|start_header_id|>assistant<|end_header_id|>",
+	}
+
+	// 豆包使用的思考标签
+	DoubaoParser = &ThinkTagParser{
+		StartTag: "<think>",
+		EndTag:   "</think>",
+	}
+
+	// 默认解析器 - 支持多种标签
+	DefaultParser = &ThinkTagParser{
+		StartTag: "<think>",
+		EndTag:   "</think>",
+	}
+)
+
+// ExtractThinkingContent 从内容中提取思考内容并清理内容
+// 返回: (清理后的内容, 思考内容)
+func ExtractThinkingContent(content, reasoningContent string) (string, string) {
+	// 1. 如果有独立的 reasoning_content 字段，优先使用
+	if reasoningContent != "" {
+		return content, reasoningContent
+	}
+
+	// 2. 从 content 中解析思考标签 (DeepSeek-R1 等模型)
+	thinking := extractFromTags(content, DeepSeekParser)
+	if thinking != "" {
+		return content, thinking
+	}
+
+	// 3. 尝试 Kimi 格式
+	thinking = extractFromTags(content, KimiParser)
+	if thinking != "" {
+		return content, thinking
+	}
+
+	// 4. 尝试豆包格式
+	thinking = extractFromTags(content, DoubaoParser)
+	if thinking != "" {
+		return content, thinking
+	}
+
+	// 没有找到思考内容
+	return content, ""
+}
+
+// extractFromTags 使用指定的标签解析器提取思考内容
+func extractFromTags(content string, parser *ThinkTagParser) string {
+	startIdx := strings.Index(content, parser.StartTag)
+	if startIdx == -1 {
+		return ""
+	}
+
+	endIdx := strings.Index(content, parser.EndTag)
+	if endIdx == -1 {
+		return ""
+	}
+
+	// 提取思考内容
+	startIdx += len(parser.StartTag)
+	thinking := strings.TrimSpace(content[startIdx:endIdx])
+
+	return thinking
+}
+
+// CleanThinkingTags 从内容中移除思考标签
+// 返回: 清理后的内容
+func CleanThinkingTags(content string) string {
+	content = strings.ReplaceAll(content, "<think>", "")
+	content = strings.ReplaceAll(content, "</think>", "")
+	content = strings.ReplaceAll(content, "<|start_header_id|>reasoning<|end_header_id|>", "")
+	content = strings.ReplaceAll(content, "<|start_header_id|>assistant<|end_header_id|>", "")
+	return strings.TrimSpace(content)
+}

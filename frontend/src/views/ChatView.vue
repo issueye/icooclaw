@@ -1,5 +1,5 @@
 <template>
-    <div class="flex w-full h-screen bg-[#0d0d0d] overflow-hidden">
+    <div class="flex w-full h-screen bg-bg-primary overflow-hidden">
         <!-- 左侧边栏 -->
         <ChatSidebar
             :sessions="chatStore.sessions"
@@ -40,14 +40,14 @@
                     class="text-center px-4 max-w-2xl"
                 >
                     <div
-                        class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#7c6af7] to-[#5b4fcf] flex items-center justify-center shadow-xl shadow-[#7c6af7]/20"
+                        class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-linear-to-br from-accent to-[#5b4fcf] flex items-center justify-center shadow-xl shadow-[#7c6af7]/20"
                     >
                         <BotIcon :size="28" class="text-white" />
                     </div>
-                    <h2 class="text-2xl font-semibold text-[#f0f0f0] mb-3">
+                    <h2 class="text-2xl font-semibold text-text-primary mb-3">
                         开始与 AI 对话
                     </h2>
-                    <p class="text-[#909090] text-sm leading-relaxed mb-8">
+                    <p class="text-text-secondary text-sm leading-relaxed mb-8">
                         icooclaw 是一个强大的 AI
                         Agent，支持工具调用、记忆系统和多种 LLM 模型。
                     </p>
@@ -57,7 +57,7 @@
                             v-for="hint in hints"
                             :key="hint"
                             @click="sendMessage(hint)"
-                            class="px-4 py-3 rounded-xl bg-[#1e1e1e] border border-[#2a2a2a] text-sm text-[#909090] hover:bg-[#252525] hover:text-[#f0f0f0] hover:border-[#7c6af7]/30 transition-all text-left"
+                            class="px-4 py-3 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:bg-[#252525] hover:text-text-primary hover:border-[#7c6af7]/30 transition-all text-left"
                         >
                             {{ hint }}
                         </button>
@@ -84,9 +84,7 @@
                 <div class="flex items-center justify-between px-4 pb-2">
                     <p class="text-xs text-[#606060]">
                         连接到
-                        <span class="text-[#7c6af7]">{{
-                            chatStore.wsUrl
-                        }}</span>
+                        <span class="text-accent">{{ chatStore.wsUrl }}</span>
                     </p>
                     <p
                         class="text-xs"
@@ -152,6 +150,8 @@ onMessage((msg) => {
     if (msg.type === "chunk") {
         chatStore.appendToLastAI(msg.content || "");
         scrollToBottom();
+    } else if (msg.type === "thinking") {
+        chatStore.updateThinking(msg.thinking || "");
     } else if (msg.type === "chunk_end" || msg.type === "message") {
         if (msg.type === "message") {
             chatStore.finishLastAI(msg.content || "");

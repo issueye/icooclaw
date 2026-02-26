@@ -77,6 +77,30 @@ func (s *SkillsLoader) loadBuiltInSkills() {
 	// 添加内置技能
 	builtInSkills := []Skill{
 		{
+			Name:        "identity",
+			Description: "身份设定技能",
+			Content: `## 身份设定技能
+
+你可以帮助用户设定 AI 的身份、名字以及用户的称呼。
+
+### 设定 AI 身份/名字
+当用户告诉你它的名字时，你应该：
+1. 使用 memory_update 工具更新 SOUL.md 文件的 "身份" 部分
+2. 格式：设置我的名字为 [名字]
+
+### 设定用户称呼
+当用户告诉你希望如何称呼他时，你应该：
+1. 使用 memory_update 工具更新 USER.md 文件的 "用户称呼" 部分
+2. 格式：叫我 [称呼] 即可 / 请叫我 [称呼]
+
+### 重要提示
+- 如果用户还没有设置称呼，第一次对话时你应该主动询问用户希望如何称呼
+- 如果 AI 还没有名字，你应该主动询问用户希望给你起什么名字
+- 记住用户的称呼并在后续对话中使用`,
+			AlwaysLoad: true,
+			Enabled:    true,
+		},
+		{
 			Name:        "file",
 			Description: "文件操作技能",
 			Content: `## 文件操作技能

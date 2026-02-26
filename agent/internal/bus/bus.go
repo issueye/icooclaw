@@ -21,10 +21,11 @@ type InboundMessage struct {
 // OutboundMessage 发送消息
 type OutboundMessage struct {
 	ID        string
-	Type      string // "message", "chunk", "chunk_end", "tool_call", "error"
+	Type      string // "message", "chunk", "chunk_end", "tool_call", "error", "thinking"
 	Channel   string
 	ChatID    string
 	Content   string
+	Thinking  string // 思考内容
 	Timestamp time.Time
 	Metadata  map[string]interface{}
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/icooclaw/icooclaw/internal/provider"
@@ -19,6 +20,12 @@ type ContextBuilder struct {
 	agent   *Agent
 	session *storage.Session
 	logger  *slog.Logger
+}
+
+// TemplateData 模板数据
+type TemplateData struct {
+	AgentName string // AI 名字
+	UserName  string // 用户称呼
 }
 
 // NewContextBuilder 创建上下文构建器
@@ -55,16 +62,35 @@ func (cb *ContextBuilder) Build(ctx context.Context) ([]provider.Message, string
 func (cb *ContextBuilder) buildSystemPrompt() string {
 	var parts []string
 
+	// 获取模板数据
+	templateData := cb.getTemplateData()
+
+	// 读取并渲染 SOUL.md 模板（AI 身份和人格）
+	soulContent := cb.renderTemplateFile("SOUL.md", templateData)
+	if soulContent != "" {
+		parts = append(parts, "## 身份与人格")
+		parts = append(parts, soulContent)
+	}
+
+	// 读取并渲染 USER.md 模板（用户信息）
+	userContent := cb.renderTemplateFile("USER.md", templateData)
+	if userContent != "" {
+		parts = append(parts, "", "## 用户信息")
+		parts = append(parts, userContent)
+	}
+
 	// 添加用户设定的角色提示词（优先级最高）
 	rolePrompt, err := cb.agent.GetSessionRolePrompt(cb.session.ID)
 	if err == nil && rolePrompt != "" {
+		parts = append(parts, "", "## 角色设定")
 		parts = append(parts, rolePrompt)
 	}
 
 	// 添加默认系统提示词
 	defaultPrompt := cb.agent.GetSystemPrompt()
 	if defaultPrompt != "" {
-		parts = append(parts, "", defaultPrompt)
+		parts = append(parts, "", "## 系统指令")
+		parts = append(parts, defaultPrompt)
 	}
 
 	// 读取 workspace 下的记忆文件
@@ -91,6 +117,60 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+// getTemplateData 获取模板数据
+func (cb *ContextBuilder) getTemplateData() TemplateData {
+	data := TemplateData{
+		AgentName: cb.agent.Name(),
+		UserName:  "",
+	}
+
+	// 从会话元数据或记忆中获取用户称呼
+	// 这里可以扩展为从 storage 中读取用户名称
+	// 目前返回空字符串，让 AI 在首次对话时询问用户
+
+	return data
+}
+
+// renderTemplateFile 读取并渲染模板文件
+func (cb *ContextBuilder) renderTemplateFile(filename string, data TemplateData) string {
+	workspace := cb.agent.Workspace()
+	if workspace == "" {
+		return ""
+	}
+
+	templatePath := filepath.Join(workspace, "..", "templates", filename)
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		// 尝试从当前工作目录
+		templatePath = filepath.Join("templates", filename)
+		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+			cb.logger.Debug("Template file not found", "file", filename)
+			return ""
+		}
+	}
+
+	// 读取模板内容
+	content, err := os.ReadFile(templatePath)
+	if err != nil {
+		cb.logger.Warn("Failed to read template file", "file", templatePath, "error", err)
+		return ""
+	}
+
+	// 渲染模板
+	tmpl, err := template.New(filename).Parse(string(content))
+	if err != nil {
+		cb.logger.Warn("Failed to parse template", "file", filename, "error", err)
+		return string(content) // 返回未渲染的内容
+	}
+
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		cb.logger.Warn("Failed to render template", "file", filename, "error", err)
+		return string(content)
+	}
+
+	return buf.String()
 }
 
 // readMemoryFile 读取 workspace/memory/MEMORY.md 文件
@@ -356,6 +436,58 @@ func (a *Agent) GetMemoryFilePath() string {
 		return ""
 	}
 	return filepath.Join(workspace, "memory", "MEMORY.md")
+}
+
+// UpdateSoulFile 更新 SOUL.md 文件的指定部分
+func (a *Agent) UpdateSoulFile(section, content string) error {
+	workspace := a.Workspace()
+	if workspace == "" {
+		return fmt.Errorf("workspace not set")
+	}
+
+	soulPath := filepath.Join(workspace, "SOUL.md")
+	return a.updateTemplateFile(soulPath, section, content)
+}
+
+// UpdateUserFile 更新 USER.md 文件的指定部分
+func (a *Agent) UpdateUserFile(section, content string) error {
+	workspace := a.Workspace()
+	if workspace == "" {
+		return fmt.Errorf("workspace not set")
+	}
+
+	userPath := filepath.Join(workspace, "USER.md")
+	return a.updateTemplateFile(userPath, section, content)
+}
+
+// updateTemplateFile 更新模板文件的指定部分
+func (a *Agent) updateTemplateFile(filePath, section, content string) error {
+	// 读取现有内容
+	var fileContent string
+	if data, err := os.ReadFile(filePath); err == nil {
+		fileContent = string(data)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read file: %w", err)
+	} else {
+		// 文件不存在，创建默认内容
+		fileContent = "# " + section + "\n\n"
+		fileContent += "此文件存储相关信息。\n\n"
+		fileContent += "## " + section + "\n\n"
+		fileContent += "<!-- 内容 -->\n"
+	}
+
+	// 更新指定部分
+	updatedContent, err := updateMarkdownSection(fileContent, section, content)
+	if err != nil {
+		return err
+	}
+
+	// 写入文件
+	if err := os.WriteFile(filePath, []byte(updatedContent), 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
 }
 
 // buildMessages 构建消息列表
