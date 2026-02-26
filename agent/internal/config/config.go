@@ -191,6 +191,7 @@ type DatabaseConfig struct {
 type LogConfig struct {
 	Level  string `mapstructure:"level"`
 	Format string `mapstructure:"format"`
+	Output string `mapstructure:"output"` // 日志输出文件路径，为空则输出到 stdout
 }
 
 // SecurityConfig 安全配置
@@ -220,6 +221,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("database.path", "./data/icooclaw.db")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "text")
+	viper.SetDefault("log.output", "")
 	viper.SetDefault("workspace", "$HOME/.icooclaw/workspace")
 	viper.SetDefault("agents.default_provider", "openrouter")
 	viper.SetDefault("scheduler.enabled", false)
@@ -284,7 +286,7 @@ func extractExtra(m map[string]interface{}) map[string]string {
 }
 
 // InitLogger 初始化日志系统
-func InitLogger(level string, format string) *slog.Logger {
+func InitLogger(level string, format string, output string) *slog.Logger {
 	var handler slog.Handler
 
 	opts := &slog.HandlerOptions{
@@ -304,10 +306,46 @@ func InitLogger(level string, format string) *slog.Logger {
 		opts.Level = slog.LevelInfo
 	}
 
-	if format == "json" {
-		handler = slog.NewJSONHandler(os.Stdout, opts)
+	// 如果指定了输出文件，则同时输出到文件和控制台
+	if output != "" {
+		// 确保日志目录存在
+		logDir := filepath.Dir(output)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			slog.Warn("failed to create log directory, using stdout only", "error", err)
+			if format == "json" {
+				handler = slog.NewJSONHandler(os.Stdout, opts)
+			} else {
+				handler = slog.NewTextHandler(os.Stdout, opts)
+			}
+			return slog.New(handler)
+		}
+
+		// 打开日志文件
+		logFile, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			slog.Warn("failed to open log file, using stdout only", "error", err)
+			if format == "json" {
+				handler = slog.NewJSONHandler(os.Stdout, opts)
+			} else {
+				handler = slog.NewTextHandler(os.Stdout, opts)
+			}
+			return slog.New(handler)
+		}
+
+		// 创建同时输出到文件和 stdout 的 io.Writer
+		fileWriter := io.MultiWriter(logFile, os.Stdout)
+
+		if format == "json" {
+			handler = slog.NewJSONHandler(fileWriter, opts)
+		} else {
+			handler = slog.NewTextHandler(fileWriter, opts)
+		}
 	} else {
-		handler = slog.NewTextHandler(os.Stdout, opts)
+		if format == "json" {
+			handler = slog.NewJSONHandler(os.Stdout, opts)
+		} else {
+			handler = slog.NewTextHandler(os.Stdout, opts)
+		}
 	}
 
 	return slog.New(handler)

@@ -297,6 +297,8 @@ func TestValidateJSCode(t *testing.T) {
 		{"has process", "function execute(params) { process.exit(); }", true},
 		{"has os.Exit", "function execute(params) { os.Exit(1); }", true},
 		{"has import", "function execute(params) { import fs from 'fs'; }", true},
+		{"has async", "async function execute(params) { return 'ok'; }", true},
+		{"has await", "function execute(params) { await something(); }", true},
 	}
 
 	for _, tt := range tests {

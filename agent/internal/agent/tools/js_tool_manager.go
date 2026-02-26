@@ -381,6 +381,11 @@ func validateJSCode(code string) error {
 		return fmt.Errorf("code must define an 'execute(params)' function")
 	}
 
+	// 检查是否使用了 async/await（goja 不支持）
+	if strings.Contains(code, "async ") || strings.Contains(code, "await ") {
+		return fmt.Errorf("code cannot use 'async' or 'await' keywords (not supported by the JavaScript engine)")
+	}
+
 	// 危险模式检查（移除 fs.、http. 等，因为这些现在由脚本引擎安全提供）
 	dangerousPatterns := []string{
 		"require(",

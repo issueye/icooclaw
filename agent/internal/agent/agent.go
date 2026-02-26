@@ -14,17 +14,23 @@ import (
 	"github.com/icooclaw/icooclaw/internal/storage"
 )
 
+// SessionMetadata 会话元数据
+type SessionMetadata struct {
+	RolePrompt string `json:"role_prompt"` // 用户设定的角色提示词
+}
+
 // Agent Agent核心结构
 type Agent struct {
-	name     string
-	provider provider.Provider
-	tools    *tools.Registry
-	storage  *storage.Storage
-	memory   *MemoryStore
-	skills   *SkillsLoader
-	config   config.AgentSettings
-	bus      *bus.MessageBus
-	logger   *slog.Logger
+	name      string
+	provider  provider.Provider
+	tools     *tools.Registry
+	storage   *storage.Storage
+	memory    *MemoryStore
+	skills    *SkillsLoader
+	config    config.AgentSettings
+	bus       *bus.MessageBus
+	logger    *slog.Logger
+	workspace string // workspace 目录路径
 }
 
 // NewAgent 创建Agent实例
@@ -34,24 +40,31 @@ func NewAgent(
 	storage *storage.Storage,
 	config config.AgentSettings,
 	logger *slog.Logger,
+	workspace string,
 ) *Agent {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	return &Agent{
-		name:     name,
-		provider: provider,
-		tools:    tools.NewRegistry(),
-		storage:  storage,
+		name:      name,
+		provider:  provider,
+		tools:     tools.NewRegistry(),
+		storage:   storage,
 		memory: NewMemoryStoreWithConfig(storage, logger, MemoryConfig{
 			ConsolidationThreshold: 50,
 			SummaryEnabled:         true,
 		}),
-		skills: NewSkillsLoader(storage, logger),
-		config: config,
-		logger: logger,
+		skills:    NewSkillsLoader(storage, logger),
+		config:    config,
+		logger:    logger,
+		workspace: workspace,
 	}
+}
+
+// Workspace 获取 workspace 路径
+func (a *Agent) Workspace() string {
+	return a.workspace
 }
 
 // Name 获取Agent名称
@@ -269,4 +282,51 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 	}
 
 	return response, nil
+}
+
+// SetSessionRolePrompt 设置会话的角色提示词
+func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
+	// 获取当前会话的元数据
+	session, err := a.storage.GetSession(sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	var metadata SessionMetadata
+	if session.Metadata != "" {
+		if err := json.Unmarshal([]byte(session.Metadata), &metadata); err != nil {
+			// 如果解析失败，创建新的
+			metadata = SessionMetadata{}
+		}
+	}
+
+	// 更新角色提示词
+	metadata.RolePrompt = rolePrompt
+
+	// 序列化和保存
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	return a.storage.UpdateSessionMetadata(sessionID, string(metadataJSON))
+}
+
+// GetSessionRolePrompt 获取会话的角色提示词
+func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
+	session, err := a.storage.GetSession(sessionID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get session: %w", err)
+	}
+
+	if session.Metadata == "" {
+		return "", nil
+	}
+
+	var metadata SessionMetadata
+	if err := json.Unmarshal([]byte(session.Metadata), &metadata); err != nil {
+		return "", fmt.Errorf("failed to unmarshal metadata: %w", err)
+	}
+
+	return metadata.RolePrompt, nil
 }

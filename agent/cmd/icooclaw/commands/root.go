@@ -67,7 +67,7 @@ func initComponents() error {
 	}
 
 	// 2. Initialize logger (early so we can use it)
-	logger = config.InitLogger(cfg.Log.Level, cfg.Log.Format)
+	logger = config.InitLogger(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output)
 	slog.SetDefault(logger)
 
 	// 3. Initialize workspace directory
@@ -126,6 +126,7 @@ func initComponents() error {
 		storage.NewStorage(db),
 		agentConfig,
 		logger,
+		workspace,
 	)
 
 	// 8. Initialize tools

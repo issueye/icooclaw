@@ -100,6 +100,18 @@ func (s *Storage) GetSessions(userID, channel string) ([]Session, error) {
 	return sessions, err
 }
 
+// UpdateSessionMetadata 更新会话元数据
+func (s *Storage) UpdateSessionMetadata(sessionID uint, metadata string) error {
+	return s.db.Model(&Session{}).Where("id = ?", sessionID).Update("metadata", metadata).Error
+}
+
+// GetSession 获取会话
+func (s *Storage) GetSession(sessionID uint) (*Session, error) {
+	var session Session
+	err := s.db.First(&session, sessionID).Error
+	return &session, err
+}
+
 // DeleteSession 删除会话
 func (s *Storage) DeleteSession(sessionID string) error {
 	// 删除相关的消息

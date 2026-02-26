@@ -170,7 +170,12 @@ func (t *JSTool) Execute(ctx context.Context, params map[string]interface{}) (st
 	result, err := t.vm.RunString(fmt.Sprintf(`
 		(function() {
 			var params = %s;
-			return execute(params);
+			var result = execute(params);
+			// Ensure result is serializable
+			if (typeof result === 'object' && result !== null) {
+				return JSON.stringify(result);
+			}
+			return result;
 		})()
 	`, string(paramsJSON)))
 	if err != nil {
@@ -181,19 +186,16 @@ func (t *JSTool) Execute(ctx context.Context, params map[string]interface{}) (st
 		return "", nil
 	}
 
-	switch v := result.Export().(type) {
+	exported := result.Export()
+	if exported == nil {
+		return "", nil
+	}
+
+	switch v := exported.(type) {
 	case string:
 		return v, nil
-	case map[string]interface{}:
-		b, err := json.Marshal(v)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal result: %w", err)
-		}
-		return string(b), nil
-	case nil:
-		return "", nil
 	default:
-		return fmt.Sprintf("%v", v), nil
+		return fmt.Sprintf("%v", exported), nil
 	}
 }
 

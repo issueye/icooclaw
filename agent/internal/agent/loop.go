@@ -198,7 +198,15 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 			toolCallsJSON, _ := json.Marshal(toolCalls)
 			l.session.AddMessage("assistant", content, string(toolCallsJSON), "", "", reasoningContent)
 
-			// 执行工具
+			// 首先添加 assistant 消息（包含所有 tool_calls）
+			messages = append(messages, provider.Message{
+				Role:             "assistant",
+				Content:          content,
+				ToolCalls:        toolCalls,
+				ReasoningContent: reasoningContent,
+			})
+
+			// 执行工具并添加工具结果消息
 			for _, call := range toolCalls {
 				// 转换为 tools.ToolCall
 				toolCall := tools.ToolCall{
@@ -221,20 +229,14 @@ func (l *Loop) Run(ctx context.Context, messages []provider.Message, systemPromp
 					resultContent = result.Content
 				}
 
-				// 添加工具结果消息
+				// 添加工具结果消息到 session
 				l.session.AddMessage("tool", resultContent, "", result.ToolCallID, call.Function.Name, "")
 
-				// 更新消息列表以便下一次迭代
-				messages = append(messages, provider.Message{
-					Role:             "assistant",
-					Content:          content,
-					ToolCalls:        toolCalls,
-					ReasoningContent: reasoningContent,
-				})
+				// 添加工具结果消息到消息列表
 				messages = append(messages, provider.Message{
 					Role:       "tool",
 					Content:    resultContent,
-					ToolCallID: result.ToolCallID,
+					ToolCallID: call.ID,
 				})
 			}
 
