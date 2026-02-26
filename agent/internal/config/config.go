@@ -1,8 +1,11 @@
 package config
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/viper"
@@ -203,11 +206,17 @@ type SchedulerConfig struct {
 
 // Load 加载配置文件
 func Load() (*Config, error) {
-	viper.SetConfigName("config")
-	viper.SetConfigType("toml")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("./config")
-	viper.AddConfigPath("$HOME/.icooclaw")
+	// 检查是否通过 --config 标志指定了配置文件
+	configFile := viper.GetString("config")
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		viper.SetConfigName("config")
+		viper.SetConfigType("toml")
+		viper.AddConfigPath(".")
+		viper.AddConfigPath("./config")
+	}
+
 	viper.SetDefault("database.path", "./data/icooclaw.db")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "text")
@@ -241,6 +250,8 @@ func Load() (*Config, error) {
 		} else {
 			return nil, err
 		}
+	} else {
+		slog.Info("Config file loaded", "path", viper.ConfigFileUsed())
 	}
 
 	var cfg Config
@@ -300,4 +311,104 @@ func InitLogger(level string, format string) *slog.Logger {
 	}
 
 	return slog.New(handler)
+}
+
+// TemplatesFS 嵌入的模板文件系统，由主程序设置
+// TemplatesDir 模板目录路径，用于运行时查找模板
+var TemplatesDir string
+
+// InitWorkspace 初始化工作目录
+// 如果 workspace 目录不存在则创建，并将 templates 模板复制到 workspace 中
+func InitWorkspace(workspace string) error {
+	workspace, err := expandPath(workspace)
+	if err != nil {
+		return fmt.Errorf("failed to expand workspace path: %w", err)
+	}
+
+	if err := os.MkdirAll(workspace, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	if err := copyTemplatesToWorkspace(workspace); err != nil {
+		return fmt.Errorf("failed to copy templates to workspace: %w", err)
+	}
+
+	return nil
+}
+
+// expandPath 展开路径中的环境变量和 ~ 符号
+func expandPath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path is empty")
+	}
+
+	if path[0] == '~' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		path = filepath.Join(home, path[1:])
+	}
+
+	path = os.ExpandEnv(path)
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	return absPath, nil
+}
+
+// copyTemplatesToWorkspace 将模板文件复制到 workspace 目录
+func copyTemplatesToWorkspace(workspace string) error {
+	if TemplatesDir == "" {
+		slog.Debug("TemplatesDir not set, skipping template copy")
+		return nil
+	}
+
+	return filepath.WalkDir(TemplatesDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(TemplatesDir, path)
+		if err != nil {
+			return err
+		}
+
+		targetPath := filepath.Join(workspace, relPath)
+
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, 0755)
+		}
+
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			return copyFile(path, targetPath)
+		}
+
+		return nil
+	})
+}
+
+// copyFile 复制单个文件
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	return dstFile.Sync()
 }

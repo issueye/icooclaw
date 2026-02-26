@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -366,4 +367,275 @@ func TestLoad_NoConfigFile(t *testing.T) {
 		assert.NotEmpty(t, cfg.Database.Path)
 		assert.NotEmpty(t, cfg.Workspace)
 	}
+}
+
+// TestExpandPath tests for expandPath function
+func TestExpandPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		shouldError bool
+		setup       func()
+		teardown    func()
+	}{
+		{
+			name:        "Empty path",
+			input:       "",
+			shouldError: true,
+		},
+		{
+			name:        "Relative path",
+			input:       "./test/path",
+			shouldError: false,
+		},
+		{
+			name:        "Absolute path",
+			input:       "/tmp/test/path",
+			shouldError: false,
+		},
+		{
+			name:  "Home path",
+			input: "~/test/path",
+			setup: func() {
+				home := os.Getenv("HOME")
+				if home == "" {
+					os.Setenv("HOME", "/tmp/testhome")
+				}
+			},
+			teardown: func() {
+				os.Unsetenv("HOME")
+			},
+			shouldError: false,
+		},
+		{
+			name:        "Environment variable path",
+			input:       "$HOME/test",
+			shouldError: false,
+			setup: func() {
+				os.Setenv("HOME", "/tmp/testhome")
+			},
+			teardown: func() {
+				os.Unsetenv("HOME")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+			defer func() {
+				if tt.teardown != nil {
+					tt.teardown()
+				}
+			}()
+
+			result, err := expandPath(tt.input)
+			if tt.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.NotEmpty(t, result)
+				assert.IsType(t, "", result)
+			}
+		})
+	}
+}
+
+// TestInitWorkspace tests for InitWorkspace function
+func TestInitWorkspace(t *testing.T) {
+	t.Run("Create new workspace", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		workspacePath := filepath.Join(tmpDir, "workspace")
+
+		err := InitWorkspace(workspacePath)
+		require.NoError(t, err)
+
+		_, err = os.Stat(workspacePath)
+		assert.NoError(t, err)
+		assert.True(t, isDir(workspacePath))
+	})
+
+	t.Run("Existing workspace", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		workspacePath := filepath.Join(tmpDir, "existing_workspace")
+
+		err := os.MkdirAll(workspacePath, 0755)
+		require.NoError(t, err)
+
+		err = InitWorkspace(workspacePath)
+		require.NoError(t, err)
+	})
+
+	t.Run("With templates", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		templateDir := filepath.Join(tmpDir, "templates")
+		workspacePath := filepath.Join(tmpDir, "workspace")
+
+		err := os.MkdirAll(filepath.Join(templateDir, "subdir"), 0755)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(templateDir, "test.md"), []byte("test content"), 0644)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(templateDir, "subdir", "nested.md"), []byte("nested content"), 0644)
+		require.NoError(t, err)
+
+		TemplatesDir = templateDir
+		defer func() { TemplatesDir = "" }()
+
+		err = InitWorkspace(workspacePath)
+		require.NoError(t, err)
+
+		_, err = os.Stat(filepath.Join(workspacePath, "test.md"))
+		assert.NoError(t, err)
+		_, err = os.Stat(filepath.Join(workspacePath, "subdir", "nested.md"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("Existing files not overwritten", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		templateDir := filepath.Join(tmpDir, "templates")
+		workspacePath := filepath.Join(tmpDir, "workspace")
+
+		err := os.MkdirAll(templateDir, 0755)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(templateDir, "test.md"), []byte("template content"), 0644)
+		require.NoError(t, err)
+
+		err = os.MkdirAll(workspacePath, 0755)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(workspacePath, "test.md"), []byte("existing content"), 0644)
+		require.NoError(t, err)
+
+		TemplatesDir = templateDir
+		defer func() { TemplatesDir = "" }()
+
+		err = InitWorkspace(workspacePath)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(filepath.Join(workspacePath, "test.md"))
+		require.NoError(t, err)
+		assert.Equal(t, "existing content", string(content))
+	})
+
+	t.Run("Empty path", func(t *testing.T) {
+		err := InitWorkspace("")
+		assert.Error(t, err)
+	})
+}
+
+// TestCopyTemplatesToWorkspace tests for copyTemplatesToWorkspace function
+func TestCopyTemplatesToWorkspace(t *testing.T) {
+	t.Run("No templates directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		TemplatesDir = ""
+		defer func() { TemplatesDir = "" }()
+
+		err := copyTemplatesToWorkspace(tmpDir)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Copy files successfully", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		templateDir := filepath.Join(tmpDir, "templates")
+		workspacePath := filepath.Join(tmpDir, "workspace")
+
+		err := os.MkdirAll(templateDir, 0755)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(templateDir, "file1.md"), []byte("content1"), 0644)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(templateDir, "file2.md"), []byte("content2"), 0644)
+		require.NoError(t, err)
+
+		TemplatesDir = templateDir
+		defer func() { TemplatesDir = "" }()
+
+		err = copyTemplatesToWorkspace(workspacePath)
+		require.NoError(t, err)
+
+		content1, err := os.ReadFile(filepath.Join(workspacePath, "file1.md"))
+		require.NoError(t, err)
+		assert.Equal(t, "content1", string(content1))
+
+		content2, err := os.ReadFile(filepath.Join(workspacePath, "file2.md"))
+		require.NoError(t, err)
+		assert.Equal(t, "content2", string(content2))
+	})
+
+	t.Run("Copy nested directories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		templateDir := filepath.Join(tmpDir, "templates")
+		workspacePath := filepath.Join(tmpDir, "workspace")
+
+		err := os.MkdirAll(filepath.Join(templateDir, "level1", "level2"), 0755)
+		require.NoError(t, err)
+		err = os.WriteFile(filepath.Join(templateDir, "level1", "level2", "deep.md"), []byte("deep content"), 0644)
+		require.NoError(t, err)
+
+		TemplatesDir = templateDir
+		defer func() { TemplatesDir = "" }()
+
+		err = copyTemplatesToWorkspace(workspacePath)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(filepath.Join(workspacePath, "level1", "level2", "deep.md"))
+		require.NoError(t, err)
+		assert.Equal(t, "deep content", string(content))
+	})
+}
+
+// TestCopyFile tests for copyFile function
+func TestCopyFile(t *testing.T) {
+	t.Run("Copy file successfully", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcPath := filepath.Join(tmpDir, "source.txt")
+		dstPath := filepath.Join(tmpDir, "dest.txt")
+
+		content := []byte("test file content")
+		err := os.WriteFile(srcPath, content, 0644)
+		require.NoError(t, err)
+
+		err = copyFile(srcPath, dstPath)
+		require.NoError(t, err)
+
+		copiedContent, err := os.ReadFile(dstPath)
+		require.NoError(t, err)
+		assert.Equal(t, content, copiedContent)
+	})
+
+	t.Run("Source file not found", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcPath := filepath.Join(tmpDir, "nonexistent.txt")
+		dstPath := filepath.Join(tmpDir, "dest.txt")
+
+		err := copyFile(srcPath, dstPath)
+		assert.Error(t, err)
+	})
+
+	t.Run("Overwrite destination", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcPath := filepath.Join(tmpDir, "source.txt")
+		dstPath := filepath.Join(tmpDir, "dest.txt")
+
+		err := os.WriteFile(srcPath, []byte("new content"), 0644)
+		require.NoError(t, err)
+		err = os.WriteFile(dstPath, []byte("old content"), 0644)
+		require.NoError(t, err)
+
+		err = copyFile(srcPath, dstPath)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(dstPath)
+		require.NoError(t, err)
+		assert.Equal(t, "new content", string(content))
+	})
+}
+
+// isDir checks if path is a directory
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }

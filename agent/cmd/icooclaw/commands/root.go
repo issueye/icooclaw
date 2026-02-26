@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/icooclaw/icooclaw/internal/agent"
@@ -65,11 +66,23 @@ func initComponents() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// 2. Initialize logger
+	// 2. Initialize logger (early so we can use it)
 	logger = config.InitLogger(cfg.Log.Level, cfg.Log.Format)
 	slog.SetDefault(logger)
 
-	// 3. Initialize database
+	// 3. Initialize workspace directory
+	workspace := cfg.Workspace
+	if workspace == "" {
+		workspace = cfg.Tools.Workspace
+	}
+	if workspace != "" {
+		if err := config.InitWorkspace(workspace); err != nil {
+			return fmt.Errorf("failed to initialize workspace: %w", err)
+		}
+		logger.Info("Workspace initialized", "path", workspace)
+	}
+
+	// 4. Initialize database
 	db, err = storage.InitDB(cfg.Database.Path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
@@ -172,6 +185,11 @@ func printProviders() {
 }
 
 func Execute() error {
+	// 设置模板目录路径
+	if err := findTemplatesDir(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to find templates directory: %v\n", err)
+	}
+
 	// 添加持久化标志
 	rootCmd.PersistentFlags().StringP("config", "c", "", "配置文件路径")
 	rootCmd.PersistentFlags().StringP("log-level", "l", "", "日志级别 (debug, info, warn, error)")
@@ -183,4 +201,32 @@ func Execute() error {
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 
 	return rootCmd.Execute()
+}
+
+// findTemplatesDir 查找 templates 目录并设置到 config.TemplatesDir
+func findTemplatesDir() error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	searchPaths := []string{
+		"./templates",
+		filepath.Join(filepath.Dir(execPath), "templates"),
+		filepath.Join(filepath.Dir(execPath), "..", "templates"),
+		filepath.Join(filepath.Dir(execPath), "..", "..", "templates"),
+	}
+
+	for _, path := range searchPaths {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			continue
+		}
+		if info, err := os.Stat(absPath); err == nil && info.IsDir() {
+			config.TemplatesDir = absPath
+			return nil
+		}
+	}
+
+	return fmt.Errorf("templates directory not found")
 }

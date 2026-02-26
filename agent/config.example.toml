@@ -61,6 +61,9 @@ model = "gpt-4"
 # X-API-Version = "2024-01"
 
 # Agent 默认配置
+[agents]
+default_provider = "openrouter"
+
 [agents.defaults]
 name = "icooclaw"
 model = "anthropic/claude-sonnet-4-20250514"
@@ -68,9 +71,6 @@ temperature = 0.7
 max_tokens = 4096
 memory_window = 10
 system_prompt = "You are a helpful AI assistant."
-
-# 默认 Provider 名称
-agents.default_provider = "openrouter"
 
 # WebSocket 通道配置
 [channels.websocket]
