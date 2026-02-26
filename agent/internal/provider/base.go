@@ -116,6 +116,33 @@ type Provider interface {
 	GetName() string
 }
 
+type OpenAIToolCall struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"`
+	Index    int              `json:"index"`
+	Function ToolCallFunction `json:"function"`
+}
+
+type OpenAIDelta struct {
+	Content          string           `json:"content"`
+	ReasoningContent string           `json:"reasoning_content"`
+	ToolCalls        []OpenAIToolCall `json:"tool_calls"`
+	Refusal          string           `json:"refusal"`
+	FunctionCall     json.RawMessage  `json:"function_call"`
+}
+
+type OpenAIChoice struct {
+	Index        int         `json:"index"`
+	Delta        OpenAIDelta `json:"delta"`
+	FinishReason string      `json:"finish_reason"`
+}
+
+type OpenAIChunk struct {
+	ID      string         `json:"id"`      // 流式响应的唯一标识符
+	Choices []OpenAIChoice `json:"choices"` // 流式响应中的选择
+	Usage   *Usage         `json:"usage"`
+}
+
 // BaseProvider 基础Provider
 type BaseProvider struct {
 	Name       string
@@ -240,30 +267,10 @@ func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request,
 			break
 		}
 
+		fmt.Println("请求[sendStreamRequest] 数据:", data)
+
 		// 解析 OpenAI 格式的流式块
-		var chunk struct {
-			ID      string `json:"id"`
-			Choices []struct {
-				Index int `json:"index"`
-				Delta struct {
-					Content          string `json:"content"`
-					ReasoningContent string `json:"reasoning_content"`
-					ToolCalls        []struct {
-						ID       string `json:"id"`
-						Type     string `json:"type"`
-						Index    int    `json:"index"`
-						Function struct {
-							Name      string `json:"name"`
-							Arguments string `json:"arguments"`
-						} `json:"function"`
-					} `json:"tool_calls"`
-					Refusal      string          `json:"refusal"`
-					FunctionCall json.RawMessage `json:"function_call"`
-				} `json:"delta"`
-				FinishReason string `json:"finish_reason"`
-			} `json:"choices"`
-			Usage *Usage `json:"usage"`
-		}
+		var chunk OpenAIChunk
 
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			// 忽略解析失败的行，可能是非 JSON 或格式不匹配
@@ -327,8 +334,8 @@ var (
 		EndTag:   "<|start_header_id|>assistant<|end_header_id|>",
 	}
 
-	// 豆包使用的思考标签
-	DoubaoParser = &ThinkTagParser{
+	// MiniMax 使用的思考标签
+	MiniMaxParser = &ThinkTagParser{
 		StartTag: "<think>",
 		EndTag:   "</think>",
 	}
@@ -360,12 +367,6 @@ func ExtractThinkingContent(content, reasoningContent string) (string, string) {
 		return content, thinking
 	}
 
-	// 4. 尝试豆包格式
-	thinking = extractFromTags(content, DoubaoParser)
-	if thinking != "" {
-		return content, thinking
-	}
-
 	// 没有找到思考内容
 	return content, ""
 }
@@ -377,10 +378,11 @@ func extractFromTags(content string, parser *ThinkTagParser) string {
 		return ""
 	}
 
-	endIdx := strings.Index(content, parser.EndTag)
+	endIdx := strings.Index(content[startIdx:], parser.EndTag)
 	if endIdx == -1 {
 		return ""
 	}
+	endIdx += startIdx
 
 	// 提取思考内容
 	startIdx += len(parser.StartTag)

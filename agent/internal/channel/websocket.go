@@ -31,11 +31,12 @@ var wsUpgrader = websocket.Upgrader{
 
 // WebSocketMessage WebSocket 消息格式
 type WebSocketMessage struct {
-	Type    string          `json:"type"`
-	Content string          `json:"content"`
-	ChatID  string          `json:"chat_id,omitempty"`
-	UserID  string          `json:"user_id,omitempty"`
-	Data    json.RawMessage `json:"data,omitempty"`
+	Type     string          `json:"type"`
+	Content  string          `json:"content"`
+	Thinking string          `json:"thinking,omitempty"`
+	ChatID   string          `json:"chat_id,omitempty"`
+	UserID   string          `json:"user_id,omitempty"`
+	Data     json.RawMessage `json:"data,omitempty"`
 }
 
 // WebSocketClient WebSocket 客户端连接
@@ -129,14 +130,15 @@ func (h *WebSocketHub) Broadcast(message []byte) {
 }
 
 // SendToClient 发送消息给指定客户端
-func (h *WebSocketHub) SendToClient(clientID, chatID, msgType, content string) error {
+func (h *WebSocketHub) SendToClient(clientID, chatID, msgType, content, thinking string) error {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	data, err := json.Marshal(WebSocketMessage{
-		Type:    msgType,
-		Content: content,
-		ChatID:  chatID,
+		Type:     msgType,
+		Content:  content,
+		Thinking: thinking,
+		ChatID:   chatID,
 	})
 	if err != nil {
 		return err
@@ -445,13 +447,14 @@ func (c *WebSocketChannel) processOutbound(ctx context.Context) {
 			clientID, _ := msg.Metadata["client_id"].(string)
 			if clientID != "" {
 				// 精准推送
-				c.hub.SendToClient(clientID, msg.ChatID, msg.Type, msg.Content)
+				c.hub.SendToClient(clientID, msg.ChatID, msg.Type, msg.Content, msg.Thinking)
 			} else {
 				// 广播（回退逻辑）
 				wsMsg := WebSocketMessage{
-					Type:    msg.Type,
-					Content: msg.Content,
-					ChatID:  msg.ChatID,
+					Type:     msg.Type,
+					Content:  msg.Content,
+					Thinking: msg.Thinking,
+					ChatID:   msg.ChatID,
 				}
 				data, _ := json.Marshal(wsMsg)
 				c.hub.Broadcast(data)
