@@ -359,25 +359,12 @@ func (t *GrepTool) ToDefinition() ToolDefinition {
 
 // resolvePath 解析路径
 func (t *GrepTool) resolvePath(path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(t.config.Workspace, path)
+	return resolveToolPath(path, t.config.Workspace)
 }
 
 // isInWorkspace 检查路径是否在工作区内
 func (t *GrepTool) isInWorkspace(path string) bool {
-	workspace, err := filepath.EvalSymlinks(t.config.Workspace)
-	if err != nil {
-		workspace = t.config.Workspace
-	}
-
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		return false
-	}
-
-	return strings.HasPrefix(path, workspace)
+	return isPathInWorkspace(path, t.config.Workspace)
 }
 
 // FindTool 文件查找工具
@@ -600,25 +587,12 @@ func (t *FindTool) ToDefinition() ToolDefinition {
 
 // resolvePath 解析路径
 func (t *FindTool) resolvePath(path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(t.config.Workspace, path)
+	return resolveToolPath(path, t.config.Workspace)
 }
 
 // isInWorkspace 检查路径是否在工作区内
 func (t *FindTool) isInWorkspace(path string) bool {
-	workspace, err := filepath.EvalSymlinks(t.config.Workspace)
-	if err != nil {
-		workspace = t.config.Workspace
-	}
-
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		return false
-	}
-
-	return strings.HasPrefix(path, workspace)
+	return isPathInWorkspace(path, t.config.Workspace)
 }
 
 // TreeTool 目录树工具
@@ -783,25 +757,12 @@ func (t *TreeTool) ToDefinition() ToolDefinition {
 
 // resolvePath 解析路径
 func (t *TreeTool) resolvePath(path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(t.config.Workspace, path)
+	return resolveToolPath(path, t.config.Workspace)
 }
 
 // isInWorkspace 检查路径是否在工作区内
 func (t *TreeTool) isInWorkspace(path string) bool {
-	workspace, err := filepath.EvalSymlinks(t.config.Workspace)
-	if err != nil {
-		workspace = t.config.Workspace
-	}
-
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		return false
-	}
-
-	return strings.HasPrefix(path, workspace)
+	return isPathInWorkspace(path, t.config.Workspace)
 }
 
 // ReadPartTool 部分读取文件工具
@@ -945,25 +906,12 @@ func (t *ReadPartTool) ToDefinition() ToolDefinition {
 
 // resolvePath 解析路径
 func (t *ReadPartTool) resolvePath(path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(t.config.Workspace, path)
+	return resolveToolPath(path, t.config.Workspace)
 }
 
 // isInWorkspace 检查路径是否在工作区内
 func (t *ReadPartTool) isInWorkspace(path string) bool {
-	workspace, err := filepath.EvalSymlinks(t.config.Workspace)
-	if err != nil {
-		workspace = t.config.Workspace
-	}
-
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		return false
-	}
-
-	return strings.HasPrefix(path, workspace)
+	return isPathInWorkspace(path, t.config.Workspace)
 }
 
 // LineCountTool 行数统计工具
@@ -1101,23 +1049,10 @@ func (t *LineCountTool) ToDefinition() ToolDefinition {
 
 // resolvePath 解析路径
 func (t *LineCountTool) resolvePath(path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(t.config.Workspace, path)
+	return resolveToolPath(path, t.config.Workspace)
 }
 
 // isInWorkspace 检查路径是否在工作区内
 func (t *LineCountTool) isInWorkspace(path string) bool {
-	workspace, err := filepath.EvalSymlinks(t.config.Workspace)
-	if err != nil {
-		workspace = t.config.Workspace
-	}
-
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		return false
-	}
-
-	return strings.HasPrefix(path, workspace)
+	return isPathInWorkspace(path, t.config.Workspace)
 }

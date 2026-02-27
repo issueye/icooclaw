@@ -7,11 +7,14 @@ import (
 
 	"github.com/icooclaw/icooclaw/internal/channel"
 	"github.com/icooclaw/icooclaw/internal/config"
+	"github.com/icooclaw/icooclaw/pkg/utils"
 )
 
 // InitTools 初始化工具系统
 func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.Manager) *Registry {
 	registry := NewRegistry()
+
+	expandedWorkspace, _ := utils.ExpandPath(cfg.Workspace)
 
 	// 创建文件工具配置
 	toolConfig := &FileToolConfig{
@@ -19,7 +22,7 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 		AllowedWrite:  true,
 		AllowedEdit:   true,
 		AllowedDelete: true,
-		Workspace:     cfg.Workspace,
+		Workspace:     expandedWorkspace,
 	}
 
 	// 从配置读取工具权限
@@ -53,7 +56,7 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 	}
 
 	if cfg.Tools.Workspace != "" {
-		toolConfig.Workspace = cfg.Tools.Workspace
+		toolConfig.Workspace, _ = utils.ExpandPath(cfg.Tools.Workspace)
 	}
 
 	// 注册 HTTP 请求工具

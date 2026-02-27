@@ -87,7 +87,6 @@ allow_file_write = true
 allow_file_edit = true
 allow_file_delete = true
 allow_exec = false  # 默认关闭，需要手动开启以保证安全
-workspace = "~/.icooclaw/workspace"
 exec_timeout = 30  # Shell命令超时时间（秒）
 
 # JavaScript 工具配置
@@ -99,11 +98,11 @@ timeout = 30                     # 执行超时（秒）
 
 # JS 工具默认权限（可通过 create_tool 的 permissions 参数覆盖）
 [tools.js.permissions]
-file_read = false               # 允许读取文件
-file_write = false              # 允许写入文件
-file_delete = false             # 允许删除文件
-network = false                 # 允许网络访问
-exec = false                    # 允许执行命令
+file_read = true               # 允许读取文件
+file_write = true              # 允许写入文件
+file_delete = true             # 允许删除文件
+network = true                 # 允许网络访问
+exec = true                    # 允许执行命令
 http_timeout = 30              # HTTP 请求超时（秒）
 exec_timeout = 30               # 命令执行超时（秒）
 # allowed_domains = ["api.example.com"]  # 允许的域名白名单（空=允许所有）

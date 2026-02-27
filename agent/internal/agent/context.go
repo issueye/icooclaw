@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -82,6 +83,11 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 		parts = append(parts, "", "## 系统指令")
 		parts = append(parts, defaultPrompt)
 	}
+
+	// 添加环境信息
+	parts = append(parts, "", "## 环境信息")
+	parts = append(parts, fmt.Sprintf("- 操作系统: %s", runtime.GOOS))
+	parts = append(parts, fmt.Sprintf("- 工作目录: %s", cb.agent.Workspace()))
 
 	// 读取 workspace 下的记忆文件
 	memoryContent := cb.readMemoryFile()
@@ -189,7 +195,7 @@ func (cb *ContextBuilder) hasUserPreference(content string) bool {
 				// 到达下一个 ## 标题，停止收集
 				break
 			}
-			if strings.Contains(trimmed, "用户偏好") || strings.Contains(trimmed, "用户偏好") {
+			if strings.Contains(trimmed, "用户偏好") {
 				inUserPreference = true
 				continue
 			}

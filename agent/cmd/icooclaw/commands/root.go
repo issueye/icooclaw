@@ -78,8 +78,6 @@ func initComponents() error {
 	}
 
 	// 4. 初始化工作空间目录
-	fmt.Println("工作目录[initComponents]", workspace)
-
 	if workspace == "" {
 		workspace = cfg.Tools.Workspace
 	}
@@ -87,31 +85,33 @@ func initComponents() error {
 		if err := config.InitWorkspace(workspace); err != nil {
 			return fmt.Errorf("failed to initialize workspace: %w", err)
 		}
-		logger.Info("Workspace initialized", "path", workspace)
+		logger.Info("工作目录初始化成功...", "path", workspace)
 	}
+
+	fmt.Println("工作目录[initComponents]", workspace)
 
 	// 4. 初始化数据库
 	db, err = storage.InitDB(cfg.Database.Path)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
-	logger.Info("Database initialized", "path", cfg.Database.Path)
+	logger.Info("数据库初始化成功...", "path", cfg.Database.Path)
 
 	// 4. 初始化消息总线
 	messageBus = bus.NewMessageBus()
 	messageBus.SetLogger(logger)
-	logger.Info("Message bus initialized")
+	logger.Info("消息总线初始化成功...")
 
 	// 5. 初始化提供者注册表
 	providerReg = provider.NewRegistry()
 	if err := providerReg.RegisterFromConfig(cfg.Providers); err != nil {
 		return fmt.Errorf("failed to register providers: %w", err)
 	}
-	logger.Info("Providers registered", "count", providerReg.Count())
+	logger.Info("供应商注册成功...", "count", providerReg.Count())
 
 	// 6. 初始化通道管理器
 	channelManager = channel.NewManager(messageBus, cfg.Channels, db, logger)
-	logger.Info("Channels registered", "count", channelManager.Count())
+	logger.Info("通道注册成功...", "count", channelManager.Count())
 
 	// 7. 创建默认代理
 	agentConfig := cfg.Agents.Defaults
@@ -136,6 +136,7 @@ func initComponents() error {
 		logger,
 		workspace,
 	)
+	logger.Info("默认代理初始化成功...", "name", agentConfig.Name)
 
 	// 8. 初始化工具
 	toolRegistry = tools.InitTools(cfg, logger, channelManager)
@@ -143,6 +144,7 @@ func initComponents() error {
 
 	// 9. 初始化调度器
 	schedulerInst = scheduler.NewScheduler(messageBus, storage.NewStorage(db), cfg, logger)
+	logger.Info("调度器初始化成功...")
 
 	return nil
 }

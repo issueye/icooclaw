@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/icooclaw/icooclaw/pkg/utils"
 )
 
 // FileToolConfig 文件工具配置
@@ -16,6 +18,55 @@ type FileToolConfig struct {
 	AllowedEdit   bool
 	AllowedDelete bool
 	Workspace     string
+}
+
+// resolveToolPath 解析工具路径，处理 /workspace 前缀和 ~ 展开
+func resolveToolPath(path, workspace string) string {
+	path = strings.TrimPrefix(path, "/workspace")
+	path = strings.TrimPrefix(path, "workspace")
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimPrefix(path, "\\")
+
+	if filepath.IsAbs(path) {
+		absPath, err := utils.ExpandPath(path)
+		if err != nil {
+			return path
+		}
+		return absPath
+	}
+
+	expandedWorkspace, err := utils.ExpandPath(workspace)
+	if err != nil {
+		expandedWorkspace = workspace
+	}
+	return filepath.Join(expandedWorkspace, path)
+}
+
+// normalizePath 规范化路径，处理 Windows 上的路径大小写和分隔符问题
+func normalizePath(path string) string {
+	path = filepath.ToSlash(path)
+	path = strings.ToLower(path)
+	return path
+}
+
+// isPathInWorkspace 检查路径是否在工作区内
+func isPathInWorkspace(path, workspace string) bool {
+	workspaceAbs, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		workspaceAbs = workspace
+	}
+	workspaceAbs = normalizePath(workspaceAbs)
+
+	pathAbs, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		if path == "" || normalizePath(path) == workspaceAbs || normalizePath(path) == normalizePath(workspace) {
+			return true
+		}
+		return false
+	}
+	pathAbs = normalizePath(pathAbs)
+
+	return strings.HasPrefix(pathAbs, workspaceAbs) || pathAbs == workspaceAbs
 }
 
 // FileReadTool 文件读取工具
@@ -113,11 +164,16 @@ func (t *FileReadTool) Execute(ctx context.Context, params map[string]interface{
 
 // resolvePath 解析路径
 func (t *FileReadTool) resolvePath(path string) string {
+	// 处理 /workspace 前缀，将其视为 workspace 根目录
+	path = strings.TrimPrefix(path, "/workspace")
+	path = strings.TrimPrefix(path, "workspace")
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimPrefix(path, "\\")
+
 	if filepath.IsAbs(path) {
 		return path
 	}
 
-	// 相对于工作区
 	return filepath.Join(t.config.Workspace, path)
 }
 
@@ -130,10 +186,13 @@ func (t *FileReadTool) isInWorkspace(path string) bool {
 
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
+		if path == "" || path == workspace {
+			return true
+		}
 		return false
 	}
 
-	return strings.HasPrefix(path, workspace)
+	return strings.HasPrefix(path, workspace) || path == workspace
 }
 
 // ToDefinition 转换为工具定义
@@ -264,6 +323,11 @@ func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface
 
 // resolvePath 解析路径
 func (t *FileWriteTool) resolvePath(path string) string {
+	path = strings.TrimPrefix(path, "/workspace")
+	path = strings.TrimPrefix(path, "workspace")
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimPrefix(path, "\\")
+
 	if filepath.IsAbs(path) {
 		return path
 	}
@@ -279,10 +343,13 @@ func (t *FileWriteTool) isInWorkspace(path string) bool {
 
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
+		if path == "" || path == workspace {
+			return true
+		}
 		return false
 	}
 
-	return strings.HasPrefix(path, workspace)
+	return strings.HasPrefix(path, workspace) || path == workspace
 }
 
 // ToDefinition 转换为工具定义
@@ -414,6 +481,11 @@ func (t *FileListTool) Execute(ctx context.Context, params map[string]interface{
 
 // resolvePath 解析路径
 func (t *FileListTool) resolvePath(path string) string {
+	path = strings.TrimPrefix(path, "/workspace")
+	path = strings.TrimPrefix(path, "workspace")
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimPrefix(path, "\\")
+
 	if filepath.IsAbs(path) {
 		return path
 	}
@@ -429,10 +501,13 @@ func (t *FileListTool) isInWorkspace(path string) bool {
 
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
+		if path == "" || path == workspace {
+			return true
+		}
 		return false
 	}
 
-	return strings.HasPrefix(path, workspace)
+	return strings.HasPrefix(path, workspace) || path == workspace
 }
 
 // ToDefinition 转换为工具定义
@@ -540,6 +615,11 @@ func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]interfac
 
 // resolvePath 解析路径
 func (t *FileDeleteTool) resolvePath(path string) string {
+	path = strings.TrimPrefix(path, "/workspace")
+	path = strings.TrimPrefix(path, "workspace")
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimPrefix(path, "\\")
+
 	if filepath.IsAbs(path) {
 		return path
 	}
@@ -555,10 +635,13 @@ func (t *FileDeleteTool) isInWorkspace(path string) bool {
 
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
+		if path == "" || path == workspace {
+			return true
+		}
 		return false
 	}
 
-	return strings.HasPrefix(path, workspace)
+	return strings.HasPrefix(path, workspace) || path == workspace
 }
 
 // ToDefinition 转换为工具定义
