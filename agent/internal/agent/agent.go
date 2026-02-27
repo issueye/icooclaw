@@ -47,10 +47,10 @@ func NewAgent(
 	}
 
 	return &Agent{
-		name:      name,
-		provider:  provider,
-		tools:     tools.NewRegistry(),
-		storage:   storage,
+		name:     name,
+		provider: provider,
+		tools:    tools.NewRegistry(),
+		storage:  storage,
 		memory: NewMemoryStoreWithConfig(storage, logger, MemoryConfig{
 			ConsolidationThreshold: 50,
 			SummaryEnabled:         true,
@@ -242,6 +242,16 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
 		a.logger.Error("Agent loop failed", "error", err)
+		if a.bus != nil {
+			a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+				Type:      "error",
+				Channel:   msg.Channel,
+				ChatID:    msg.ChatID,
+				Content:   fmt.Sprintf("处理消息时出错: %s", err.Error()),
+				Timestamp: time.Now(),
+				Metadata:  map[string]interface{}{"client_id": clientID},
+			})
+		}
 		return
 	}
 
