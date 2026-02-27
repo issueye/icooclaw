@@ -27,6 +27,74 @@
   --color-error: #ef4444;
 }
 
+[data-theme="light"] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #f1f3f4;
+  --color-bg-hover: #e8eaed;
+  --color-border: #e0e0e0;
+  --color-border-light: #d0d0d0;
+
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #5f6368;
+  --color-text-muted: #80868b;
+
+  --color-user-bubble: #e8f0fe;
+  --color-ai-bubble: #f8f9fa;
+}
+
+[data-theme="light"] body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+[data-theme="light"] .markdown-content pre {
+  background: #f6f8fa;
+  border-color: #e0e0e0;
+}
+
+[data-theme="light"] .markdown-content th {
+  background: #f6f8fa;
+}
+
+[data-theme="light"] .markdown-content tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .markdown-content p code,
+[data-theme="light"] .markdown-content li code {
+  background: rgba(124, 106, 247, 0.12);
+  color: #6d28d9;
+  border-color: rgba(124, 106, 247, 0.2);
+}
+
+[data-theme="light"] .markdown-content h1,
+[data-theme="light"] .markdown-content h2,
+[data-theme="light"] .markdown-content h3,
+[data-theme="light"] .markdown-content h4 {
+  color: #1a1a1a;
+}
+
+[data-theme="light"] .markdown-content blockquote {
+  color: #5f6368;
+}
+
+[data-theme="light"] .markdown-content td {
+  border-color: #e0e0e0;
+}
+
+[data-theme="light"] .markdown-content a {
+  color: #5b21b6;
+}
+
 * {
   box-sizing: border-box;
 }

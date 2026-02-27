@@ -1,14 +1,14 @@
 <template>
     <div class="w-full min-h-screen bg-bg-primary text-text-primary">
         <!-- Header -->
-        <header class="border-b border-border bg-[#151515]">
+        <header class="border-b border-border bg-bg-secondary">
             <div
                 class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between"
             >
                 <div class="flex items-center gap-3">
                     <button
                         @click="router.back()"
-                        class="p-2 rounded-lg `hover:bg-border transition-colors"
+                        class="p-2 rounded-lg hover:bg-bg-tertiary transition-colors"
                     >
                         <ArrowLeftIcon :size="20" />
                     </button>
@@ -19,7 +19,7 @@
 
         <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
             <!-- 连接设置 -->
-            <section class="bg-[#151515] rounded-xl border border-border p-6">
+            <section class="bg-bg-secondary rounded-xl border border-border p-6">
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
                     <SettingsIcon :size="20" class="text-accent" />
                     连接设置
@@ -65,7 +65,7 @@
             </section>
 
             <!-- Provider 设置 -->
-            <section class="bg-[#151515] rounded-xl border border-border p-6">
+            <section class="bg-bg-secondary rounded-xl border border-border p-6">
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
                     <BotIcon :size="20" class="text-accent" />
                     LLM Provider
@@ -99,7 +99,7 @@
             <!-- 技能管理入口 -->
             <section
                 @click="router.push('/skills')"
-                class="bg-[#151515] rounded-xl border border-border p-6 cursor-pointer hover:border-accent/50 transition-colors"
+                class="bg-bg-secondary rounded-xl border border-border p-6 cursor-pointer hover:border-accent/50 transition-colors"
             >
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
                     <SparklesIcon :size="20" class="text-accent" />
@@ -114,8 +114,50 @@
                 </p>
             </section>
 
-            <!-- 状态信息 -->
+            <!-- 主题设置 -->
             <section class="bg-[#151515] rounded-xl border border-border p-6">
+                <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
+                    <SunIcon :size="20" class="text-accent" />
+                    外观设置
+                </h2>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-medium">主题模式</div>
+                        <div class="text-sm text-text-secondary mt-1">
+                            切换明暗主题
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 bg-bg-tertiary rounded-lg p-1">
+                        <button
+                            @click="themeStore.setTheme('light')"
+                            :class="[
+                                'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
+                                themeStore.theme === 'light'
+                                    ? 'bg-accent text-white'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            ]"
+                        >
+                            <SunIcon :size="14" />
+                            浅色
+                        </button>
+                        <button
+                            @click="themeStore.setTheme('dark')"
+                            :class="[
+                                'px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5',
+                                themeStore.theme === 'dark'
+                                    ? 'bg-accent text-white'
+                                    : 'text-text-secondary hover:text-text-primary'
+                            ]"
+                        >
+                            <MoonIcon :size="14" />
+                            深色
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 状态信息 -->
+            <section class="bg-bg-secondary rounded-xl border border-border p-6">
                 <h2 class="text-lg font-medium mb-4 flex items-center gap-2">
                     <ActivityIcon :size="20" class="text-accent" />
                     连接状态
@@ -157,7 +199,7 @@
                 </button>
                 <button
                     @click="handleSave"
-                    class="px-6 py-2.5 rounded-lg bg-accent hover:bg-[#6b5ce7] transition-colors font-medium"
+                    class="px-6 py-2.5 rounded-lg bg-accent hover:bg-accent-hover transition-colors font-medium"
                 >
                     保存设置
                 </button>
@@ -176,14 +218,18 @@ import {
     Activity as ActivityIcon,
     Sparkles as SparklesIcon,
     ChevronRight as ChevronRightIcon,
+    MoonIcon,
+    SunIcon,
 } from "lucide-vue-next";
 
 import { useChatStore } from "@/stores/chat";
 import { useWebSocket } from "@/composables/useWebSocket";
+import { useThemeStore } from "@/stores/theme";
 import api from "@/services/api";
 
 const router = useRouter();
 const chatStore = useChatStore();
+const themeStore = useThemeStore();
 const { status: wsStatus } = useWebSocket();
 
 // 表单数据

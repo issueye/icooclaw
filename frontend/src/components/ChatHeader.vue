@@ -7,7 +7,7 @@
             <button
                 v-if="sidebarCollapsed"
                 @click="$emit('toggle-sidebar')"
-                class="text-[#606060] hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
+                class="text-text-muted hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
             >
                 <PanelLeftOpenIcon :size="16" />
             </button>
@@ -34,16 +34,26 @@
             <!-- 新建对话 -->
             <button
                 @click="$emit('new-chat')"
-                class="text-[#606060] hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
+                class="text-text-muted hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
                 title="新建对话"
             >
                 <SquarePenIcon :size="16" />
             </button>
 
+            <!-- 主题切换 -->
+            <button
+                @click="themeStore.toggleTheme()"
+                class="text-text-muted hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
+                title="切换主题"
+            >
+                <SunIcon v-if="themeStore.theme === 'dark'" :size="16" />
+                <MoonIcon v-else :size="16" />
+            </button>
+
             <!-- 设置 -->
             <button
                 @click="$emit('open-settings')"
-                class="text-[#606060] hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
+                class="text-text-muted hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
                 title="设置"
             >
                 <Settings2Icon :size="16" />
@@ -58,7 +68,12 @@ import {
     PanelLeftOpenIcon,
     SquarePenIcon,
     Settings2Icon,
+    MoonIcon,
+    SunIcon,
 } from "lucide-vue-next";
+import { useThemeStore } from "@/stores/theme";
+
+const themeStore = useThemeStore();
 
 defineProps({
     title: { type: String, default: "" },

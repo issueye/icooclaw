@@ -15,7 +15,7 @@
             {{ isUser ? "U" : "AI" }}
         </div>
 
-        <!-- 消息内容 -->
+            <!-- 消息内容 -->
         <div
             class="flex flex-col max-w-[70%]"
             :class="isUser ? 'items-end' : 'items-start'"
@@ -42,7 +42,7 @@
                 </button>
                 <div
                     v-if="thinkingExpanded && message.thinking"
-                    class="mt-2 p-3 bg-[#1a1a2e]/50 rounded-lg border border-[#7c6af7]/20 text-xs text-text-secondary whitespace-pre-wrap max-h-60 overflow-y-auto"
+                    class="mt-2 p-3 bg-bg-tertiary rounded-lg border border-accent/20 text-xs text-text-secondary whitespace-pre-wrap max-h-60 overflow-y-auto"
                 >
                     {{ message.thinking }}
                 </div>
@@ -52,8 +52,8 @@
                 class="rounded-2xl px-4 py-3 text-sm leading-relaxed relative group"
                 :class="
                     isUser
-                        ? 'bg-[#1a1a2e] border border-[#7c6af7]/30 text-text-primary rounded-tr-sm'
-                        : 'bg-[#161616] border border-border text-text-primary rounded-tl-sm'
+                        ? 'bg-user-bubble border border-accent/30 text-text-primary rounded-tr-sm'
+                        : 'bg-ai-bubble border border-border text-text-primary rounded-tl-sm'
                 "
             >
                 <!-- 用户消息纯文本 -->
@@ -84,7 +84,7 @@
                 <button
                     v-if="!message.streaming && message.content"
                     @click="copyContent"
-                    class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center bg-[#2a2a2a] hover:bg-[#333] text-text-secondary hover:text-white"
+                    class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary"
                     :title="copied ? '已复制' : '复制'"
                 >
                     <CheckIcon v-if="copied" :size="12" />
@@ -93,7 +93,7 @@
             </div>
 
             <!-- 时间戳 -->
-            <span class="text-xs text-[#606060] mt-1 px-1">{{ timeStr }}</span>
+            <span class="text-xs text-text-muted mt-1 px-1">{{ timeStr }}</span>
         </div>
     </div>
 </template>

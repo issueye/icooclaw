@@ -14,7 +14,7 @@
                 @input="autoResize"
                 :disabled="disabled"
                 placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
-                class="w-full bg-transparent text-text-primary placeholder-[#606060] text-sm px-4 py-3 pr-12 resize-none outline-none leading-relaxed max-h-[200px] min-h-[48px] overflow-y-auto"
+                class="w-full bg-transparent text-text-primary placeholder-text-muted text-sm px-4 py-3 pr-12 resize-none outline-none leading-relaxed max-h-[200px] min-h-[48px] overflow-y-auto"
                 rows="1"
             />
 
@@ -25,8 +25,8 @@
                 class="absolute right-2 bottom-2 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200"
                 :class="
                     canSend
-                        ? 'bg-accent hover:bg-[#6c5ae0] text-white shadow-lg shadow-[#7c6af7]/20 hover:scale-105'
-                        : 'bg-[#2a2a2a] text-[#606060] cursor-not-allowed'
+                        ? 'bg-accent hover:bg-accent-hover text-white shadow-lg shadow-accent/20 hover:scale-105'
+                        : 'bg-bg-tertiary text-text-muted cursor-not-allowed'
                 "
             >
                 <LoaderIcon v-if="disabled" :size="14" class="animate-spin" />

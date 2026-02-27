@@ -57,7 +57,7 @@
                             v-for="hint in hints"
                             :key="hint"
                             @click="sendMessage(hint)"
-                            class="px-4 py-3 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:bg-[#252525] hover:text-text-primary hover:border-[#7c6af7]/30 transition-all text-left"
+                            class="px-4 py-3 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-accent/30 transition-all text-left"
                         >
                             {{ hint }}
                         </button>
@@ -82,7 +82,7 @@
                     @send="sendMessage"
                 />
                 <div class="flex items-center justify-between px-4 pb-2">
-                    <p class="text-xs text-[#606060]">
+                    <p class="text-xs text-text-muted">
                         连接到
                         <span class="text-accent">{{ chatStore.wsUrl }}</span>
                     </p>

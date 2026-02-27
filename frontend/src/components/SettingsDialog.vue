@@ -12,7 +12,7 @@
 
             <!-- 弹窗 -->
             <div
-                class="relative bg-[#161616] border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 p-0 overflow-hidden"
+                class="relative bg-bg-secondary border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 p-0 overflow-hidden"
             >
                 <!-- 标题 -->
                 <div
@@ -28,7 +28,7 @@
                     </div>
                     <button
                         @click="$emit('close')"
-                        class="text-[#606060] hover:text-text-primary p-1.5 rounded-lg hover:bg-[#2a2a2a] transition-colors"
+                        class="text-text-muted hover:text-text-primary p-1.5 rounded-lg hover:bg-bg-tertiary transition-colors"
                     >
                         <XIcon :size="16" />
                     </button>
@@ -47,9 +47,9 @@
                             v-model="localConfig.wsUrl"
                             type="text"
                             placeholder="ws://localhost:8080/ws"
-                            class="w-full bg-bg-tertiary border border-border text-text-primary text-sm px-4 py-2.5 rounded-xl outline-none placeholder-[#606060] focus:border-[#7c6af7]/60 transition-colors"
+                            class="w-full bg-bg-tertiary border border-border text-text-primary text-sm px-4 py-2.5 rounded-xl outline-none placeholder-text-muted focus:border-accent/60 transition-colors"
                         />
-                        <p class="text-xs text-[#606060]">
+                        <p class="text-xs text-text-muted">
                             Agent 后端 WebSocket 端点地址
                         </p>
                     </div>
@@ -66,13 +66,13 @@
                             v-model="localConfig.userId"
                             type="text"
                             placeholder="user-1"
-                            class="w-full bg-bg-tertiary border border-border text-text-primary text-sm px-4 py-2.5 rounded-xl outline-none placeholder-[#606060] focus:border-[#7c6af7]/60 transition-colors"
+                            class="w-full bg-bg-tertiary border border-border text-text-primary text-sm px-4 py-2.5 rounded-xl outline-none placeholder-text-muted focus:border-accent/60 transition-colors"
                         />
                     </div>
 
                     <!-- 连接状态展示 -->
                     <div
-                        class="flex items-center gap-3 bg-[#1a1a1a] border border-border rounded-xl px-4 py-3"
+                        class="flex items-center gap-3 bg-bg-tertiary border border-border rounded-xl px-4 py-3"
                     >
                         <div
                             class="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -91,7 +91,7 @@
                             </div>
                             <div
                                 v-if="wsError"
-                                class="text-xs text-[#ef4444] mt-0.5"
+                                class="text-xs text-error mt-0.5"
                             >
                                 {{ wsError }}
                             </div>
@@ -103,13 +103,13 @@
                 <div class="flex gap-2 px-6 py-4 border-t border-border">
                     <button
                         @click="$emit('close')"
-                        class="flex-1 py-2.5 px-4 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:text-text-primary hover:bg-[#252525] transition-colors"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
                     >
                         取消
                     </button>
                     <button
                         @click="handleSave"
-                        class="flex-1 py-2.5 px-4 rounded-xl bg-accent hover:bg-[#6c5ae0] text-sm text-white font-medium transition-colors"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-accent hover:bg-accent-hover text-sm text-white font-medium transition-colors"
                     >
                         保存并重连
                     </button>

@@ -24,7 +24,7 @@
                 </div>
                 <button
                     @click="$emit('toggle')"
-                    class="text-[#606060] hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
+                    class="text-text-muted hover:text-text-primary hover:bg-bg-tertiary rounded-lg p-1.5 transition-colors"
                 >
                     <PanelLeftCloseIcon :size="16" />
                 </button>
@@ -34,7 +34,7 @@
             <div class="px-3 pt-3 pb-2">
                 <button
                     @click="handleNewChat"
-                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm bg-[#1a1a2e] border border-[#7c6af7]/30 text-accent hover:bg-accent/10 hover:border-[#7c6af7]/60 transition-all group"
+                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm bg-user-bubble border border-accent/30 text-accent hover:bg-accent/10 hover:border-accent/60 transition-all group"
                 >
                     <PlusIcon
                         :size="16"
@@ -48,7 +48,7 @@
             <div class="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
                 <div
                     v-if="sessions.length === 0"
-                    class="text-center text-[#606060] text-xs py-8"
+                    class="text-center text-text-muted text-xs py-8"
                 >
                     暂无对话记录
                 </div>
@@ -60,8 +60,8 @@
                     class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left group transition-colors text-sm truncate"
                     :class="
                         session.id === currentSessionId
-                            ? 'bg-bg-tertiary text-text-primary border border-[#333]'
-                            : 'text-text-secondary hover:bg-[#141414] hover:text-text-primary'
+                            ? 'bg-bg-tertiary text-text-primary border border-border-light'
+                            : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                     "
                 >
                     <MessageSquareIcon
@@ -86,7 +86,7 @@
             <div class="px-3 py-3 border-t border-border">
                 <!-- 连接状态 -->
                 <div
-                    class="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#141414]"
+                    class="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-secondary"
                 >
                     <div
                         class="w-2 h-2 rounded-full flex-shrink-0"
@@ -99,7 +99,7 @@
                             'bg-gray-500': wsStatus === 'disconnected',
                         }"
                     ></div>
-                    <span class="text-xs text-[#606060]">
+                    <span class="text-xs text-text-muted">
                         {{ statusText }}
                     </span>
                 </div>

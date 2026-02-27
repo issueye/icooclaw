@@ -1,14 +1,14 @@
 <template>
     <div class="w-full min-h-screen bg-bg-primary text-text-primary">
         <!-- Header -->
-        <header class="border-b border-border bg-[#151515]">
+        <header class="border-b border-border bg-bg-secondary">
             <div
                 class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between"
             >
                 <div class="flex items-center gap-3">
                     <button
                         @click="router.back()"
-                        class="p-2 rounded-lg hover:bg-[#2a2a2a] transition-colors"
+                        class="p-2 rounded-lg hover:bg-bg-tertiary transition-colors"
                     >
                         <ArrowLeftIcon :size="20" />
                     </button>
@@ -16,7 +16,7 @@
                 </div>
                 <button
                     @click="showAddDialog = true"
-                    class="px-4 py-2 bg-accent hover:bg-[#6b5ce7] rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                 >
                     <PlusIcon :size="16" />
                     添加技能
@@ -52,7 +52,7 @@
                         <div
                             v-for="skill in skillStore.userSkills"
                             :key="skill.id"
-                            class="bg-[#151515] rounded-xl border border-border p-4"
+                            class="bg-bg-secondary rounded-xl border border-border p-4"
                         >
                             <div class="flex items-start justify-between">
                                 <div class="flex-1">
@@ -79,7 +79,7 @@
                                         :class="
                                             skill.enabled
                                                 ? 'bg-accent'
-                                                : 'bg-[#2a2a2a]'
+                                                : 'bg-bg-tertiary'
                                         "
                                     >
                                         <span
@@ -94,7 +94,7 @@
                                     <!-- 删除按钮 -->
                                     <button
                                         @click="handleDelete(skill)"
-                                        class="p-2 rounded-lg hover:bg-[#2a2a2a] text-text-secondary hover:text-red-500 transition-colors"
+                                        class="p-2 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-red-500 transition-colors"
                                     >
                                         <TrashIcon :size="16" />
                                     </button>
@@ -113,7 +113,7 @@
                         <div
                             v-for="skill in skillStore.builtinSkills"
                             :key="skill.id"
-                            class="bg-[#151515] rounded-xl border border-border p-4"
+                            class="bg-bg-secondary rounded-xl border border-border p-4"
                         >
                             <div class="flex items-start justify-between">
                                 <div class="flex-1">
@@ -122,7 +122,7 @@
                                             {{ skill.name }}
                                         </h3>
                                         <span
-                                            class="text-xs px-2 py-0.5 rounded bg-[#2a2a2a] text-text-secondary"
+                                            class="text-xs px-2 py-0.5 rounded bg-bg-tertiary text-text-secondary"
                                         >
                                             内置
                                         </span>
@@ -138,7 +138,7 @@
                                         :class="
                                             skill.enabled
                                                 ? 'bg-accent'
-                                                : 'bg-[#2a2a2a]'
+                                                : 'bg-bg-tertiary'
                                         "
                                     >
                                         <span
@@ -151,6 +151,25 @@
                                         ></span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <!-- 用户技能描述 -->
+                            <div
+                                v-if="
+                                    !skill.builtin &&
+                                    skillStore.userSkills.includes(skill)
+                                "
+                                class="mt-3 pt-3 border-t border-border"
+                            >
+                                <label class="text-xs text-text-secondary"
+                                    >描述</label
+                                >
+                                <textarea
+                                    v-model="skill.description"
+                                    @blur="updateSkill(skill)"
+                                    rows="2"
+                                    class="w-full mt-1 px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary outline-none placeholder-text-muted focus:border-accent/60 resize-none"
+                                ></textarea>
                             </div>
                         </div>
                     </div>
@@ -187,7 +206,7 @@
             @click.self="showAddDialog = false"
         >
             <div
-                class="bg-[#151515] rounded-xl border border-border w-full max-w-lg mx-4"
+                class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4"
             >
                 <div class="p-4 border-b border-border">
                     <h2 class="text-lg font-medium">添加技能</h2>
