@@ -92,9 +92,9 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 
 	// 添加技能提示词
 	skills := cb.agent.skills.GetLoaded()
-	for _, skill := range skills {
-		parts = append(parts, "", fmt.Sprintf("## Skill: %s", skill.Name))
-		parts = append(parts, skill.Content)
+	for _, sk := range skills {
+		parts = append(parts, "", fmt.Sprintf("## Skill: %s", sk.Name))
+		parts = append(parts, sk.Content)
 	}
 
 	// 添加记忆
@@ -413,70 +413,6 @@ func (a *Agent) GetMemoryFilePath() string {
 		return ""
 	}
 	return filepath.Join(workspace, "memory", "MEMORY.md")
-}
-
-// UpdateSoulFile 更新 SOUL.md 文件的指定部分
-func (a *Agent) UpdateSoulFile(section, content string) error {
-	workspace := a.Workspace()
-	if workspace == "" {
-		return fmt.Errorf("workspace not set")
-	}
-
-	fmt.Println("工作目录[UpdateSoulFile]", workspace)
-
-	soulPath := filepath.Join(workspace, "SOUL.md")
-	a.logger.Debug("UpdateSoulFile called", "path", soulPath, "section", section, "content", content)
-	return a.updateTemplateFile(soulPath, section, content)
-}
-
-// UpdateUserFile 更新 USER.md 文件的指定部分
-func (a *Agent) UpdateUserFile(section, content string) error {
-	workspace := a.Workspace()
-	if workspace == "" {
-		return fmt.Errorf("workspace not set")
-	}
-
-	userPath := filepath.Join(workspace, "USER.md")
-	a.logger.Debug("UpdateUserFile called", "path", userPath, "section", section, "content", content)
-	return a.updateTemplateFile(userPath, section, content)
-}
-
-// updateTemplateFile 更新模板文件的指定部分
-func (a *Agent) updateTemplateFile(filePath, section, content string) error {
-	a.logger.Debug("updateTemplateFile called", "filePath", filePath)
-
-	// 读取现有内容
-	var fileContent string
-	if data, err := os.ReadFile(filePath); err == nil {
-		fileContent = string(data)
-		a.logger.Debug("read existing file", "size", len(data))
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read file: %w", err)
-	} else {
-		// 文件不存在，创建默认内容
-		fileContent = "# " + section + "\n\n"
-		fileContent += "此文件存储相关信息。\n\n"
-		fileContent += "## " + section + "\n\n"
-		fileContent += "<!-- 内容 -->\n"
-		a.logger.Debug("file does not exist, using default content")
-	}
-
-	// 更新指定部分
-	updatedContent, err := updateMarkdownSection(fileContent, section, content)
-	if err != nil {
-		return err
-	}
-
-	a.logger.Debug("updated content", "length", len(updatedContent))
-
-	// 写入文件
-	if err := os.WriteFile(filePath, []byte(updatedContent), 0644); err != nil {
-		a.logger.Error("failed to write file", "error", err)
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	a.logger.Info("file updated successfully", "filePath", filePath)
-	return nil
 }
 
 // buildMessages 构建消息列表

@@ -11,6 +11,7 @@ import (
 	"github.com/icooclaw/icooclaw/internal/bus"
 	"github.com/icooclaw/icooclaw/internal/config"
 	"github.com/icooclaw/icooclaw/internal/provider"
+	"github.com/icooclaw/icooclaw/internal/skill"
 	"github.com/icooclaw/icooclaw/internal/storage"
 )
 
@@ -26,11 +27,11 @@ type Agent struct {
 	tools     *tools.Registry
 	storage   *storage.Storage
 	memory    *MemoryStore
-	skills    *SkillsLoader
+	skills    *skill.Loader
 	config    config.AgentSettings
 	bus       *bus.MessageBus
 	logger    *slog.Logger
-	workspace string // workspace 目录路径
+	workspace string
 }
 
 // NewAgent 创建Agent实例
@@ -55,7 +56,7 @@ func NewAgent(
 			ConsolidationThreshold: 50,
 			SummaryEnabled:         true,
 		}),
-		skills:    NewSkillsLoader(storage, logger),
+		skills:    skill.NewLoader(storage, logger),
 		config:    config,
 		logger:    logger,
 		workspace: workspace,
@@ -85,14 +86,6 @@ func (a *Agent) Tools() *tools.Registry {
 // SetTools 设置工具注册表
 func (a *Agent) SetTools(registry *tools.Registry) {
 	a.tools = registry
-
-	// 注册 memory_update 工具（用于更新 SOUL.md 和 USER.md）
-	memoryConfig := &tools.MemoryUpdateConfig{
-		Agent:  a,
-		Logger: a.logger,
-	}
-	registry.Register(tools.NewMemoryUpdateTool(memoryConfig))
-	a.logger.Debug("Registered tool: memory_update")
 }
 
 // Storage 获取存储

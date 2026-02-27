@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/icooclaw/icooclaw/internal/script/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +45,7 @@ func TestEngine_Console(t *testing.T) {
 }
 
 func TestEngine_FS_ReadFile(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		Workspace:     ".",
 		AllowFileRead: true,
 	}, nil)
@@ -64,7 +65,7 @@ func TestEngine_FS_ReadFile(t *testing.T) {
 }
 
 func TestEngine_FS_WriteFile(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		Workspace:      t.TempDir(),
 		AllowFileWrite: true,
 	}, nil)
@@ -83,7 +84,7 @@ func TestEngine_FS_WriteFile(t *testing.T) {
 }
 
 func TestEngine_FS_Disabled(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		Workspace:     ".",
 		AllowFileRead: false,
 	}, nil)
@@ -101,7 +102,7 @@ func TestEngine_FS_Disabled(t *testing.T) {
 
 func TestEngine_FS_Dir(t *testing.T) {
 	tmpDir := t.TempDir()
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		Workspace:       tmpDir,
 		AllowFileWrite:  true,
 		AllowFileRead:   true,
@@ -130,7 +131,7 @@ func TestEngine_FS_Dir(t *testing.T) {
 }
 
 func TestEngine_HTTP_Get(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		AllowNetwork: true,
 		HTTPTimeout:  5,
 	}, nil)
@@ -148,7 +149,7 @@ func TestEngine_HTTP_Get(t *testing.T) {
 }
 
 func TestEngine_HTTP_Disabled(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		AllowNetwork: false,
 	}, nil)
 
@@ -159,7 +160,7 @@ func TestEngine_HTTP_Disabled(t *testing.T) {
 }
 
 func TestEngine_HTTP_Post(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		AllowNetwork: true,
 		HTTPTimeout:  5,
 	}, nil)
@@ -175,7 +176,7 @@ func TestEngine_HTTP_Post(t *testing.T) {
 }
 
 func TestEngine_Shell_Exec(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		AllowExec:   true,
 		ExecTimeout: 5,
 	}, nil)
@@ -201,7 +202,7 @@ func TestEngine_Shell_Exec(t *testing.T) {
 }
 
 func TestEngine_Shell_Disabled(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		AllowExec: false,
 	}, nil)
 
@@ -279,7 +280,7 @@ func TestEngine_Context(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	engine := NewEngineWithContext(ctx, &Config{
+	engine := NewEngineWithContext(ctx, &config.Config{
 		AllowExec: true,
 	}, nil)
 
@@ -291,7 +292,7 @@ func TestEngine_Context(t *testing.T) {
 }
 
 func TestEngine_ComplexScript(t *testing.T) {
-	engine := NewEngine(&Config{
+	engine := NewEngine(&config.Config{
 		Workspace:      t.TempDir(),
 		AllowFileRead:  true,
 		AllowFileWrite: true,
@@ -346,7 +347,7 @@ func TestEngine_GlobalVariables(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
-	config := DefaultConfig()
+	config := config.DefaultConfig()
 
 	assert.Equal(t, ".", config.Workspace)
 	assert.True(t, config.AllowFileRead)

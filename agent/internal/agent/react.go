@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/icooclaw/icooclaw/consts"
 	"github.com/icooclaw/icooclaw/internal/agent/tools"
 	"github.com/icooclaw/icooclaw/internal/provider"
 	"github.com/icooclaw/icooclaw/internal/storage"
@@ -53,16 +54,26 @@ type ReActHooks interface {
 // DefaultHooks 默认空实现
 type DefaultHooks struct{}
 
-func (h *DefaultHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error { return nil }
-func (h *DefaultHooks) OnLLMChunk(ctx context.Context, content, thinking string) error                  { return nil }
+func (h *DefaultHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error {
+	return nil
+}
+func (h *DefaultHooks) OnLLMChunk(ctx context.Context, content, thinking string) error { return nil }
 func (h *DefaultHooks) OnLLMResponse(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iteration int) error {
 	return nil
 }
-func (h *DefaultHooks) OnToolCall(ctx context.Context, toolName string, arguments string) error    { return nil }
-func (h *DefaultHooks) OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error { return nil }
-func (h *DefaultHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error { return nil }
-func (h *DefaultHooks) OnIterationEnd(ctx context.Context, iteration int, hasToolCalls bool) error   { return nil }
-func (h *DefaultHooks) OnError(ctx context.Context, err error) error                                 { return nil }
+func (h *DefaultHooks) OnToolCall(ctx context.Context, toolName string, arguments string) error {
+	return nil
+}
+func (h *DefaultHooks) OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error {
+	return nil
+}
+func (h *DefaultHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error {
+	return nil
+}
+func (h *DefaultHooks) OnIterationEnd(ctx context.Context, iteration int, hasToolCalls bool) error {
+	return nil
+}
+func (h *DefaultHooks) OnError(ctx context.Context, err error) error { return nil }
 func (h *DefaultHooks) OnComplete(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iterations int) error {
 	return nil
 }
@@ -71,7 +82,7 @@ func (h *DefaultHooks) OnComplete(ctx context.Context, content, reasoningContent
 
 // ReActConfig ReAct 配置
 type ReActConfig struct {
-	MaxIterations int              // 最大迭代次数，默认 10
+	MaxIterations int // 最大迭代次数，默认 10
 	Provider      provider.Provider
 	Tools         *tools.Registry
 	Session       *storage.Session
@@ -101,7 +112,7 @@ func NewReActAgent(config *ReActConfig) *ReActAgent {
 		config.Hooks = &DefaultHooks{}
 	}
 	if config.MaxIterations <= 0 {
-		config.MaxIterations = 10
+		config.MaxIterations = 20
 	}
 	return &ReActAgent{
 		config: config,
@@ -122,7 +133,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		reasoningContent: "",
 		hooks:            hooks,
 		logger:           logger,
-		toolCallsData:    make(map[int]*struct {
+		toolCallsData: make(map[int]*struct {
 			id   string
 			typ  string
 			name string
@@ -146,7 +157,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 		// 触发迭代开始钩子
 		if err := hooks.OnIterationStart(ctx, iteration, messages); err != nil {
-			logger.Warn("Hook OnIterationStart error", "error", err)
+			logger.Warn("迭代开始钩子报错", "error", err)
 		}
 
 		// 构建请求
@@ -154,7 +165,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 		// 触发 LLM 请求钩子
 		if err := hooks.OnLLMRequest(ctx, req, iteration); err != nil {
-			logger.Warn("Hook OnLLMRequest error", "error", err)
+			logger.Warn("LLM 请求钩子报错", "error", err)
 			return "", "", nil, err
 		}
 
@@ -163,7 +174,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		// 调用 LLM
 		err := cfg.Provider.ChatStream(ctx, *req, streamCallback)
 		if err != nil {
-			hooks.OnError(ctx, fmt.Errorf("failed to call LLM stream: %w", err))
+			hooks.OnError(ctx, fmt.Errorf("LLM 流式调用报错: %w", err))
 			return "", "", nil, err
 		}
 
@@ -185,7 +196,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 		// 触发 LLM 响应钩子
 		if err := hooks.OnLLMResponse(ctx, content, reasoningContent, toolCalls, iteration); err != nil {
-			logger.Warn("Hook OnLLMResponse error", "error", err)
+			logger.Warn("LLM 响应钩子报错", "error", err)
 		}
 
 		logger.Info("LLM response", "iteration", iteration, "content_length", len(content), "tool_calls", len(toolCalls), "content_preview", content[:min(200, len(content))])
@@ -200,12 +211,12 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 			// 触发迭代结束钩子
 			if err := hooks.OnIterationEnd(ctx, iteration, false); err != nil {
-				logger.Warn("Hook OnIterationEnd error", "error", err)
+				logger.Warn("迭代结束钩子报错", "error", err)
 			}
 
 			// 触发完成钩子
 			if err := hooks.OnComplete(ctx, content, reasoningContent, toolCalls, iteration+1); err != nil {
-				logger.Warn("Hook OnComplete error", "error", err)
+				logger.Warn("完成钩子报错", "error", err)
 			}
 
 			return content, reasoningContent, toolCalls, nil
@@ -220,7 +231,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 			// 触发工具调用前钩子
 			if err := hooks.OnToolCall(ctx, toolName, arguments); err != nil {
-				logger.Warn("Hook OnToolCall error", "error", err)
+				logger.Warn("工具调用前钩子报错", "error", err)
 			}
 
 			// 执行工具
@@ -233,10 +244,15 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 				},
 			}
 			result := cfg.Tools.Execute(ctx, toolCall)
+			if result.Error != nil {
+				logger.Error("工具执行报错", "tool", toolName, "error", result.Error)
+			}
+
+			logger.Debug(fmt.Sprintf("工具调用[%s]\n参数[%s]\n结果[%s]", toolName, arguments, result.Content))
 
 			// 触发工具结果钩子
 			if err := hooks.OnToolResult(ctx, toolName, result); err != nil {
-				logger.Warn("Hook OnToolResult error", "error", err)
+				logger.Warn("工具结果钩子报错", "error", err)
 			}
 
 			// 添加工具结果到消息
@@ -249,14 +265,14 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 			// 添加 assistant 消息（包含 tool_calls）
 			messages = append(messages, provider.Message{
-				Role:      "assistant",
+				Role:      consts.RoleAssistant.ToString(),
 				Content:   content,
 				ToolCalls: []provider.ToolCall{call},
 			})
 
 			// 添加工具结果消息
 			messages = append(messages, provider.Message{
-				Role:       "tool",
+				Role:       consts.RoleTool.ToString(),
 				Content:    resultContent,
 				ToolCallID: call.ID,
 			})
@@ -264,7 +280,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 		// 触发迭代结束钩子
 		if err := hooks.OnIterationEnd(ctx, iteration, true); err != nil {
-			logger.Warn("Hook OnIterationEnd error", "error", err)
+			logger.Warn("迭代结束钩子报错", "error", err)
 		}
 	}
 
@@ -297,7 +313,7 @@ func (r *ReActAgent) createStreamCallback(state *streamCallbackState) provider.S
 			state.reasoningContent += chunk.ReasoningContent
 			// 触发思考内容更新钩子
 			if err := state.hooks.OnLLMChunk(context.Background(), "", state.reasoningContent); err != nil {
-				state.logger.Warn("Hook OnLLMChunk error", "error", err)
+				state.logger.Warn("思考内容更新钩子报错", "error", err)
 			}
 		}
 
@@ -312,7 +328,7 @@ func (r *ReActAgent) createStreamCallback(state *streamCallbackState) provider.S
 
 			// 触发流式输出钩子（发送累积的思考内容）
 			if err := state.hooks.OnLLMChunk(context.Background(), cleanContent, state.reasoningContent); err != nil {
-				state.logger.Warn("Hook OnLLMChunk error", "error", err)
+				state.logger.Warn("流式输出钩子报错", "error", err)
 			}
 
 			state.content += cleanContent
@@ -386,7 +402,7 @@ func (r *ReActAgent) buildRequest(ctx context.Context, messages []provider.Messa
 	// 添加系统提示词
 	if systemPrompt != "" {
 		messages = append([]provider.Message{
-			{Role: "system", Content: systemPrompt},
+			{Role: consts.RoleSystem.ToString(), Content: systemPrompt},
 		}, messages...)
 	}
 	req.Messages = messages
@@ -402,7 +418,9 @@ type loopHooks struct {
 	onChunk OnChunkFunc
 }
 
-func (h *loopHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error { return nil }
+func (h *loopHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error {
+	return nil
+}
 
 func (h *loopHooks) OnLLMChunk(ctx context.Context, content, thinking string) error {
 	if h.onChunk != nil {
@@ -415,13 +433,21 @@ func (h *loopHooks) OnLLMResponse(ctx context.Context, content, reasoningContent
 	return nil
 }
 
-func (h *loopHooks) OnToolCall(ctx context.Context, toolName string, arguments string) error { return nil }
+func (h *loopHooks) OnToolCall(ctx context.Context, toolName string, arguments string) error {
+	return nil
+}
 
-func (h *loopHooks) OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error { return nil }
+func (h *loopHooks) OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error {
+	return nil
+}
 
-func (h *loopHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error { return nil }
+func (h *loopHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error {
+	return nil
+}
 
-func (h *loopHooks) OnIterationEnd(ctx context.Context, iteration int, hasToolCalls bool) error { return nil }
+func (h *loopHooks) OnIterationEnd(ctx context.Context, iteration int, hasToolCalls bool) error {
+	return nil
+}
 
 func (h *loopHooks) OnError(ctx context.Context, err error) error { return nil }
 

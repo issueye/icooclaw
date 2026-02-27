@@ -44,21 +44,21 @@ type SessionMemory struct {
 
 // UserMemory 用户级别记忆
 type UserMemory struct {
-	UserID    string
-	Key       string
-	Content   string
-	Tags      []string
+	UserID  string
+	Key     string
+	Content string
+	Tags    []string
 }
 
 // MemoryStats 记忆统计
 type MemoryStats struct {
-	Total       int64 `json:"total"`
-	Memory      int64 `json:"memory"`
-	History     int64 `json:"history"`
-	Session     int64 `json:"session"`
-	User        int64 `json:"user"`
-	Pinned      int64 `json:"pinned"`
-	Expired     int64 `json:"expired"`
+	Total   int64 `json:"total"`
+	Memory  int64 `json:"memory"`
+	History int64 `json:"history"`
+	Session int64 `json:"session"`
+	User    int64 `json:"user"`
+	Pinned  int64 `json:"pinned"`
+	Expired int64 `json:"expired"`
 }
 
 // NewMemoryStore 创建记忆存储
@@ -83,16 +83,6 @@ func NewMemoryStoreWithConfig(storage *storage.Storage, logger *slog.Logger, cfg
 		sessionMessageCounts: make(map[uint]int),
 		lastConsolidation:    make(map[uint]time.Time),
 	}
-}
-
-// NewMemoryStore 创建记忆存储（兼容旧接口）
-func NewMemoryStore(storage *storage.Storage, logger *slog.Logger) *MemoryStore {
-	return NewMemoryStoreWithConfig(storage, logger, MemoryConfig{
-		ConsolidationThreshold: 50,
-		MaxMemoryAge:           30,
-		MaxSessionMemories:     100,
-		MaxUserMemories:        500,
-	})
 }
 
 // Load 加载记忆
@@ -492,11 +482,11 @@ func (m *MemoryStore) GetSessionMemories(sessionID uint) ([]storage.Memory, erro
 // SaveUserMemory 保存用户级别记忆
 func (m *MemoryStore) SaveUserMemory(userID, key, content string, tags ...string) error {
 	memory := &storage.Memory{
-		Type:     "user",
-		Key:      fmt.Sprintf("user_%s_%s", userID, key),
-		Content:  content,
-		UserID:   userID,
-		Tags:     "," + strings.Join(tags, ",") + ",",
+		Type:    "user",
+		Key:     fmt.Sprintf("user_%s_%s", userID, key),
+		Content: content,
+		UserID:  userID,
+		Tags:    "," + strings.Join(tags, ",") + ",",
 	}
 	return m.storage.CreateMemory(memory)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/icooclaw/icooclaw/internal/script"
+	scriptConfig "github.com/icooclaw/icooclaw/internal/script/config"
 )
 
 // JSToolConfig JavaScript 工具配置
@@ -96,7 +97,7 @@ func NewJSTool(def JSToolDefinition, config *JSToolConfig, logger *slog.Logger) 
 
 	if useEngine {
 		// 使用增强脚本引擎
-		engineConfig := &script.Config{
+		engineConfig := &scriptConfig.Config{
 			Workspace:       config.Workspace,
 			AllowFileRead:   config.AllowFileRead,
 			AllowFileWrite:  config.AllowFileWrite,
