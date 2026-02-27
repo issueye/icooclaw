@@ -63,6 +63,11 @@ export async function getSession(id) {
   return request(`/api/v1/sessions/${id}`);
 }
 
+// 获取会话消息
+export async function getSessionMessages(id) {
+  return request(`/api/v1/sessions/${id}/messages`);
+}
+
 // 创建会话
 export async function createSession(data) {
   return request('/api/v1/sessions', {
@@ -205,6 +210,7 @@ export default {
   getProviders,
   getSessions,
   getSession,
+  getSessionMessages,
   createSession,
   updateSession,
   deleteSession,

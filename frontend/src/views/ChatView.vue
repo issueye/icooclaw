@@ -205,8 +205,8 @@ function handleNewChat() {
     chatInputRef.value?.focus();
 }
 
-function handleSelectSession(id) {
-    chatStore.switchSession(id);
+async function handleSelectSession(id) {
+    await chatStore.switchSession(id);
     if (window.innerWidth < 768) {
         sidebarCollapsed.value = true;
     }
@@ -243,11 +243,15 @@ watch(
 );
 
 // ===== 初始化 =====
-onMounted(() => {
+onMounted(async () => {
     if (window.innerWidth < 768) {
         sidebarCollapsed.value = true;
     }
     connectWs();
     checkApiStatus();
+    await chatStore.loadSessions();
+    if (chatStore.currentSessionId) {
+        await chatStore.loadMessages(chatStore.currentSessionId);
+    }
 });
 </script>

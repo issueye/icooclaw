@@ -273,9 +273,11 @@ func (c *WebSocketChannel) Start(ctx context.Context) error {
 	r.Post("/api/v1/chat", c.handleRestChat)
 	r.Post("/api/v1/chat/stream", c.handleRestChatStream)
 	r.Get("/api/v1/sessions", c.handleRestSessions)
+	r.Post("/api/v1/sessions", c.handleRestCreateSession)
 	r.Route("/api/v1/sessions/{id}", func(r chi.Router) {
 		r.Get("/", c.handleRestSessionDetail)
 		r.Get("/messages", c.handleRestSessionDetail)
+		r.Delete("/", c.handleRestSessionDetail)
 	})
 	r.Get("/api/v1/providers", c.handleRestProviders)
 	r.Get("/api/v1/skills", c.handleRestSkills)
@@ -588,6 +590,31 @@ func (c *WebSocketChannel) handleRestSessions(w http.ResponseWriter, r *http.Req
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sessions)
+}
+
+func (c *WebSocketChannel) handleRestCreateSession(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserID   string `json:"user_id"`
+		Metadata string `json:"metadata"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	chatID := fmt.Sprintf("chat_%d", time.Now().UnixNano())
+	session, err := c.storage.GetOrCreateSession("websocket", chatID, req.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if req.Metadata != "" {
+		c.storage.UpdateSessionMetadata(session.ID, req.Metadata)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(session)
 }
 
 func (c *WebSocketChannel) handleRestSessionDetail(w http.ResponseWriter, r *http.Request) {
