@@ -7,6 +7,22 @@ import (
 	"time"
 )
 
+type MessageType string
+
+const (
+	MessageTypeMessage    MessageType = "message"
+	MessageTypeChunk      MessageType = "chunk"
+	MessageTypeEnd        MessageType = "chunk_end"
+	MessageTypeToolCall   MessageType = "tool_call"
+	MessageTypeToolResult MessageType = "tool_result"
+	MessageTypeError      MessageType = "error"
+	MessageTypeThinking   MessageType = "thinking"
+)
+
+func (m MessageType) ToString() string {
+	return string(m)
+}
+
 // InboundMessage 接收消息
 type InboundMessage struct {
 	ID        string
@@ -21,7 +37,7 @@ type InboundMessage struct {
 // OutboundMessage 发送消息
 type OutboundMessage struct {
 	ID         string                 `json:"id,omitempty"`
-	Type       string                 `json:"type"` // "message", "chunk", "chunk_end", "tool_call", "tool_result", "error", "thinking"
+	Type       MessageType            `json:"type"` // "message", "chunk", "chunk_end", "tool_call", "tool_result", "error", "thinking"
 	Channel    string                 `json:"channel,omitempty"`
 	ChatID     string                 `json:"chat_id,omitempty"`
 	Content    string                 `json:"content,omitempty"`

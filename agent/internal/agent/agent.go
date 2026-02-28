@@ -201,7 +201,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 			// 发送内容块
 			if chunk != "" {
 				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-					Type:      "chunk",
+					Type:      bus.MessageTypeChunk,
 					Channel:   msg.Channel,
 					ChatID:    msg.ChatID,
 					Content:   chunk,
@@ -212,7 +212,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 			// 发送思考内容更新
 			if thinking != "" {
 				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-					Type:      "thinking",
+					Type:      bus.MessageTypeThinking,
 					Channel:   msg.Channel,
 					ChatID:    msg.ChatID,
 					Thinking:  thinking,
@@ -229,7 +229,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	config.Tools = a.Tools()
 	config.Session = session
 	config.Logger = a.logger
-	config.Hooks = &loopHooks{agent: a, onChunk: onChunk, chatID: msg.ChatID, clientID: clientID}
+	config.Hooks = &loopHooks{agent: a, onChunk: onChunk, chatID: msg.ChatID, clientID: clientID, session: session}
 
 	reactAgent := NewReActAgent(config)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
@@ -237,7 +237,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 		a.logger.Error("Agent loop failed", "error", err)
 		if a.bus != nil {
 			a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-				Type:      "error",
+				Type:      bus.MessageTypeError,
 				Channel:   msg.Channel,
 				ChatID:    msg.ChatID,
 				Content:   fmt.Sprintf("处理消息时出错: %s", err.Error()),
@@ -251,7 +251,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	// 发送流式结束
 	if a.bus != nil {
 		a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-			Type:      "chunk_end",
+			Type:      bus.MessageTypeEnd,
 			Channel:   msg.Channel,
 			ChatID:    msg.ChatID,
 			Timestamp: time.Now(),

@@ -420,6 +420,7 @@ type loopHooks struct {
 	onChunk  OnChunkFunc
 	chatID   string
 	clientID string
+	session  *storage.Session
 }
 
 func (h *loopHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error {
@@ -438,6 +439,23 @@ func (h *loopHooks) OnLLMResponse(ctx context.Context, content, reasoningContent
 }
 
 func (h *loopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error {
+	// 保存工具调用消息到数据库
+	if h.agent.storage != nil && h.session != nil {
+		_, err := h.agent.storage.AddMessage(
+			h.session.ID,
+			consts.RoleToolCall.ToString(),
+			"",           // content 为空
+			arguments,    // tool_calls 字段存储参数
+			toolCallID,   // tool_call_id
+			toolName,     // tool_name
+			"",           // reasoning_content 为空
+		)
+		if err != nil {
+			h.agent.logger.Error("保存工具调用消息失败", "error", err, "tool", toolName)
+		}
+	}
+
+	// 发布到消息总线
 	if h.agent.bus != nil {
 		h.agent.bus.PublishOutbound(ctx, bus.OutboundMessage{
 			Type:       "tool_call",
@@ -455,6 +473,27 @@ func (h *loopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName 
 }
 
 func (h *loopHooks) OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error {
+	// 保存工具结果消息到数据库
+	if h.agent.storage != nil && h.session != nil {
+		resultContent := result.Content
+		if result.Error != nil {
+			resultContent = fmt.Sprintf("Error: %v", result.Error)
+		}
+		_, err := h.agent.storage.AddMessage(
+			h.session.ID,
+			consts.RoleTool.ToString(),
+			resultContent,  // content 存储结果
+			"",             // tool_calls 为空
+			toolCallID,     // tool_call_id
+			toolName,       // tool_name
+			"",             // reasoning_content 为空
+		)
+		if err != nil {
+			h.agent.logger.Error("保存工具结果消息失败", "error", err, "tool", toolName)
+		}
+	}
+
+	// 发布到消息总线
 	if h.agent.bus != nil {
 		status := "completed"
 		errorMsg := ""

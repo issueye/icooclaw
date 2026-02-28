@@ -449,11 +449,11 @@ func (c *WebSocketChannel) processOutbound(ctx context.Context) {
 			clientID, _ := msg.Metadata["client_id"].(string)
 			if clientID != "" {
 				// 精准推送
-				c.hub.SendToClient(clientID, msg.ChatID, msg.Type, msg.Content, msg.Thinking)
+				c.hub.SendToClient(clientID, msg.ChatID, msg.Type.ToString(), msg.Content, msg.Thinking)
 			} else {
 				// 广播（回退逻辑）
 				wsMsg := WebSocketMessage{
-					Type:     msg.Type,
+					Type:     msg.Type.ToString(),
 					Content:  msg.Content,
 					Thinking: msg.Thinking,
 					ChatID:   msg.ChatID,
