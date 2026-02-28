@@ -20,14 +20,19 @@ type InboundMessage struct {
 
 // OutboundMessage 发送消息
 type OutboundMessage struct {
-	ID        string
-	Type      string // "message", "chunk", "chunk_end", "tool_call", "error", "thinking"
-	Channel   string
-	ChatID    string
-	Content   string
-	Thinking  string // 思考内容
-	Timestamp time.Time
-	Metadata  map[string]interface{}
+	ID         string                 `json:"id,omitempty"`
+	Type       string                 `json:"type"` // "message", "chunk", "chunk_end", "tool_call", "tool_result", "error", "thinking"
+	Channel    string                 `json:"channel,omitempty"`
+	ChatID     string                 `json:"chat_id,omitempty"`
+	Content    string                 `json:"content,omitempty"`
+	Thinking   string                 `json:"thinking,omitempty"`
+	ToolName   string                 `json:"tool_name,omitempty"`
+	ToolCallID string                 `json:"tool_call_id,omitempty"`
+	Arguments  string                 `json:"arguments,omitempty"`
+	Status     string                 `json:"status,omitempty"` // "running", "completed", "error"
+	Error      string                 `json:"error,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // MessageBus 异步消息队列

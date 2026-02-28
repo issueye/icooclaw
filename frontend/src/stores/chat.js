@@ -175,6 +175,7 @@ export const useChatStore = defineStore("chat", () => {
       role: "assistant",
       content: "",
       thinking: "",
+      toolCalls: [],
       timestamp: Date.now(),
       streaming: true,
     };
@@ -208,6 +209,43 @@ export const useChatStore = defineStore("chat", () => {
     if (lastMsg && lastMsg.role === "assistant") {
       if (content !== undefined) lastMsg.content = content;
       lastMsg.streaming = false;
+    }
+  }
+
+  function addToolCall(toolCall) {
+    if (!currentSession.value) return;
+    const msgs = currentSession.value.messages;
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg && lastMsg.role === "assistant") {
+      if (!lastMsg.toolCalls) {
+        lastMsg.toolCalls = [];
+      }
+      const existing = lastMsg.toolCalls.find(tc => tc.id === toolCall.id);
+      if (!existing) {
+        lastMsg.toolCalls.push({
+          id: toolCall.id,
+          toolName: toolCall.tool_name,
+          arguments: toolCall.arguments,
+          status: toolCall.status,
+          content: "",
+          error: null,
+          timestamp: toolCall.timestamp,
+        });
+      }
+    }
+  }
+
+  function updateToolResult(toolResult) {
+    if (!currentSession.value) return;
+    const msgs = currentSession.value.messages;
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg && lastMsg.role === "assistant" && lastMsg.toolCalls) {
+      const toolCall = lastMsg.toolCalls.find(tc => tc.id === toolResult.id);
+      if (toolCall) {
+        toolCall.status = toolResult.status;
+        toolCall.content = toolResult.content;
+        toolCall.error = toolResult.error;
+      }
     }
   }
 
@@ -260,6 +298,8 @@ export const useChatStore = defineStore("chat", () => {
     appendToLastAI,
     updateThinking,
     finishLastAI,
+    addToolCall,
+    updateToolResult,
     clearCurrentMessages,
     ensureSession,
     setApiBase,

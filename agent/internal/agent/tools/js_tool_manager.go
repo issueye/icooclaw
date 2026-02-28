@@ -38,77 +38,13 @@ func (t *CreateJSTool) Name() string {
 
 // Description 获取工具描述
 func (t *CreateJSTool) Description() string {
-	return `动态创建新的 JavaScript 工具。使用此工具可以在运行时创建新的工具并立即使用。
+	// 从 embed.FS 读取工具描述
+	desc, err := toolDescs.ReadFile(filepath.Join("tools_desc", "js_tool_create.md"))
+	if err != nil {
+		return fmt.Sprintf("读取工具描述失败: %v", err)
+	}
 
-## 工具参数
-
-- name: 工具名称，只能包含字母、数字和下划线
-- description: 工具功能描述
-- code: JavaScript 执行函数代码，必须定义 execute(params) 函数
-- parameters: 工具参数定义（JSON Schema 格式）
-- permissions: 工具权限配置（fileRead/fileWrite/fileDelete/network/exec）
-- overwrite: 是否覆盖已存在的同名工具，默认 false
-
-## 完整示例
-
-创建带参数的问候工具：
-{
-  "name": "greeting",
-  "description": "生成问候消息",
-  "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "名字"}}},
-  "code": "function execute(params) { return '你好，' + params.name; }"
-}
-
-创建文件处理工具（需要权限）：
-{
-  "name": "file_tool",
-  "description": "处理文件",
-  "code": "function execute(params) { var content = fs.readFile(params.path); return content; }",
-  "permissions": {"fileRead": true}
-}
-
-创建 API 调用工具（需要网络权限）：
-{
-  "name": "fetch_data",
-  "description": "获取数据",
-  "code": "function execute(params) { var r = http.get(params.url); return r.body; }",
-  "permissions": {"network": true}
-}
-
-## 重要限制
-
-- 不支持 async/await 关键字
-- HTTP 请求使用同步方式：var response = http.get(url);
-- 所有函数必须是同步的：function execute(params) { }
-
-## 内置对象
-
-### console - 控制台输出
-- console.log/info/debug/warn/error(...args)
-
-### JSON - JSON 操作
-- JSON.stringify(obj) / JSON.parse(str) / JSON.pretty(obj)
-
-### Base64 - 编码解码
-- Base64.encode(str) / Base64.decode(str)
-
-### crypto - 加密工具
-- crypto.md5/sha1/sha256(data)
-- crypto.hmacMD5/hmacSHA1/hmacSHA256(data, key)
-- crypto.aesEncrypt/aesDecrypt(plaintext, key)
-
-### fs - 文件系统（需要 permissions.fileRead/fileWrite/fileDelete）
-- fs.readFile/writeFile/appendFile/exists/deleteFile
-- fs.mkdir/rmdir/listDir/copyFile/moveFile
-
-### http - HTTP 客户端（需要 permissions.network）
-- http.get/post/postJSON/request/download
-
-### shell - 命令执行（需要 permissions.exec）
-- shell.exec/execWithTimeout/execInDir
-
-### utils - 工具函数
-- utils.now()/timestamp()/formatTime/sleep/env/cwd`
+	return string(desc)
 }
 
 // Parameters 获取参数定义

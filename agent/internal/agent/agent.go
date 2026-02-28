@@ -229,7 +229,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	config.Tools = a.Tools()
 	config.Session = session
 	config.Logger = a.logger
-	config.Hooks = &loopHooks{agent: a, onChunk: onChunk}
+	config.Hooks = &loopHooks{agent: a, onChunk: onChunk, chatID: msg.ChatID, clientID: clientID}
 
 	reactAgent := NewReActAgent(config)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)

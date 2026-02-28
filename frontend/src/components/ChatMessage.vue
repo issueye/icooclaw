@@ -48,6 +48,13 @@
                 </div>
             </div>
 
+            <!-- 工具调用展示 -->
+            <ToolCallDisplay
+                v-if="!isUser && message.toolCalls && message.toolCalls.length > 0"
+                :tool-calls="message.toolCalls"
+                class="mb-2 w-full"
+            />
+
             <div
                 class="rounded-2xl px-4 py-3 text-sm leading-relaxed relative group"
                 :class="
@@ -103,6 +110,7 @@ import { computed, ref } from "vue";
 import { marked } from "marked";
 import hljs from "highlight.js";
 import { CopyIcon, CheckIcon, BrainIcon, ChevronDownIcon } from "lucide-vue-next";
+import ToolCallDisplay from "./ToolCallDisplay.vue";
 
 // 配置 marked
 marked.setOptions({

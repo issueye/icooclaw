@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/icooclaw/icooclaw/consts"
 	"github.com/icooclaw/icooclaw/internal/agent/tools"
+	"github.com/icooclaw/icooclaw/internal/bus"
 	"github.com/icooclaw/icooclaw/internal/provider"
 	"github.com/icooclaw/icooclaw/internal/storage"
 )
@@ -33,10 +35,10 @@ type ReActHooks interface {
 	OnLLMResponse(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iteration int) error
 
 	// OnToolCall 工具调用前调用
-	OnToolCall(ctx context.Context, toolName string, arguments string) error
+	OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error
 
 	// OnToolResult 工具执行后调用
-	OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error
+	OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error
 
 	// OnIterationStart 每次迭代开始时调用
 	OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error
@@ -61,10 +63,10 @@ func (h *DefaultHooks) OnLLMChunk(ctx context.Context, content, thinking string)
 func (h *DefaultHooks) OnLLMResponse(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iteration int) error {
 	return nil
 }
-func (h *DefaultHooks) OnToolCall(ctx context.Context, toolName string, arguments string) error {
+func (h *DefaultHooks) OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error {
 	return nil
 }
-func (h *DefaultHooks) OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error {
+func (h *DefaultHooks) OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error {
 	return nil
 }
 func (h *DefaultHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error {
@@ -230,7 +232,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			logger.Info("Executing tool", "tool", toolName, "call_id", call.ID)
 
 			// 触发工具调用前钩子
-			if err := hooks.OnToolCall(ctx, toolName, arguments); err != nil {
+			if err := hooks.OnToolCall(ctx, call.ID, toolName, arguments); err != nil {
 				logger.Warn("工具调用前钩子报错", "error", err)
 			}
 
@@ -251,7 +253,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			logger.Debug(fmt.Sprintf("工具调用[%s]\n参数[%s]\n结果[%s]", toolName, arguments, result.Content))
 
 			// 触发工具结果钩子
-			if err := hooks.OnToolResult(ctx, toolName, result); err != nil {
+			if err := hooks.OnToolResult(ctx, call.ID, toolName, result); err != nil {
 				logger.Warn("工具结果钩子报错", "error", err)
 			}
 
@@ -414,8 +416,10 @@ func (r *ReActAgent) buildRequest(ctx context.Context, messages []provider.Messa
 
 // loopHooks 实现 ReActHooks 接口，用于将 Loop 的 onChunk 回调连接到 ReAct
 type loopHooks struct {
-	agent   *Agent
-	onChunk OnChunkFunc
+	agent    *Agent
+	onChunk  OnChunkFunc
+	chatID   string
+	clientID string
 }
 
 func (h *loopHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error {
@@ -433,11 +437,44 @@ func (h *loopHooks) OnLLMResponse(ctx context.Context, content, reasoningContent
 	return nil
 }
 
-func (h *loopHooks) OnToolCall(ctx context.Context, toolName string, arguments string) error {
+func (h *loopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error {
+	if h.agent.bus != nil {
+		h.agent.bus.PublishOutbound(ctx, bus.OutboundMessage{
+			Type:       "tool_call",
+			ID:         toolCallID,
+			ToolCallID: toolCallID,
+			ToolName:   toolName,
+			Arguments:  arguments,
+			Status:     "running",
+			ChatID:     h.chatID,
+			Timestamp:  time.Now(),
+			Metadata:   map[string]interface{}{"client_id": h.clientID},
+		})
+	}
 	return nil
 }
 
-func (h *loopHooks) OnToolResult(ctx context.Context, toolName string, result tools.ToolResult) error {
+func (h *loopHooks) OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error {
+	if h.agent.bus != nil {
+		status := "completed"
+		errorMsg := ""
+		if result.Error != nil {
+			status = "error"
+			errorMsg = result.Error.Error()
+		}
+		h.agent.bus.PublishOutbound(ctx, bus.OutboundMessage{
+			Type:       "tool_result",
+			ID:         toolCallID,
+			ToolCallID: toolCallID,
+			ToolName:   toolName,
+			Content:    result.Content,
+			Error:      errorMsg,
+			Status:     status,
+			ChatID:     h.chatID,
+			Timestamp:  time.Now(),
+			Metadata:   map[string]interface{}{"client_id": h.clientID},
+		})
+	}
 	return nil
 }
 

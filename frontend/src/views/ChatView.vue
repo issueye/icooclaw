@@ -152,6 +152,12 @@ onMessage((msg) => {
         scrollToBottom();
     } else if (msg.type === "thinking") {
         chatStore.updateThinking(msg.thinking || "");
+    } else if (msg.type === "tool_call") {
+        chatStore.addToolCall(msg);
+        scrollToBottom();
+    } else if (msg.type === "tool_result") {
+        chatStore.updateToolResult(msg);
+        scrollToBottom();
     } else if (msg.type === "chunk_end" || msg.type === "message") {
         if (msg.type === "message") {
             chatStore.finishLastAI(msg.content || "");
