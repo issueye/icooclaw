@@ -356,22 +356,46 @@ func ExtractThinkingContent(content, reasoningContent string) (string, string) {
 	}
 
 	// 2. 从 content 中解析思考标签 (DeepSeek-R1 等模型)
-	thinking := extractFromTags(content, DeepSeekParser)
+	thinking, cleanedContent := extractAndCleanFromTags(content, DeepSeekParser)
 	if thinking != "" {
-		return content, thinking
+		return cleanedContent, thinking
 	}
 
 	// 3. 尝试 Kimi 格式
-	thinking = extractFromTags(content, KimiParser)
+	thinking, cleanedContent = extractAndCleanFromTags(content, KimiParser)
 	if thinking != "" {
-		return content, thinking
+		return cleanedContent, thinking
 	}
 
 	// 没有找到思考内容
 	return content, ""
 }
 
-// extractFromTags 使用指定的标签解析器提取思考内容
+// extractAndCleanFromTags 使用指定的标签解析器提取思考内容，并从原内容中移除
+func extractAndCleanFromTags(content string, parser *ThinkTagParser) (string, string) {
+	startIdx := strings.Index(content, parser.StartTag)
+	if startIdx == -1 {
+		return "", content
+	}
+
+	endIdx := strings.Index(content[startIdx:], parser.EndTag)
+	if endIdx == -1 {
+		return "", content
+	}
+	endIdx += startIdx
+
+	// 提取思考内容
+	thinkingStartIdx := startIdx + len(parser.StartTag)
+	thinking := strings.TrimSpace(content[thinkingStartIdx:endIdx])
+
+	// 从原内容中移除思考标签和内容
+	cleanedContent := content[:startIdx] + content[endIdx+len(parser.EndTag):]
+	cleanedContent = strings.TrimSpace(cleanedContent)
+
+	return thinking, cleanedContent
+}
+
+// extractFromTags 使用指定的标签解析器提取思考内容（仅提取不移除，保留向后兼容）
 func extractFromTags(content string, parser *ThinkTagParser) string {
 	startIdx := strings.Index(content, parser.StartTag)
 	if startIdx == -1 {

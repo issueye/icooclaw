@@ -171,7 +171,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			return "", "", nil, err
 		}
 
-		logger.Debug("Sending request to LLM", "iteration", iteration, "message_count", len(messages))
+		logger.Debug("发送请求到 LLM", "iteration", iteration, "message_count", len(messages))
 
 		// 调用 LLM
 		err := cfg.Provider.ChatStream(ctx, *req, streamCallback)
@@ -201,15 +201,15 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			logger.Warn("LLM 响应钩子报错", "error", err)
 		}
 
-		logger.Info("LLM response", "iteration", iteration, "content_length", len(content), "tool_calls", len(toolCalls), "content_preview", content[:min(200, len(content))])
+		logger.Info("LLM 响应", "iteration", iteration, "content_length", len(content), "tool_calls", len(toolCalls), "content_preview", content[:min(200, len(content))])
 
 		// 调试：打印原始 toolCallsData
-		logger.Debug("toolCallsData debug", "count", len(streamState.toolCallsData), "data", streamState.toolCallsData)
+		logger.Debug("工具调用数据调试", "count", len(streamState.toolCallsData), "data", streamState.toolCallsData)
 
 		// 检查是否需要执行工具
 		if len(toolCalls) == 0 {
 			// 没有工具调用，结束循环
-			logger.Info("Agent loop completed", "iterations", iteration+1)
+			logger.Info("Agent 循环完成", "iterations", iteration+1)
 
 			// 触发迭代结束钩子
 			if err := hooks.OnIterationEnd(ctx, iteration, false); err != nil {
@@ -229,7 +229,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			toolName := call.Function.Name
 			arguments := call.Function.Arguments
 
-			logger.Info("Executing tool", "tool", toolName, "call_id", call.ID)
+			logger.Info("执行工具", "tool", toolName, "call_id", call.ID)
 
 			// 触发工具调用前钩子
 			if err := hooks.OnToolCall(ctx, call.ID, toolName, arguments); err != nil {
@@ -286,7 +286,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		}
 	}
 
-	return "", "", nil, fmt.Errorf("max iterations exceeded")
+	return "", "", nil, fmt.Errorf("最大迭代次数 %d 已超过", cfg.MaxIterations)
 }
 
 // ============ 流式回调状态管理 ============

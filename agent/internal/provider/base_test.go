@@ -194,3 +194,65 @@ func TestBaseProvider_Chat_NotImplemented(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 }
+
+// TestExtractThinkingContent tests for ExtractThinkingContent function
+func TestExtractThinkingContent_NoThinking(t *testing.T) {
+	content := "Hello, this is a normal response."
+	cleanContent, thinking := ExtractThinkingContent(content, "")
+
+	assert.Equal(t, "Hello, this is a normal response.", cleanContent)
+	assert.Equal(t, "", thinking)
+}
+
+func TestExtractThinkingContent_WithReasoningContent(t *testing.T) {
+	content := "This is the response."
+	reasoningContent := "This is my reasoning."
+	cleanContent, thinking := ExtractThinkingContent(content, reasoningContent)
+
+	// 当有独立的 reasoning_content 字段时，应该直接使用，不修改 content
+	assert.Equal(t, "This is the response.", cleanContent)
+	assert.Equal(t, "This is my reasoning.", thinking)
+}
+
+func TestExtractThinkingContent_DeepSeekFormat(t *testing.T) {
+	content := "<think>Let me think about this...</think>This is the answer."
+	cleanContent, thinking := ExtractThinkingContent(content, "")
+
+	assert.Equal(t, "This is the answer.", cleanContent)
+	assert.Equal(t, "Let me think about this...", thinking)
+}
+
+func TestExtractThinkingContent_DeepSeekFormat_Multiline(t *testing.T) {
+	content := `<think>First, I need to analyze the problem.
+Then I will provide a solution.
+</think>Here is my final answer.`
+	cleanContent, thinking := ExtractThinkingContent(content, "")
+
+	assert.Equal(t, "Here is my final answer.", cleanContent)
+	assert.Contains(t, thinking, "First, I need to analyze the problem.")
+	assert.Contains(t, thinking, "Then I will provide a solution.")
+}
+
+func TestExtractThinkingContent_KimiFormat(t *testing.T) {
+	content := "<|start_header_id|>reasoning<|end_header_id|>Let me reason through this.<|start_header_id|>assistant<|end_header_id|>This is the answer."
+	cleanContent, thinking := ExtractThinkingContent(content, "")
+
+	assert.Equal(t, "This is the answer.", cleanContent)
+	assert.Equal(t, "Let me reason through this.", thinking)
+}
+
+func TestExtractThinkingContent_OnlyThinking(t *testing.T) {
+	content := "<think>Just thinking, no answer yet.</think>"
+	cleanContent, thinking := ExtractThinkingContent(content, "")
+
+	assert.Equal(t, "", cleanContent)
+	assert.Equal(t, "Just thinking, no answer yet.", thinking)
+}
+
+func TestExtractThinkingContent_ThinkingWithWhitespace(t *testing.T) {
+	content := "<think>  Thinking with spaces  </think>  Answer here.  "
+	cleanContent, thinking := ExtractThinkingContent(content, "")
+
+	assert.Equal(t, "Answer here.", cleanContent)
+	assert.Equal(t, "Thinking with spaces", thinking)
+}
