@@ -122,7 +122,7 @@ func NewJSTool(def JSToolDefinition, config *JSToolConfig, logger *slog.Logger) 
 	}
 
 	if _, err := tool.vm.RunString(tool.script); err != nil {
-		return nil, fmt.Errorf("failed to compile script: %w", err)
+		return nil, fmt.Errorf("编译脚本失败: %w", err)
 	}
 
 	return tool, nil
@@ -180,7 +180,7 @@ func (t *JSTool) Execute(ctx context.Context, params map[string]interface{}) (st
 		})()
 	`, string(paramsJSON)))
 	if err != nil {
-		return "", fmt.Errorf("script execution failed: %w", err)
+		return "", fmt.Errorf("脚本执行失败: %w", err)
 	}
 
 	if result == nil || goja.IsUndefined(result) {
@@ -272,12 +272,12 @@ func NewJSToolLoader(config *JSToolConfig, logger *slog.Logger) *JSToolLoader {
 func (l *JSToolLoader) LoadFromFile(path string) (*JSTool, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
+		return nil, fmt.Errorf("读取文件失败: %w", err)
 	}
 
 	def, err := l.parseScript(string(content))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse script: %w", err)
+		return nil, fmt.Errorf("解析脚本失败: %w", err)
 	}
 
 	if def.Name == "" {
@@ -296,7 +296,7 @@ func (l *JSToolLoader) LoadFromDirectory(dir string) ([]Tool, error) {
 		if os.IsNotExist(err) {
 			return tools, nil
 		}
-		return nil, fmt.Errorf("failed to read directory: %w", err)
+		return nil, fmt.Errorf("读取目录失败: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -312,12 +312,12 @@ func (l *JSToolLoader) LoadFromDirectory(dir string) ([]Tool, error) {
 		path := filepath.Join(dir, name)
 		tool, err := l.LoadFromFile(path)
 		if err != nil {
-			l.logger.Warn("Failed to load JS tool", "path", path, "error", err)
+			l.logger.Warn("加载 JS 工具失败", "path", path, "error", err)
 			continue
 		}
 
 		tools = append(tools, tool)
-		l.logger.Info("Loaded JS tool", "name", tool.Name(), "path", path)
+		l.logger.Info("加载 JS 工具", "name", tool.Name(), "path", path)
 	}
 
 	return tools, nil
@@ -336,7 +336,7 @@ func (l *JSToolLoader) parseScript(script string) (JSToolDefinition, error) {
 
 	toolDef := vm.Get("tool")
 	if toolDef == nil || goja.IsUndefined(toolDef) {
-		return def, fmt.Errorf("script must define a 'tool' object")
+		return def, fmt.Errorf("脚本必须定义一个 'tool' 对象")
 	}
 
 	exported := toolDef.Export()
@@ -372,12 +372,12 @@ func (l *JSToolLoader) parseScript(script string) (JSToolDefinition, error) {
 	}
 
 	if def.Name == "" {
-		return def, fmt.Errorf("tool definition must have a 'name' property")
+		return def, fmt.Errorf("工具定义必须包含 'name' 属性")
 	}
 
 	executeFunc := vm.Get("execute")
 	if executeFunc == nil || goja.IsUndefined(executeFunc) {
-		return def, fmt.Errorf("tool must define an 'execute' function")
+		return def, fmt.Errorf("工具必须定义一个 'execute' 函数")
 	}
 
 	def.Execute = script

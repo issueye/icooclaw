@@ -40,76 +40,75 @@ func (t *CreateJSTool) Name() string {
 func (t *CreateJSTool) Description() string {
 	return `动态创建新的 JavaScript 工具。使用此工具可以在运行时创建新的工具并立即使用。
 
+## 工具参数
+
+- name: 工具名称，只能包含字母、数字和下划线
+- description: 工具功能描述
+- code: JavaScript 执行函数代码，必须定义 execute(params) 函数
+- parameters: 工具参数定义（JSON Schema 格式）
+- permissions: 工具权限配置（fileRead/fileWrite/fileDelete/network/exec）
+- overwrite: 是否覆盖已存在的同名工具，默认 false
+
+## 完整示例
+
+创建带参数的问候工具：
+{
+  "name": "greeting",
+  "description": "生成问候消息",
+  "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "名字"}}},
+  "code": "function execute(params) { return '你好，' + params.name; }"
+}
+
+创建文件处理工具（需要权限）：
+{
+  "name": "file_tool",
+  "description": "处理文件",
+  "code": "function execute(params) { var content = fs.readFile(params.path); return content; }",
+  "permissions": {"fileRead": true}
+}
+
+创建 API 调用工具（需要网络权限）：
+{
+  "name": "fetch_data",
+  "description": "获取数据",
+  "code": "function execute(params) { var r = http.get(params.url); return r.body; }",
+  "permissions": {"network": true}
+}
+
+## 重要限制
+
+- 不支持 async/await 关键字
+- HTTP 请求使用同步方式：var response = http.get(url);
+- 所有函数必须是同步的：function execute(params) { }
+
 ## 内置对象
 
-脚本中可以使用以下内置对象：
-
 ### console - 控制台输出
-- console.log(...args) - 输出信息
-- console.info(...args) - 输出信息
-- console.debug(...args) - 输出调试信息
-- console.warn(...args) - 输出警告
-- console.error(...args) - 输出错误
-- console.table(data) - 表格形式输出
+- console.log/info/debug/warn/error(...args)
 
 ### JSON - JSON 操作
-- JSON.stringify(obj) - 对象转字符串
-- JSON.parse(str) - 字符串转对象
-- JSON.pretty(obj) - 格式化输出
+- JSON.stringify(obj) / JSON.parse(str) / JSON.pretty(obj)
 
 ### Base64 - 编码解码
-- Base64.encode(str) - Base64 编码
-- Base64.decode(str) - Base64 解码
+- Base64.encode(str) / Base64.decode(str)
 
-### crypto - 加密工具（已内置）
-- crypto.md5(data) - MD5 哈希
-- crypto.sha1(data) - SHA1 哈希
-- crypto.sha256(data) - SHA256 哈希
-- crypto.hmacMD5(data, key) - HMAC-MD5
-- crypto.hmacSHA1(data, key) - HMAC-SHA1
-- crypto.hmacSHA256(data, key) - HMAC-SHA256
-- crypto.aesEncrypt(plaintext, key) - AES 加密
-- crypto.aesDecrypt(ciphertext, key) - AES 解密
-- crypto.base64Encode(data) / crypto.base64Decode(encoded) - Base64 编解码
-- crypto.hexEncode(data) / crypto.hexDecode(encoded) - Hex 编解码
+### crypto - 加密工具
+- crypto.md5/sha1/sha256(data)
+- crypto.hmacMD5/hmacSHA1/hmacSHA256(data, key)
+- crypto.aesEncrypt/aesDecrypt(plaintext, key)
 
-### fs - 文件系统（需要设置 permissions.fileRead/fileWrite/fileDelete）
-- fs.readFile(path) - 读取文件内容
-- fs.writeFile(path, content) - 写入文件
-- fs.appendFile(path, content) - 追加内容
-- fs.exists(path) - 检查文件是否存在
-- fs.deleteFile(path) - 删除文件
-- fs.mkdir(path) - 创建目录
-- fs.rmdir(path) - 删除目录
-- fs.listDir(path) - 列出目录内容
-- fs.copyFile(src, dst) - 复制文件
-- fs.moveFile(src, dst) - 移动文件
+### fs - 文件系统（需要 permissions.fileRead/fileWrite/fileDelete）
+- fs.readFile/writeFile/appendFile/exists/deleteFile
+- fs.mkdir/rmdir/listDir/copyFile/moveFile
 
-### http - HTTP 客户端（需要设置 permissions.network）
-- http.get(url) - GET 请求
-- http.post(url, body) - POST 请求
-- http.postJSON(url, body) - POST JSON 请求
-- http.request(method, url, body, headers) - 自定义请求
-- http.download(url, savePath) - 下载文件
+### http - HTTP 客户端（需要 permissions.network）
+- http.get/post/postJSON/request/download
 
-### shell - 命令执行（需要设置 permissions.exec）
-- shell.exec(command) - 执行命令
-- shell.execWithTimeout(command, timeout) - 带超时执行
-- shell.execInDir(command, workDir) - 在指定目录执行
+### shell - 命令执行（需要 permissions.exec）
+- shell.exec/execWithTimeout/execInDir
 
 ### utils - 工具函数
-- utils.now() - 当前时间字符串
-- utils.timestamp() - 当前时间戳
-- utils.formatTime(ts, layout) - 格式化时间
-- utils.sleep(ms) - 休眠毫秒
-- utils.env(key) - 获取环境变量
-- utils.cwd() - 当前工作目录
-
-## 使用示例
-- 创建一个简单的问候工具
-- 创建一个数据转换工具
-- 创建一个 API 调用包装工具
-- 创建一个文件处理工具`
+- utils.now()/timestamp()/formatTime/sleep/env/cwd`
 }
 
 // Parameters 获取参数定义
@@ -172,17 +171,17 @@ func (t *CreateJSTool) Parameters() map[string]interface{} {
 func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{}) (string, error) {
 	name, ok := params["name"].(string)
 	if !ok || name == "" {
-		return "", fmt.Errorf("name parameter is required")
+		return "", fmt.Errorf("name 参数是必填项")
 	}
 
 	description, ok := params["description"].(string)
 	if !ok || description == "" {
-		return "", fmt.Errorf("description parameter is required")
+		return "", fmt.Errorf("description 参数是必填项")
 	}
 
 	code, ok := params["code"].(string)
 	if !ok || code == "" {
-		return "", fmt.Errorf("code parameter is required")
+		return "", fmt.Errorf("code 参数是必填项")
 	}
 
 	overwrite := false
@@ -200,7 +199,7 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 
 	// 验证代码安全性
 	if err := validateJSCode(code); err != nil {
-		return "", fmt.Errorf("code validation failed: %w", err)
+		return "", fmt.Errorf("code 参数验证失败: %w", err)
 	}
 
 	// 构建参数定义
@@ -218,18 +217,18 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 	// 确保工具目录存在
 	toolsDir := filepath.Join(t.config.Workspace, t.config.ToolsDir)
 	if err := os.MkdirAll(toolsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create tools directory: %w", err)
+		return "", fmt.Errorf("创建工具目录失败: %w", err)
 	}
 
 	// 检查是否已存在
 	scriptPath := filepath.Join(toolsDir, name+".js")
 	if _, err := os.Stat(scriptPath); err == nil && !overwrite {
-		return "", fmt.Errorf("tool '%s' already exists, set overwrite=true to replace it", name)
+		return "", fmt.Errorf("工具 '%s' 已存在，设置 overwrite=true 可覆盖", name)
 	}
 
 	// 写入文件
 	if err := os.WriteFile(scriptPath, []byte(script), 0644); err != nil {
-		return "", fmt.Errorf("failed to write tool file: %w", err)
+		return "", fmt.Errorf("写入工具文件失败: %w", err)
 	}
 
 	// 动态注册工具
@@ -252,7 +251,7 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 		if err != nil {
 			// 删除文件
 			os.Remove(scriptPath)
-			return "", fmt.Errorf("failed to load created tool: %w", err)
+			return "", fmt.Errorf("加载创建的工具失败: %w", err)
 		}
 
 		t.config.mu.Lock()
@@ -282,8 +281,8 @@ func (t *CreateJSTool) Execute(ctx context.Context, params map[string]interface{
 		"success":     true,
 		"name":        name,
 		"file":        scriptPath,
-		"message":     fmt.Sprintf("Tool '%s' created successfully and is now available for use", name),
-		"usage":       fmt.Sprintf("You can now use the tool '%s' in subsequent requests", name),
+		"message":     fmt.Sprintf("工具 '%s' 创建成功，可在后续请求中使用", name),
+		"usage":       fmt.Sprintf("你可以在后续请求中使用工具 '%s'", name),
 		"permissions": permDesc,
 	}
 
@@ -343,15 +342,15 @@ func (t *CreateJSTool) ToDefinition() ToolDefinition {
 // validateToolName 验证工具名称
 func validateToolName(name string) error {
 	if len(name) < 2 || len(name) > 50 {
-		return fmt.Errorf("tool name must be between 2 and 50 characters")
+		return fmt.Errorf("工具名称长度必须在 2 到 50 个字符之间")
 	}
 
 	for i, c := range name {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
-			return fmt.Errorf("tool name can only contain letters, numbers, and underscores")
+			return fmt.Errorf("工具名称只能包含字母、数字和下划线")
 		}
 		if i == 0 && (c >= '0' && c <= '9') {
-			return fmt.Errorf("tool name cannot start with a number")
+			return fmt.Errorf("工具名称不能以数字开头")
 		}
 	}
 
@@ -380,7 +379,7 @@ func validateToolName(name string) error {
 	}
 
 	if reserved[name] {
-		return fmt.Errorf("'%s' is a reserved tool name", name)
+		return fmt.Errorf("工具名称 '%s' 是保留名称", name)
 	}
 
 	return nil
@@ -390,12 +389,12 @@ func validateToolName(name string) error {
 func validateJSCode(code string) error {
 	// 检查是否包含 execute 函数
 	if !strings.Contains(code, "function execute") {
-		return fmt.Errorf("code must define an 'execute(params)' function")
+		return fmt.Errorf("代码必须定义一个 'execute(params)' 函数")
 	}
 
 	// 检查是否使用了 async/await（goja 不支持）
 	if strings.Contains(code, "async ") || strings.Contains(code, "await ") {
-		return fmt.Errorf("code cannot use 'async' or 'await' keywords (not supported by the JavaScript engine)")
+		return fmt.Errorf("代码不能使用 'async' 或 'await' 关键字（JavaScript 引擎不支持）")
 	}
 
 	// 危险模式检查（移除 fs.、http. 等，因为这些现在由脚本引擎安全提供）
@@ -421,7 +420,7 @@ func validateJSCode(code string) error {
 
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(code, pattern) {
-			return fmt.Errorf("code contains potentially unsafe pattern: %s", pattern)
+			return fmt.Errorf("代码包含潜在不安全模式: %s", pattern)
 		}
 	}
 
@@ -637,7 +636,7 @@ func (t *DeleteJSTool) Parameters() map[string]interface{} {
 func (t *DeleteJSTool) Execute(ctx context.Context, params map[string]interface{}) (string, error) {
 	name, ok := params["name"].(string)
 	if !ok || name == "" {
-		return "", fmt.Errorf("name parameter is required")
+		return "", fmt.Errorf("参数 'name' 是必填项")
 	}
 
 	// 验证不能删除内置工具
@@ -651,7 +650,7 @@ func (t *DeleteJSTool) Execute(ctx context.Context, params map[string]interface{
 	}
 
 	if builtinTools[name] {
-		return "", fmt.Errorf("cannot delete built-in tool '%s'", name)
+		return "", fmt.Errorf("不能删除内置工具 '%s'", name)
 	}
 
 	// 查找并删除文件
@@ -659,17 +658,17 @@ func (t *DeleteJSTool) Execute(ctx context.Context, params map[string]interface{
 	scriptPath := filepath.Join(toolsDir, name+".js")
 
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("tool '%s' not found", name)
+		return "", fmt.Errorf("工具 '%s' 不存在", name)
 	}
 
 	if err := os.Remove(scriptPath); err != nil {
-		return "", fmt.Errorf("failed to delete tool file: %w", err)
+		return "", fmt.Errorf("删除工具文件失败: %w", err)
 	}
 
 	result := map[string]interface{}{
 		"success": true,
 		"name":    name,
-		"message": fmt.Sprintf("Tool '%s' has been deleted", name),
+		"message": fmt.Sprintf("工具 '%s' 已删除", name),
 	}
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")

@@ -27,7 +27,7 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 
 	// 从配置读取工具权限
 	if !cfg.Tools.Enabled {
-		logger.Info("Tools are disabled in config")
+		logger.Info("工具已禁用")
 		return registry
 	}
 
@@ -61,37 +61,37 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 
 	// 注册 HTTP 请求工具
 	registry.Register(NewHTTPRequestTool())
-	logger.Debug("Registered tool: http_request")
+	logger.Debug("注册工具【http_request】")
 
 	// 注册文件工具
 	if toolConfig.AllowedRead {
 		registry.Register(NewFileReadTool(toolConfig))
-		logger.Debug("Registered tool: file_read")
+		logger.Debug("注册工具【file_read】")
 	}
 	if toolConfig.AllowedWrite {
 		registry.Register(NewFileWriteTool(toolConfig))
-		logger.Debug("Registered tool: file_write")
+		logger.Debug("注册工具【file_write】")
 	}
 	if toolConfig.AllowedEdit {
 		registry.Register(NewFileEditTool(toolConfig))
-		logger.Debug("Registered tool: file_edit")
+		logger.Debug("注册工具【file_edit】")
 	}
 	if toolConfig.AllowedDelete {
 		registry.Register(NewFileDeleteTool(toolConfig))
-		logger.Debug("Registered tool: file_delete")
+		logger.Debug("注册工具【file_delete】")
 	}
 	registry.Register(NewFileListTool(toolConfig))
-	logger.Debug("Registered tool: file_list")
+	logger.Debug("注册工具【file_list】")
 
 	// 注册搜索工具
 	registry.Register(NewWebSearchTool())
-	logger.Debug("Registered tool: web_search")
+	logger.Debug("注册工具【web_search】")
 	registry.Register(NewWebFetchTool())
-	logger.Debug("Registered tool: web_fetch")
+	logger.Debug("注册工具【web_fetch】")
 
 	// 注册计算器工具
 	registry.Register(NewCalculatorTool())
-	logger.Debug("Registered tool: calculator")
+	logger.Debug("注册工具【calculator】")
 
 	// 注册Shell执行工具
 	if cfg.Tools.AllowExec {
@@ -101,7 +101,7 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 			Workspace: cfg.Workspace,
 		}
 		registry.Register(NewShellExecTool(execConfig))
-		logger.Debug("Registered tool: exec")
+		logger.Debug("注册工具【exec】")
 	}
 
 	// 注册消息工具
@@ -110,21 +110,21 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 			ChannelManager: channelManager,
 		}
 		registry.Register(NewMessageTool(messageConfig))
-		logger.Debug("Registered tool: message")
+		logger.Debug("注册工具【message】")
 	}
 
 	// 注册 Grep 搜索工具
 	if toolConfig.AllowedRead {
 		registry.Register(NewGrepTool(toolConfig))
-		logger.Debug("Registered tool: grep")
+		logger.Debug("注册工具【grep】")
 		registry.Register(NewFindTool(toolConfig))
-		logger.Debug("Registered tool: find")
+		logger.Debug("注册工具【find】")
 		registry.Register(NewTreeTool(toolConfig))
-		logger.Debug("Registered tool: tree")
+		logger.Debug("注册工具【tree】")
 		registry.Register(NewReadPartTool(toolConfig))
-		logger.Debug("Registered tool: read_part")
+		logger.Debug("注册工具【read_part】")
 		registry.Register(NewLineCountTool(toolConfig))
-		logger.Debug("Registered tool: wc")
+		logger.Debug("注册工具【wc】")
 	}
 
 	// 注册 JS 工具管理工具
@@ -135,14 +135,14 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 		Registry:  registry,
 	}
 	registry.Register(NewCreateJSTool(createToolConfig))
-	logger.Debug("Registered tool: create_tool")
+	logger.Debug("注册工具【create_tool】")
 
 	listToolConfig := &ListJSToolsConfig{
 		Workspace: cfg.Workspace,
 		ToolsDir:  cfg.Tools.JS.ToolsDir,
 	}
 	registry.Register(NewListJSTools(listToolConfig))
-	logger.Debug("Registered tool: list_tools")
+	logger.Debug("注册工具【list_tools】")
 
 	deleteToolConfig := &DeleteJSToolConfig{
 		Workspace: cfg.Workspace,
@@ -151,7 +151,7 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 		mu:        &mu,
 	}
 	registry.Register(NewDeleteJSTool(deleteToolConfig))
-	logger.Debug("Registered tool: delete_tool")
+	logger.Debug("注册工具【delete_tool】")
 
 	// 加载 JavaScript 工具
 	if cfg.Tools.JS.Enabled {
@@ -170,13 +170,13 @@ func InitTools(cfg *config.Config, logger *slog.Logger, channelManager *channel.
 			AllowedDomains:  cfg.Tools.JS.Permissions.AllowedDomains,
 		}
 		if err := RegisterJSTools(registry, toolsDir, jsConfig, logger); err != nil {
-			logger.Warn("Failed to load JS tools", "error", err)
+			logger.Warn("加载 JS 工具失败", "error", err)
 		}
 	} else {
-		logger.Info("JavaScript tools are disabled")
+		logger.Info("JavaScript 工具已禁用")
 	}
 
-	logger.Info("Tools initialized", "count", registry.Count())
+	logger.Info("工具初始化完成", "count", registry.Count())
 
 	return registry
 }
