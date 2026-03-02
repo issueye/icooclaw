@@ -1,10 +1,10 @@
 go 1.24.11
 
 use (
+	./icooclaw.ai
 	./icooclaw.bus
 	./icooclaw.channel
 	./icooclaw.scheduler
 	./icooclaw.script
 	./icooclaw.utils
-	./icooclaw.ai
 )

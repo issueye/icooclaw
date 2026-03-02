@@ -10,9 +10,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/icooclaw/icooclaw/internal/agent"
-	"github.com/icooclaw/icooclaw/internal/provider"
 	"github.com/spf13/cobra"
+	"icooclaw.ai/agent"
+	"icooclaw.ai/provider"
 )
 
 var chatCmd = &cobra.Command{

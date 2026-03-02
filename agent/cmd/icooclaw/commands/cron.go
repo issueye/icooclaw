@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/icooclaw/icooclaw/internal/scheduler"
-	"github.com/icooclaw/icooclaw/internal/storage"
 	"github.com/spf13/cobra"
+	"icooclaw.ai/storage"
+	scheduler "icooclaw.scheduler"
 )
 
 var cronCmd = &cobra.Command{

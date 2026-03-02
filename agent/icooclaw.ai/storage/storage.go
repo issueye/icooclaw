@@ -37,7 +37,7 @@ func (s *Storage) GetSessionByKey(key string) (*Session, error) {
 
 // GetOrCreateSession 获取或创建会话
 func (s *Storage) GetOrCreateSession(channel, chatID, userID string) (*Session, error) {
-	key := channel + ":" + chatID
+	key := GenerateSessionKey(channel, chatID)
 	session, err := s.GetSessionByKey(key)
 	if err == nil {
 		return session, nil

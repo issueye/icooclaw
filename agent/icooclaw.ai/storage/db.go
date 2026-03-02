@@ -133,6 +133,11 @@ func (Session) TableName() string {
 	return "sessions"
 }
 
+// GenerateSessionKey 生成会话 Key
+func GenerateSessionKey(channel, chatID string) string {
+	return fmt.Sprintf("%s:%s", channel, chatID)
+}
+
 // Create 创建会话
 func (s *Session) Create() error {
 	return DB.Create(s).Error
@@ -150,7 +155,7 @@ func GetSessionByKey(key string) (*Session, error) {
 
 // GetOrCreateByChannelChatID 通过通道和聊天ID获取或创建会话
 func GetOrCreateSession(channel, chatID, userID string) (*Session, error) {
-	key := fmt.Sprintf("%s:%s", channel, chatID)
+	key := GenerateSessionKey(channel, chatID)
 	session, err := GetSessionByKey(key)
 	if err == nil {
 		return session, nil

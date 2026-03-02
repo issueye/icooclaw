@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/icooclaw/icooclaw/internal/storage"
+	"icooclaw.ai/storage"
 )
 
 // MemoryConfig 内存配置

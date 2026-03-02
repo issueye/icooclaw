@@ -9,18 +9,18 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/icooclaw/icooclaw/internal/agent"
-	"github.com/icooclaw/icooclaw/internal/agent/tools"
-	"github.com/icooclaw/icooclaw/internal/bus"
-	"github.com/icooclaw/icooclaw/internal/channel"
-	"github.com/icooclaw/icooclaw/internal/config"
-	"github.com/icooclaw/icooclaw/internal/provider"
-	"github.com/icooclaw/icooclaw/internal/scheduler"
-	"github.com/icooclaw/icooclaw/internal/storage"
-	"github.com/icooclaw/icooclaw/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
+	"icooclaw.ai/agent"
+	"icooclaw.ai/config"
+	"icooclaw.ai/provider"
+	"icooclaw.ai/storage"
+	"icooclaw.ai/tools"
+	bus "icooclaw.bus"
+	channel "icooclaw.channel"
+	scheduler "icooclaw.scheduler"
+	utils "icooclaw.utils"
 )
 
 // 初始化组件的全局变量

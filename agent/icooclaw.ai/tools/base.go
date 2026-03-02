@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"icooclaw.ai/provider"
 )
 
 // Tool 工具接口
@@ -161,6 +163,10 @@ func (r *Registry) Execute(ctx context.Context, call interface{}) ToolResult {
 
 	switch c := call.(type) {
 	case ToolCall:
+		toolCallID = c.ID
+		toolName = c.Function.Name
+		arguments = json.RawMessage(c.Function.Arguments)
+	case provider.ToolCall:
 		toolCallID = c.ID
 		toolName = c.Function.Name
 		arguments = json.RawMessage(c.Function.Arguments)

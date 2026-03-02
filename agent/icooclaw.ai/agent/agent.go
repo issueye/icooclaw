@@ -7,12 +7,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/icooclaw/icooclaw/internal/bus"
-	"github.com/icooclaw/icooclaw/internal/config"
-	"github.com/icooclaw/icooclaw/internal/provider"
-	"github.com/icooclaw/icooclaw/internal/react/tools"
-	"github.com/icooclaw/icooclaw/internal/skill"
-	"github.com/icooclaw/icooclaw/internal/storage"
+	"icooclaw.ai/config"
+	"icooclaw.ai/provider"
+	"icooclaw.ai/skill"
+	"icooclaw.ai/storage"
+	"icooclaw.ai/tools"
+	bus "icooclaw.bus"
 )
 
 // SessionMetadata 会话元数据
@@ -264,7 +264,10 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	}
 
 	// 保存助手消息
-	toolCallsJSON, _ := json.Marshal(toolCalls)
+	toolCallsJSON, err := json.Marshal(toolCalls)
+	if err != nil {
+		a.logger.Warn("Failed to marshal tool calls", "error", err)
+	}
 	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", reasoningContent)
 	if err != nil {
 		a.logger.Error("Failed to save assistant message", "error", err)
@@ -319,7 +322,10 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 	}
 
 	// 保存助手消息
-	toolCallsJSON, _ := json.Marshal(toolCalls)
+	toolCallsJSON, err := json.Marshal(toolCalls)
+	if err != nil {
+		a.logger.Warn("Failed to marshal tool calls", "error", err)
+	}
 	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", reasoningContent)
 	if err != nil {
 		a.logger.Warn("Failed to save assistant message", "error", err)

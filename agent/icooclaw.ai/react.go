@@ -85,12 +85,10 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		// 重置状态
 		streamState.content = ""
 		streamState.reasoningContent = ""
-		streamState.toolCallsData = make(map[int]*struct {
-			id   string
-			typ  string
-			name string
-			args strings.Builder
-		})
+		// 清空 map 而非重新创建，减少内存分配
+		for key := range streamState.toolCallsData {
+			delete(streamState.toolCallsData, key)
+		}
 
 		// 触发迭代开始钩子
 		if err := hooks.OnIterationStart(ctx, iteration, messages); err != nil {

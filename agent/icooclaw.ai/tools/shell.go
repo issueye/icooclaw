@@ -25,6 +25,10 @@ type ShellExecTool struct {
 
 // NewShellExecTool 创建Shell执行工具
 func NewShellExecTool(config *ShellExecConfig) *ShellExecTool {
+	if config == nil {
+		config = &ShellExecConfig{}
+	}
+
 	tool := NewBaseTool(
 		"exec",
 		"执行Shell命令。根据配置决定是否启用，默认关闭以保证安全。",
@@ -97,7 +101,10 @@ func (t *ShellExecTool) Execute(ctx context.Context, params map[string]interface
 
 	// 创建命令
 	cmd := exec.CommandContext(ctx, shell, shellArgs...)
-	cmd.Dir = t.config.Workspace
+	// 只有在 Workspace 非空时才设置工作目录
+	if t.config.Workspace != "" {
+		cmd.Dir = t.config.Workspace
+	}
 
 	// 设置超时
 	timeoutDuration := time.Duration(timeout) * time.Second
@@ -105,12 +112,13 @@ func (t *ShellExecTool) Execute(ctx context.Context, params map[string]interface
 	// 执行命令
 	done := make(chan struct{})
 	var stdout, stderr strings.Builder
+	var runErr error
 
 	go func() {
 		defer close(done)
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
-		_ = cmd.Run()
+		runErr = cmd.Run()
 	}()
 
 	select {
@@ -132,7 +140,9 @@ func (t *ShellExecTool) Execute(ctx context.Context, params map[string]interface
 	}
 
 	// 如果命令执行失败，包含错误信息
-	if cmd.ProcessState.ExitCode() != 0 {
+	if runErr != nil {
+		result["error"] = runErr.Error()
+	} else if cmd.ProcessState.ExitCode() != 0 {
 		result["error"] = fmt.Sprintf("command exited with code %d", cmd.ProcessState.ExitCode())
 	}
 

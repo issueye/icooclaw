@@ -1,4 +1,4 @@
-module bus
+module icooclaw.bus
 
 go 1.24.11
 
