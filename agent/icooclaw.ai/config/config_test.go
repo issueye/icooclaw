@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/icooclaw/icooclaw/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	utils "icooclaw.utils"
 )
 
 // TestConfig_Structure tests for Config struct

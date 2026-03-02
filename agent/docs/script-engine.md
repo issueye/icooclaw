@@ -10,7 +10,7 @@ package main
 import (
     "log/slog"
     
-    "github.com/icooclaw/icooclaw/internal/script"
+    "icooclaw.ai/script"
 )
 
 func main() {

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/icooclaw/icooclaw/consts"
-	"github.com/icooclaw/icooclaw/internal/agent/tools"
-	"github.com/icooclaw/icooclaw/internal/bus"
-	"github.com/icooclaw/icooclaw/internal/provider"
-	"github.com/icooclaw/icooclaw/internal/storage"
+	"icooclaw.ai/agent/tools"
+	"icooclaw.ai/consts"
+	"icooclaw.ai/provider"
+	"icooclaw.ai/storage"
+	bus "icooclaw.bus"
 )
 
 // ============ Hook 接口定义 ============

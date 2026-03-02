@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/icooclaw/icooclaw/pkg/utils"
 	"github.com/spf13/viper"
+	utils "icooclaw.utils"
 )
 
 // Config 全局配置

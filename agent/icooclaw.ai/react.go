@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/icooclaw/icooclaw/consts"
-	"github.com/icooclaw/icooclaw/internal/agent"
-	"github.com/icooclaw/icooclaw/internal/hooks"
-	"github.com/icooclaw/icooclaw/internal/provider"
-	"github.com/icooclaw/icooclaw/internal/storage"
-	"github.com/icooclaw/icooclaw/internal/tools"
+	"icooclaw.ai/agent"
+	"icooclaw.ai/consts"
+	"icooclaw.ai/hooks"
+	"icooclaw.ai/provider"
+	"icooclaw.ai/storage"
+	"icooclaw.ai/tools"
 )
 
 // ============ ReAct Agent ============

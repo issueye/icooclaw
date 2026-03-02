@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/icooclaw/icooclaw/internal/channel"
-	"github.com/icooclaw/icooclaw/internal/config"
-	"github.com/icooclaw/icooclaw/pkg/utils"
+	"icooclaw.ai/config"
+	channel "icooclaw.channel"
+	utils "icooclaw.utils"
 )
 
 // InitTools 初始化工具系统

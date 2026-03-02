@@ -3,8 +3,8 @@ package hooks
 import (
 	"context"
 
-	"github.com/icooclaw/icooclaw/internal/agent/tools"
-	"github.com/icooclaw/icooclaw/internal/provider"
+	"icooclaw.ai/provider"
+	"icooclaw.ai/tools"
 )
 
 // DefaultHooks 默认空实现
