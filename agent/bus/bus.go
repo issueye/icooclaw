@@ -163,9 +163,8 @@ func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) e
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		// 如果主通道满了，但订阅者可能已经收到了，这里为了简单返回成功或 Warn
 		b.logger.Warn("Outbound channel full")
-		return nil
+		return ErrChannelFull
 	}
 }
 

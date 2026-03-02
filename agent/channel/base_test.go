@@ -3,6 +3,7 @@ package channel
 import (
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,14 +54,16 @@ func TestInboundMessage_Structure(t *testing.T) {
 		ChatID:    "chat_123",
 		UserID:    "user_456",
 		Content:   "Hello",
-		MessageID: "msg_789",
+		ID:        "msg_789",
+		Timestamp: time.Now(),
+		Metadata:  map[string]interface{}{"key": "value"},
 	}
 
 	assert.Equal(t, "telegram", msg.Channel)
 	assert.Equal(t, "chat_123", msg.ChatID)
 	assert.Equal(t, "user_456", msg.UserID)
 	assert.Equal(t, "Hello", msg.Content)
-	assert.Equal(t, "msg_789", msg.MessageID)
+	assert.Equal(t, "msg_789", msg.ID)
 }
 
 // TestBaseChannelMethods tests the methods on BaseChannel

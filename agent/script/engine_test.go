@@ -2,10 +2,10 @@ package script
 
 import (
 	"context"
+	"script/config"
 	"testing"
 	"time"
 
-	"github.com/icooclaw/icooclaw/internal/script/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

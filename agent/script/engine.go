@@ -16,10 +16,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"script/builtons"
+	"script/config"
 
 	"github.com/dop251/goja"
-	"github.com/icooclaw/icooclaw/internal/script/builtons"
-	"github.com/icooclaw/icooclaw/internal/script/config"
 )
 
 // Engine 脚本引擎

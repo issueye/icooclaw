@@ -2,5 +2,6 @@ go 1.24.11
 
 use (
 	./bus
+	./channel
 	./scheduler
 )

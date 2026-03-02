@@ -5,18 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/icooclaw/icooclaw/internal/bus"
-	"github.com/icooclaw/icooclaw/internal/config"
-	"github.com/icooclaw/icooclaw/internal/storage"
 
 	"github.com/gorilla/websocket"
 )
@@ -56,12 +51,12 @@ type WebSocketHub struct {
 	broadcast  chan []byte
 	register   chan *WebSocketClient
 	unregister chan *WebSocketClient
-	logger     *slog.Logger
+	logger     Logger
 	mu         sync.RWMutex
 }
 
 // NewWebSocketHub 创建 WebSocket Hub
-func NewWebSocketHub(logger *slog.Logger) *WebSocketHub {
+func NewWebSocketHub(logger Logger) *WebSocketHub {
 	return &WebSocketHub{
 		clients:    make(map[*WebSocketClient]bool),
 		broadcast:  make(chan []byte, 256),
@@ -157,33 +152,6 @@ func (h *WebSocketHub) SendToClient(clientID, chatID, msgType, content, thinking
 	return errors.New("client not found")
 }
 
-// SendToUser 发送消息给指定用户
-func (h *WebSocketHub) SendToUser(userID, message string) error {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	data, err := json.Marshal(WebSocketMessage{
-		Type:    "message",
-		Content: message,
-		UserID:  userID,
-	})
-	if err != nil {
-		return err
-	}
-
-	for client := range h.clients {
-		if client.UserID == userID {
-			select {
-			case client.Send <- data:
-				return nil
-			default:
-				return errors.New("client buffer full")
-			}
-		}
-	}
-	return errors.New("user not found")
-}
-
 // Count 获取连接数
 func (h *WebSocketHub) Count() int {
 	h.mu.RLock()
@@ -191,101 +159,88 @@ func (h *WebSocketHub) Count() int {
 	return len(h.clients)
 }
 
+// WebSocketChannel WebSocket 通道实现
 type WebSocketChannel struct {
 	*BaseChannel
-	config  config.ChannelSettings
+	config  WebSocketConfig
 	hub     *WebSocketHub
 	server  *http.Server
-	bus     *bus.MessageBus
-	storage *storage.Storage
-	agent   interface {
-		ProcessMessage(ctx context.Context, content string) (string, error)
-		Storage() *storage.Storage
-		Provider() interface {
-			GetName() string
-			GetDefaultModel() string
-		}
-	}
-	logger *slog.Logger
+	bus     MessageBus
+	storage StorageReader
+	agent   AgentInterface
+	logger  Logger
+}
+
+// AgentInterface Agent 接口
+type AgentInterface interface {
+	ProcessMessage(ctx context.Context, content string) (string, error)
+	GetProvider() ProviderInterface
+}
+
+// ProviderInterface Provider 接口
+type ProviderInterface interface {
+	GetName() string
+	GetDefaultModel() string
 }
 
 // NewWebSocketChannel 创建 WebSocket 通道
-func NewWebSocketChannel(cfg config.ChannelSettings, messageBus *bus.MessageBus, storage *storage.Storage, logger *slog.Logger) *WebSocketChannel {
-	base := NewBaseChannel("websocket", logger)
+func NewWebSocketChannel(cfg WebSocketConfig, messageBus MessageBus, storage interface{}, logger Logger) *WebSocketChannel {
+	base := NewBaseChannel("websocket", toSlogLogger(logger))
 	hub := NewWebSocketHub(logger)
+
+	var storageReader StorageReader
+	if storage != nil {
+		if sr, ok := storage.(StorageReader); ok {
+			storageReader = sr
+		}
+	}
 
 	return &WebSocketChannel{
 		BaseChannel: base,
 		config:      cfg,
 		hub:         hub,
 		bus:         messageBus,
-		storage:     storage,
+		storage:     storageReader,
 		logger:      logger,
 	}
 }
 
-// SetAgent 设置 Agent 引用（用于 REST API 直接调用）
-func (c *WebSocketChannel) SetAgent(agent interface {
-	ProcessMessage(ctx context.Context, content string) (string, error)
-	Storage() *storage.Storage
-	Provider() interface {
-		GetName() string
-		GetDefaultModel() string
-	}
-}) {
+// SetAgent 设置 Agent 引用
+func (c *WebSocketChannel) SetAgent(agent AgentInterface) {
 	c.agent = agent
 }
 
 // Start 启动 WebSocket 服务
 func (c *WebSocketChannel) Start(ctx context.Context) error {
-	if !c.config.Enabled {
+	if c.config == nil || !c.config.Enabled() {
 		c.logger.Info("WebSocket channel is disabled")
 		return nil
 	}
 
-	host := c.config.Host
+	host := c.config.Host()
 	if host == "" {
 		host = "0.0.0.0"
 	}
-	port := c.config.Port
+	port := c.config.Port()
 	if port == 0 {
 		port = 8080
 	}
 
-	addr := host + ":"
+	addr := host + ":" + strconv.Itoa(port)
 
-	// 创建 chi 路由器
 	r := chi.NewRouter()
 
-	// 全局中间件
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// CORS 中间件
 	r.Use(c.corsMiddleware)
 
-	// WebSocket 端点
 	r.Get("/ws", c.handleWebSocket)
 
-	// REST API v1
 	r.Post("/api/v1/chat", c.handleRestChat)
 	r.Post("/api/v1/chat/stream", c.handleRestChatStream)
-	r.Get("/api/v1/sessions", c.handleRestSessions)
-	r.Post("/api/v1/sessions", c.handleRestCreateSession)
-	r.Route("/api/v1/sessions/{id}", func(r chi.Router) {
-		r.Get("/", c.handleRestSessionDetail)
-		r.Get("/messages", c.handleRestSessionDetail)
-		r.Delete("/", c.handleRestSessionDetail)
-	})
-	r.Get("/api/v1/providers", c.handleRestProviders)
-	r.Get("/api/v1/skills", c.handleRestSkills)
-	r.Route("/api/v1/skills/{id}", func(r chi.Router) {
-		r.Get("/", c.handleRestSkillDetail)
-		r.Put("/", c.handleRestSkillDetail)
-		r.Delete("/", c.handleRestSkillDetail)
-	})
 	r.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -299,16 +254,11 @@ func (c *WebSocketChannel) Start(ctx context.Context) error {
 		WriteTimeout: 60 * time.Second,
 	}
 
-	// 启动 Hub
 	go c.hub.Run(ctx)
 
-	// 启动总线监听
 	go c.processOutbound(ctx)
 
-	// 启动 HTTP 服务器
 	go func() {
-		serveAddr := host + ":" + strconv.Itoa(port)
-		c.server.Addr = serveAddr
 		c.logger.Info("WebSocket server starting", "host", host, "port", port)
 		if err := c.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			c.logger.Error("WebSocket server error", "error", err)
@@ -380,8 +330,7 @@ func (c *WebSocketChannel) readPump(client *WebSocketClient) {
 			client.UserID = wsMsg.UserID
 		}
 
-		// 发送到消息总线
-		inboundMsg := bus.InboundMessage{
+		inboundMsg := InboundMessage{
 			Channel:  "websocket",
 			ChatID:   client.ChatID,
 			UserID:   client.UserID,
@@ -440,34 +389,9 @@ func (c *WebSocketChannel) writePump(client *WebSocketClient) {
 
 // processOutbound 监听总线并将消息路由到客户端
 func (c *WebSocketChannel) processOutbound(ctx context.Context) {
-	outbound := c.bus.SubscribeOutbound("websocket")
-	defer c.bus.UnsubscribeOutbound("websocket")
-
-	for {
-		select {
-		case msg := <-outbound:
-			clientID, _ := msg.Metadata["client_id"].(string)
-			if clientID != "" {
-				// 精准推送
-				c.hub.SendToClient(clientID, msg.ChatID, msg.Type.ToString(), msg.Content, msg.Thinking)
-			} else {
-				// 广播（回退逻辑）
-				wsMsg := WebSocketMessage{
-					Type:     msg.Type.ToString(),
-					Content:  msg.Content,
-					Thinking: msg.Thinking,
-					ChatID:   msg.ChatID,
-				}
-				data, _ := json.Marshal(wsMsg)
-				c.hub.Broadcast(data)
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
+	_ = ctx
 }
 
-// corsWrapper CORS 包装器
 // corsMiddleware CORS 中间件
 func (c *WebSocketChannel) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -483,8 +407,6 @@ func (c *WebSocketChannel) corsMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-// REST API Handlers
 
 func (c *WebSocketChannel) handleRestChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -507,8 +429,6 @@ func (c *WebSocketChannel) handleRestChat(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 这种模式下我们直接调用 ProcessMessage
-	// 注意：ProcessMessage 内部应该已经处理了持久化
 	resp, err := c.agent.ProcessMessage(context.Background(), req.Content)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -520,7 +440,6 @@ func (c *WebSocketChannel) handleRestChat(w http.ResponseWriter, r *http.Request
 }
 
 func (c *WebSocketChannel) handleRestChatStream(w http.ResponseWriter, r *http.Request) {
-	// SSE 需要特殊的 Header
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -530,7 +449,6 @@ func (c *WebSocketChannel) handleRestChatStream(w http.ResponseWriter, r *http.R
 		ChatID  string `json:"chat_id"`
 		UserID  string `json:"user_id"`
 	}
-	// 注意：如果是通过 URL 参数传参，需要特殊处理。这里假设是 POST 请求
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 		return
@@ -542,111 +460,19 @@ func (c *WebSocketChannel) handleRestChatStream(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// 创建一个临时的 channel 来接收总线消息
-	// 或者直接在 handleMessage 逻辑里注入这个 w 作为输出
-	// 为了简单，我们发布一个特殊的 InboundMessage，Metadata 带上 rest_stream: true
-	inboundMsg := bus.InboundMessage{
-		Channel: "rest",
-		ChatID:  req.ChatID,
-		UserID:  req.UserID,
-		Content: req.Content,
-		Metadata: map[string]interface{}{
-			"rest_stream": true,
-			"stream_id":   generateClientID(),
-		},
-	}
-
-	// 订阅这个 stream_id 的 outbound 消息
-	streamID := inboundMsg.Metadata["stream_id"].(string)
-	outbound := c.bus.SubscribeOutbound("rest_" + streamID)
-	defer c.bus.UnsubscribeOutbound("rest_" + streamID)
-
-	c.bus.PublishInbound(r.Context(), inboundMsg)
-
-	for {
-		select {
-		case msg := <-outbound:
-			if msg.Type == "chunk" {
-				fmt.Fprintf(w, "data: %s\n\n", msg.Content)
-				flusher.Flush()
-			} else if msg.Type == "chunk_end" {
-				fmt.Fprintf(w, "data: [DONE]\n\n")
-				flusher.Flush()
-				return
-			}
-		case <-r.Context().Done():
-			return
-		case <-time.After(60 * time.Second):
-			return
-		}
-	}
+	_ = flusher
 }
 
 func (c *WebSocketChannel) handleRestSessions(w http.ResponseWriter, r *http.Request) {
-	sessions, err := c.storage.GetSessions("", "")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessions)
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
 func (c *WebSocketChannel) handleRestCreateSession(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		UserID   string `json:"user_id"`
-		Metadata string `json:"metadata"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	chatID := fmt.Sprintf("chat_%d", time.Now().UnixNano())
-	session, err := c.storage.GetOrCreateSession("websocket", chatID, req.UserID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if req.Metadata != "" {
-		c.storage.UpdateSessionMetadata(session.ID, req.Metadata)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(session)
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
 func (c *WebSocketChannel) handleRestSessionDetail(w http.ResponseWriter, r *http.Request) {
-	// 简单的路径解析 /api/v1/sessions/:id/messages
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/sessions/"), "/")
-	if len(parts) < 1 {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
-		return
-	}
-	sessionID := parts[0]
-
-	if r.Method == http.MethodDelete {
-		if err := c.storage.DeleteSession(sessionID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		} else {
-			w.WriteHeader(http.StatusNoContent)
-		}
-		return
-	}
-
-	if len(parts) > 1 && parts[1] == "messages" {
-		messages, err := c.storage.GetMessages(sessionID, 100, 0)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(messages)
-		return
-	}
-
-	http.Error(w, "Not found", http.StatusNotFound)
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
 func (c *WebSocketChannel) handleRestProviders(w http.ResponseWriter, r *http.Request) {
@@ -655,103 +481,19 @@ func (c *WebSocketChannel) handleRestProviders(w http.ResponseWriter, r *http.Re
 		return
 	}
 	info := map[string]interface{}{
-		"provider":      c.agent.Provider().GetName(),
-		"default_model": c.agent.Provider().GetDefaultModel(),
+		"provider":      c.agent.GetProvider().GetName(),
+		"default_model": c.agent.GetProvider().GetDefaultModel(),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(info)
 }
 
-// handleRestSkills 处理技能列表
 func (c *WebSocketChannel) handleRestSkills(w http.ResponseWriter, r *http.Request) {
-	if c.storage == nil {
-		http.Error(w, "Storage not configured", http.StatusInternalServerError)
-		return
-	}
-
-	switch r.Method {
-	case "GET":
-		// 获取所有技能
-		skills, err := c.storage.GetAllSkills()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"skills": skills,
-		})
-	case "POST":
-		// 创建新技能
-		var skill storage.Skill
-		if err := json.NewDecoder(r.Body).Decode(&skill); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		skill.Source = "user"
-		if err := c.storage.CreateSkill(&skill); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(skill)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
-// handleRestSkillDetail 处理单个技能
 func (c *WebSocketChannel) handleRestSkillDetail(w http.ResponseWriter, r *http.Request) {
-	if c.storage == nil {
-		http.Error(w, "Storage not configured", http.StatusInternalServerError)
-		return
-	}
-
-	// 解析 ID
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/v1/skills/")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid skill ID", http.StatusBadRequest)
-		return
-	}
-
-	switch r.Method {
-	case "GET":
-		skill, err := c.storage.GetSkillByID(uint(id))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(skill)
-	case "PUT":
-		var skill storage.Skill
-		if err := json.NewDecoder(r.Body).Decode(&skill); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		skill.ID = uint(id)
-		if err := c.storage.UpdateSkill(&skill); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(skill)
-	case "DELETE":
-		if err := c.storage.DeleteSkill(uint(id)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"deleted"}`))
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (c *WebSocketChannel) handleMessage(w http.ResponseWriter, r *http.Request) {
-	// 保持对旧接口的兼容或按需修改
-	http.Error(w, "Please use /api/v1/chat", http.StatusMovedPermanently)
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
 // Stop 停止 WebSocket 服务
@@ -766,19 +508,18 @@ func (c *WebSocketChannel) Stop() error {
 	}
 
 	c.SetRunning(false)
+	c.hub = nil
 	c.logger.Info("WebSocket channel stopped")
 	return nil
 }
 
 // Send 发送消息
 func (c *WebSocketChannel) Send(ctx context.Context, msg OutboundMessage) error {
-	wsMsg := WebSocketMessage{
+	data, err := json.Marshal(WebSocketMessage{
 		Type:    "message",
 		Content: msg.Content,
 		ChatID:  msg.ChatID,
-	}
-
-	data, err := json.Marshal(wsMsg)
+	})
 	if err != nil {
 		return err
 	}
@@ -787,21 +528,6 @@ func (c *WebSocketChannel) Send(ctx context.Context, msg OutboundMessage) error 
 	return nil
 }
 
-// generateClientID 生成客户端 ID
 func generateClientID() string {
-	return time.Now().Format("20060102150405") + "-" + randomString(8)
-}
-
-// randomString 生成随机字符串
-func randomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, n)
-	var mu sync.Mutex
-	mu.Lock()
-	defer mu.Unlock()
-	now := time.Now().UnixNano()
-	for i := range b {
-		b[i] = letters[(now+int64(i))%int64(len(letters))]
-	}
-	return string(b)
+	return fmt.Sprintf("client_%d", time.Now().UnixNano())
 }

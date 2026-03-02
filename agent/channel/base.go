@@ -2,7 +2,9 @@ package channel
 
 import (
 	"context"
+	"io"
 	"log/slog"
+	"time"
 )
 
 // Channel 消息通道接口
@@ -24,16 +26,88 @@ type OutboundMessage struct {
 	Channel   string
 	ChatID    string
 	Content   string
-	ParseMode string // markdown, html, text
+	ParseMode string
 }
 
 // InboundMessage 接收消息
 type InboundMessage struct {
+	ID        string
 	Channel   string
 	ChatID    string
 	UserID    string
 	Content   string
-	MessageID string
+	Timestamp time.Time
+	Metadata  map[string]interface{}
+}
+
+// MessageBus 接口 - 消息总线
+type MessageBus interface {
+	// PublishInbound 发布接收消息
+	PublishInbound(ctx context.Context, msg InboundMessage) error
+	// Publish 发布消息
+	Publish(event interface{}) error
+	// Subscribe 订阅消息
+	Subscribe(handler interface{}) error
+}
+
+// ConfigReader 接口 - 配置读取
+type ConfigReader interface {
+	GetString(key string) string
+	GetInt(key string) int
+	GetBool(key string) bool
+}
+
+// StorageReader 接口 - 存储读取
+type StorageReader interface {
+	// GetChatByID 根据ID获取聊天记录
+	GetChatByID(id uint) (interface{}, error)
+	// CreateChat 创建聊天记录
+	CreateChat(chat interface{}) error
+	// UpdateChat 更新聊天记录
+	UpdateChat(chat interface{}) error
+	// GetUserByID 根据ID获取用户
+	GetUserByID(id uint) (interface{}, error)
+	// CreateUser 创建用户
+	CreateUser(user interface{}) error
+}
+
+// Logger 接口 - 日志
+type Logger interface {
+	Debug(msg string, args ...interface{})
+	Info(msg string, args ...interface{})
+	Warn(msg string, args ...interface{})
+	Error(msg string, args ...interface{})
+}
+
+// RequestReader 接口 - HTTP 请求读取
+type RequestReader interface {
+	GetHeader(key string) string
+	GetBody() (io.ReadCloser, error)
+	GetQuery(key string) string
+	GetPathVar(key string) string
+}
+
+// ChannelConfig 接口 - 通道配置
+type ChannelConfig interface {
+	WebSocketConfig() WebSocketConfig
+	WebhookConfig() WebhookConfig
+}
+
+// WebSocketConfig WebSocket 配置
+type WebSocketConfig interface {
+	Enabled() bool
+	Host() string
+	Port() int
+}
+
+// WebhookConfig Webhook 配置
+type WebhookConfig interface {
+	Enabled() bool
+	Host() string
+	Port() int
+	Path() string
+	Secret() string
+	Extra() map[string]interface{}
 }
 
 // BaseChannel 基础通道实现
