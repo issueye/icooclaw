@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/icooclaw/icooclaw/internal/config"
+	"icooclaw.ai/config"
 )
 
 // Manager MCP 管理器（整合客户端、工具、资源、提示管理器）

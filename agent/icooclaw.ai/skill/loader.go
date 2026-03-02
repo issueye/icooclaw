@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/icooclaw/icooclaw/internal/storage"
+	"icooclaw.ai/storage"
 )
 
 type Skill struct {

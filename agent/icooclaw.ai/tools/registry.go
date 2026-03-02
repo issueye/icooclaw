@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/icooclaw/icooclaw/internal/config"
+	"icooclaw.ai/config"
 )
 
 // ToolRegistry 工具注册表管理器

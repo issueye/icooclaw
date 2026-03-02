@@ -8,33 +8,34 @@ import (
 	"time"
 
 	"icooclaw.ai/config"
+	"icooclaw.ai/consts"
+	"icooclaw.ai/hooks"
+	"icooclaw.ai/memory"
 	"icooclaw.ai/provider"
 	"icooclaw.ai/skill"
 	"icooclaw.ai/storage"
 	"icooclaw.ai/tools"
-	bus "icooclaw.bus"
+
+	icooclawbus "icooclaw.bus"
 )
 
-// SessionMetadata 会话元数据
 type SessionMetadata struct {
-	RolePrompt string `json:"role_prompt"` // 用户设定的角色提示词
+	RolePrompt string `json:"role_prompt"`
 }
 
-// Agent Agent核心结构
 type Agent struct {
 	name      string
 	provider  provider.Provider
 	tools     *tools.Registry
 	storage   *storage.Storage
-	memory    *MemoryStore
+	memory    *memory.MemoryStore
 	skills    *skill.Loader
 	config    config.AgentSettings
-	bus       *bus.MessageBus
+	bus       *icooclawbus.MessageBus
 	logger    *slog.Logger
 	workspace string
 }
 
-// NewAgent 创建Agent实例
 func NewAgent(
 	name string,
 	provider provider.Provider,
@@ -52,7 +53,7 @@ func NewAgent(
 		provider: provider,
 		tools:    tools.NewRegistry(),
 		storage:  storage,
-		memory: NewMemoryStoreWithConfig(storage, logger, MemoryConfig{
+		memory: memory.NewMemoryStoreWithConfig(storage, logger, memory.MemoryConfig{
 			ConsolidationThreshold: 50,
 			SummaryEnabled:         true,
 		}),
@@ -63,42 +64,34 @@ func NewAgent(
 	}
 }
 
-// Workspace 获取 workspace 路径
 func (a *Agent) Workspace() string {
 	return a.workspace
 }
 
-// Name 获取Agent名称
 func (a *Agent) Name() string {
 	return a.name
 }
 
-// Provider 获取Provider
 func (a *Agent) Provider() provider.Provider {
 	return a.provider
 }
 
-// Tools 获取工具注册表
 func (a *Agent) Tools() *tools.Registry {
 	return a.tools
 }
 
-// SetTools 设置工具注册表
 func (a *Agent) SetTools(registry *tools.Registry) {
 	a.tools = registry
 }
 
-// Storage 获取存储
 func (a *Agent) Storage() *storage.Storage {
 	return a.storage
 }
 
-// Config 获取配置
 func (a *Agent) Config() config.AgentSettings {
 	return a.config
 }
 
-// Logger 获取日志
 func (a *Agent) Logger() *slog.Logger {
 	return a.logger
 }
@@ -107,25 +100,24 @@ func (a *Agent) Skills() *skill.Loader {
 	return a.skills
 }
 
-// RegisterTool 注册工具
+func (a *Agent) Memory() *memory.MemoryStore {
+	return a.memory
+}
+
 func (a *Agent) RegisterTool(tool tools.Tool) {
 	a.tools.Register(tool)
 	a.logger.Info("Registered tool", "name", tool.Name())
 }
 
-// Init 初始化Agent
 func (a *Agent) Init(ctx context.Context) error {
-	// 加载技能
 	if err := a.skills.Load(ctx); err != nil {
 		return fmt.Errorf("failed to load skills: %w", err)
 	}
 
-	// 注册技能工具
 	for _, skill := range a.skills.GetLoaded() {
 		a.logger.Debug("Loaded skill", "name", skill.Name)
 	}
 
-	// 加载记忆
 	if err := a.memory.Load(ctx); err != nil {
 		a.logger.Warn("Failed to load memory", "error", err)
 	}
@@ -134,10 +126,8 @@ func (a *Agent) Init(ctx context.Context) error {
 	return nil
 }
 
-// Run 运行Agent
-func (a *Agent) Run(ctx context.Context, messageBus *bus.MessageBus) {
+func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 	a.bus = messageBus
-	// 初始化
 	if err := a.Init(ctx); err != nil {
 		a.logger.Error("Failed to initialize agent", "error", err)
 		return
@@ -160,35 +150,30 @@ func (a *Agent) Run(ctx context.Context, messageBus *bus.MessageBus) {
 				continue
 			}
 
-			// 处理消息
 			go a.handleMessage(ctx, msg)
 		}
 	}
 }
 
-// handleMessage 处理消息
-func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
+func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessage) {
 	a.logger.Info("Handling message",
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID,
 		"user_id", msg.UserID,
 		"content", msg.Content)
 
-	// 获取或创建会话
 	session, err := a.storage.GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)
 	if err != nil {
 		a.logger.Error("Failed to get or create session", "error", err)
 		return
 	}
 
-	// 添加用户消息
 	_, err = a.storage.AddMessage(session.ID, "user", msg.Content, "", "", "", "")
 	if err != nil {
 		a.logger.Error("Failed to add user message", "error", err)
 		return
 	}
 
-	// 构建上下文
 	contextBuilder := NewContextBuilder(a, session)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
@@ -196,16 +181,13 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 		return
 	}
 
-	// 获取 client_id (如果是 WebSocket)
 	clientID, _ := msg.Metadata["client_id"].(string)
 
-	// 运行 Agent Loop (带流式回调)
 	onChunk := func(chunk, thinking string) {
 		if a.bus != nil {
-			// 发送内容块
 			if chunk != "" {
-				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-					Type:      bus.MessageTypeChunk,
+				a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+					Type:      icooclawbus.MessageTypeChunk,
 					Channel:   msg.Channel,
 					ChatID:    msg.ChatID,
 					Content:   chunk,
@@ -213,10 +195,9 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 					Metadata:  map[string]interface{}{"client_id": clientID},
 				})
 			}
-			// 发送思考内容更新
 			if thinking != "" {
-				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-					Type:      bus.MessageTypeThinking,
+				a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+					Type:      icooclawbus.MessageTypeThinking,
 					Channel:   msg.Channel,
 					ChatID:    msg.ChatID,
 					Thinking:  thinking,
@@ -227,21 +208,20 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 		}
 	}
 
-	// 创建 ReAct 配置和 Hooks
-	config := NewReActConfig()
-	config.Provider = a.Provider()
-	config.Tools = a.Tools()
-	config.Session = session
-	config.Logger = a.logger
-	config.Hooks = &hook.loopHooks{agent: a, onChunk: onChunk, chatID: msg.ChatID, clientID: clientID, session: session}
+	reactCfg := NewReActConfig()
+	reactCfg.Provider = a.Provider()
+	reactCfg.Tools = a.Tools()
+	reactCfg.Session = session
+	reactCfg.Logger = a.logger
+	reactCfg.Hooks = NewLoopHooks(a, onChunk, msg.ChatID, clientID, session)
 
-	reactAgent := NewReActAgent(config)
+	reactAgent := NewReActAgent(reactCfg)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
 		a.logger.Error("Agent loop failed", "error", err)
 		if a.bus != nil {
-			a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-				Type:      bus.MessageTypeError,
+			a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+				Type:      icooclawbus.MessageTypeError,
 				Channel:   msg.Channel,
 				ChatID:    msg.ChatID,
 				Content:   fmt.Sprintf("处理消息时出错: %s", err.Error()),
@@ -252,10 +232,9 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 		return
 	}
 
-	// 发送流式结束
 	if a.bus != nil {
-		a.bus.PublishOutbound(ctx, bus.OutboundMessage{
-			Type:      bus.MessageTypeEnd,
+		a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+			Type:      icooclawbus.MessageTypeEnd,
 			Channel:   msg.Channel,
 			ChatID:    msg.ChatID,
 			Timestamp: time.Now(),
@@ -263,7 +242,6 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 		})
 	}
 
-	// 保存助手消息
 	toolCallsJSON, err := json.Marshal(toolCalls)
 	if err != nil {
 		a.logger.Warn("Failed to marshal tool calls", "error", err)
@@ -276,52 +254,44 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	a.logger.Info("Message handled", "response_length", len(response))
 }
 
-// SetSystemPrompt 设置系统提示词
 func (a *Agent) SetSystemPrompt(prompt string) {
 	a.config.SystemPrompt = prompt
 }
 
-// GetSystemPrompt 获取系统提示词
 func (a *Agent) GetSystemPrompt() string {
 	return a.config.SystemPrompt
 }
 
-// ProcessMessage 处理单条消息（用于 CLI）
 func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, error) {
-	// 创建虚拟会话
 	session, err := a.storage.GetOrCreateSession("cli", "cli-session", "cli-user")
 	if err != nil {
 		return "", fmt.Errorf("failed to get or create session: %w", err)
 	}
 
-	// 添加用户消息
 	_, err = a.storage.AddMessage(session.ID, "user", content, "", "", "", "")
 	if err != nil {
 		return "", fmt.Errorf("failed to add user message: %w", err)
 	}
 
-	// 构建上下文
 	contextBuilder := NewContextBuilder(a, session)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to build context: %w", err)
 	}
 
-	// 运行 Agent Loop
-	config := NewReActConfig()
-	config.Provider = a.Provider()
-	config.Tools = a.Tools()
-	config.Session = session
-	config.Logger = a.logger
-	config.Hooks = &DefaultHooks{}
+	reactCfg := NewReActConfig()
+	reactCfg.Provider = a.Provider()
+	reactCfg.Tools = a.Tools()
+	reactCfg.Session = session
+	reactCfg.Logger = a.logger
+	reactCfg.Hooks = &hooks.DefaultHooks{}
 
-	reactAgent := NewReActAgent(config)
+	reactAgent := NewReActAgent(reactCfg)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("agent loop failed: %w", err)
 	}
 
-	// 保存助手消息
 	toolCallsJSON, err := json.Marshal(toolCalls)
 	if err != nil {
 		a.logger.Warn("Failed to marshal tool calls", "error", err)
@@ -334,9 +304,7 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 	return response, nil
 }
 
-// SetSessionRolePrompt 设置会话的角色提示词
 func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
-	// 获取当前会话的元数据
 	session, err := a.storage.GetSession(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
@@ -345,15 +313,12 @@ func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
 	var metadata SessionMetadata
 	if session.Metadata != "" {
 		if err := json.Unmarshal([]byte(session.Metadata), &metadata); err != nil {
-			// 如果解析失败，创建新的
 			metadata = SessionMetadata{}
 		}
 	}
 
-	// 更新角色提示词
 	metadata.RolePrompt = rolePrompt
 
-	// 序列化和保存
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
@@ -362,7 +327,6 @@ func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
 	return a.storage.UpdateSessionMetadata(sessionID, string(metadataJSON))
 }
 
-// GetSessionRolePrompt 获取会话的角色提示词
 func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
 	session, err := a.storage.GetSession(sessionID)
 	if err != nil {
@@ -379,4 +343,126 @@ func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
 	}
 
 	return metadata.RolePrompt, nil
+}
+
+type LoopHooks struct {
+	agent    *Agent
+	onChunk  hooks.OnChunkFunc
+	chatID   string
+	clientID string
+	session  *storage.Session
+}
+
+func NewLoopHooks(agent *Agent, onChunk hooks.OnChunkFunc, chatID, clientID string, session *storage.Session) *LoopHooks {
+	return &LoopHooks{
+		agent:    agent,
+		onChunk:  onChunk,
+		chatID:   chatID,
+		clientID: clientID,
+		session:  session,
+	}
+}
+
+func (h *LoopHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error {
+	return nil
+}
+
+func (h *LoopHooks) OnLLMChunk(ctx context.Context, content, thinking string) error {
+	if h.onChunk != nil {
+		h.onChunk(content, thinking)
+	}
+	return nil
+}
+
+func (h *LoopHooks) OnLLMResponse(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iteration int) error {
+	return nil
+}
+
+func (h *LoopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error {
+	if h.agent.storage != nil && h.session != nil {
+		_, err := h.agent.storage.AddMessage(
+			h.session.ID,
+			consts.RoleToolCall.ToString(),
+			"",
+			arguments,
+			toolCallID,
+			toolName,
+			"",
+		)
+		if err != nil {
+			h.agent.logger.Error("保存工具调用消息失败", "error", err, "tool", toolName)
+		}
+	}
+
+	if h.agent.bus != nil {
+		h.agent.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+			Type:       "tool_call",
+			ID:         toolCallID,
+			ToolCallID: toolCallID,
+			ToolName:   toolName,
+			Arguments:  arguments,
+			Status:     "running",
+			ChatID:     h.chatID,
+			Timestamp:  time.Now(),
+			Metadata:   map[string]interface{}{"client_id": h.clientID},
+		})
+	}
+	return nil
+}
+
+func (h *LoopHooks) OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error {
+	if h.agent.storage != nil && h.session != nil {
+		resultContent := result.Content
+		if result.Error != nil {
+			resultContent = fmt.Sprintf("Error: %v", result.Error)
+		}
+		_, err := h.agent.storage.AddMessage(
+			h.session.ID,
+			consts.RoleTool.ToString(),
+			resultContent,
+			"",
+			toolCallID,
+			toolName,
+			"",
+		)
+		if err != nil {
+			h.agent.logger.Error("保存工具结果消息失败", "error", err, "tool", toolName)
+		}
+	}
+
+	if h.agent.bus != nil {
+		status := "completed"
+		errorMsg := ""
+		if result.Error != nil {
+			status = "error"
+			errorMsg = result.Error.Error()
+		}
+		h.agent.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+			Type:       "tool_result",
+			ID:         toolCallID,
+			ToolCallID: toolCallID,
+			ToolName:   toolName,
+			Content:    result.Content,
+			Error:      errorMsg,
+			Status:     status,
+			ChatID:     h.chatID,
+			Timestamp:  time.Now(),
+			Metadata:   map[string]interface{}{"client_id": h.clientID},
+		})
+	}
+	return nil
+}
+
+func (h *LoopHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error {
+	return nil
+}
+
+func (h *LoopHooks) OnIterationEnd(ctx context.Context, iteration int, hasToolCalls bool) error {
+	return nil
+}
+
+func (h *LoopHooks) OnError(ctx context.Context, err error) error { return nil }
+
+func (h *LoopHooks) OnComplete(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iterations int) error {
+	return nil
 }

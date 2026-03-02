@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/icooclaw/icooclaw/internal/provider"
-	"github.com/icooclaw/icooclaw/internal/storage"
+	"icooclaw.ai/provider"
+	"icooclaw.ai/storage"
 )
 
 // ContextBuilder 上下文构建器

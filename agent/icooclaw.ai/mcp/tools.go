@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/icooclaw/icooclaw/internal/tools"
+	"icooclaw.ai/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

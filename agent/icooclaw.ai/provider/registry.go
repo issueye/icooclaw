@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/icooclaw/icooclaw/internal/config"
+	"icooclaw.ai/config"
 )
 
 // ProviderSpec Provider规格定义

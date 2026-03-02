@@ -6,7 +6,16 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"icooclaw.ai/agent"
 )
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
 
 // SubAgentConfig 子代理配置
 type SubAgentConfig struct {
@@ -21,7 +30,7 @@ type SubAgentConfig struct {
 // SubAgent 后台子Agent
 type SubAgent struct {
 	name    string
-	agent   *Agent
+	agent   *agent.Agent
 	cfg     SubAgentConfig
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -30,14 +39,12 @@ type SubAgent struct {
 	running bool
 	mu      sync.RWMutex
 
-	// 执行状态
 	lastRun    time.Time
 	lastResult string
 	execCount  int
 }
 
-// NewSubAgent 创建子Agent
-func NewSubAgent(name string, agent *Agent, cfg SubAgentConfig, logger *slog.Logger) *SubAgent {
+func NewSubAgent(name string, ag *agent.Agent, cfg SubAgentConfig, logger *slog.Logger) *SubAgent {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -47,7 +54,7 @@ func NewSubAgent(name string, agent *Agent, cfg SubAgentConfig, logger *slog.Log
 
 	return &SubAgent{
 		name:    name,
-		agent:   agent,
+		agent:   ag,
 		cfg:     cfg,
 		logger:  logger,
 		lastRun: time.Now(),
@@ -170,10 +177,10 @@ func (s *SubAgent) execute() {
 	s.mu.Unlock()
 
 	// 保存到记忆（如果启用）
-	if err == nil && s.agent.memory != nil {
+	if err == nil && s.agent.Memory() != nil {
 		key := fmt.Sprintf("subagent_%s_%d", s.name, s.execCount)
 		summary := fmt.Sprintf("Ran at %s: %s", s.lastRun.Format(time.RFC3339), truncate(response, 200))
-		_ = s.agent.memory.RememberHistory(key, summary)
+		_ = s.agent.Memory().RememberHistory(key, summary)
 	}
 }
 
@@ -243,7 +250,7 @@ func NewSubAgentManager(ctx context.Context, logger *slog.Logger) *SubAgentManag
 }
 
 // Register 注册子Agent
-func (m *SubAgentManager) Register(name string, agent *Agent, cfg SubAgentConfig) *SubAgent {
+func (m *SubAgentManager) Register(name string, ag *agent.Agent, cfg SubAgentConfig) *SubAgent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -252,7 +259,7 @@ func (m *SubAgentManager) Register(name string, agent *Agent, cfg SubAgentConfig
 		existing.Stop()
 	}
 
-	subAgent := NewSubAgent(name, agent, cfg, m.logger)
+	subAgent := NewSubAgent(name, ag, cfg, m.logger)
 	m.agents[name] = subAgent
 	m.logger.Info("SubAgent registered", "name", name)
 	return subAgent
@@ -453,8 +460,8 @@ type TaskSubAgent struct {
 }
 
 // NewTaskSubAgent 创建任务子代理
-func NewTaskSubAgent(name string, agent *Agent, cfg SubAgentConfig, executor SubAgentExecutor, logger *slog.Logger) *TaskSubAgent {
-	subAgent := NewSubAgent(name, agent, cfg, logger)
+func NewTaskSubAgent(name string, ag *agent.Agent, cfg SubAgentConfig, executor SubAgentExecutor, logger *slog.Logger) *TaskSubAgent {
+	subAgent := NewSubAgent(name, ag, cfg, logger)
 	return &TaskSubAgent{
 		SubAgent: subAgent,
 		executor: executor,
@@ -488,8 +495,8 @@ type EventSubAgent struct {
 }
 
 // NewEventSubAgent 创建事件子代理
-func NewEventSubAgent(name string, agent *Agent, cfg SubAgentConfig, eventType string, handler func(ctx context.Context, eventData interface{}) (string, error), logger *slog.Logger) *EventSubAgent {
-	subAgent := NewSubAgent(name, agent, cfg, logger)
+func NewEventSubAgent(name string, ag *agent.Agent, cfg SubAgentConfig, eventType string, handler func(ctx context.Context, eventData interface{}) (string, error), logger *slog.Logger) *EventSubAgent {
+	subAgent := NewSubAgent(name, ag, cfg, logger)
 	return &EventSubAgent{
 		SubAgent:  subAgent,
 		eventType: eventType,

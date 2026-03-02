@@ -1,4 +1,4 @@
-package react
+package agent
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"icooclaw.ai/agent"
 	"icooclaw.ai/consts"
 	"icooclaw.ai/hooks"
 	"icooclaw.ai/provider"
@@ -37,7 +36,6 @@ func NewReActConfig() *ReActConfig {
 // ReActAgent ReAct 模式的 Agent 实现
 type ReActAgent struct {
 	config *ReActConfig
-	Agent  *agent.Agent
 }
 
 // NewReActAgent 创建 ReAct Agent

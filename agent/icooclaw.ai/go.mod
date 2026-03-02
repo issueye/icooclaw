@@ -5,7 +5,12 @@ go 1.24.11
 require (
 	github.com/dop251/goja v0.0.0-20260226184354-913bd86fb70c
 	github.com/stretchr/testify v1.11.1
+	icooclaw.bus v0.0.0
+	icooclaw.utils v0.0.0
 )
+
+replace icooclaw.bus => ../icooclaw.bus
+replace icooclaw.utils => ../icooclaw.utils
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0 // indirect
