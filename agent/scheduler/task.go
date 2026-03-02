@@ -3,8 +3,6 @@ package scheduler
 import (
 	"context"
 	"time"
-
-	"github.com/icooclaw/icooclaw/internal/storage"
 )
 
 // TaskRunStatus 任务运行状态
@@ -25,7 +23,7 @@ const (
 type RetryConfig struct {
 	MaxRetries  int           // 最大重试次数
 	Interval    time.Duration // 重试间隔
-	Backoff     time.Duration // 退避因子
+	Backoff     float64       // 退避因子
 	MaxInterval time.Duration // 最大重试间隔
 }
 
@@ -44,23 +42,14 @@ type TaskMetrics struct {
 	LastError     string        // 最后错误信息
 }
 
-// TaskType 任务类型
-type TaskType int
-
-const (
-	TaskTypeCron     TaskType = iota // Cron 任务
-	TaskTypeInterval TaskType = iota // 间隔任务
-	TaskTypeOnce     TaskType = iota // 一次性任务 立即执行
-)
-
 /**
  * TaskCallback 定义任务执行回调接口
  * 用于任务生命周期事件的外部处理
  */
 type TaskCallback interface {
-	OnStart(ctx context.Context, task *storage.Task)
-	OnComplete(ctx context.Context, task *storage.Task, err error)
-	OnNextRunCalculated(task *storage.Task, nextRun time.Time)
+	OnStart(ctx context.Context, task *TaskInfo)
+	OnComplete(ctx context.Context, task *TaskInfo, err error)
+	OnNextRunCalculated(task *TaskInfo, nextRun time.Time)
 }
 
 /**
@@ -74,7 +63,7 @@ type TaskRunner interface {
 	GetStatus() TaskRunStatus
 	GetType() TaskType
 	GetName() string
-	GetInfo() *storage.Task
+	GetInfo() *TaskInfo
 	ShouldRun(now time.Time) bool
 	SetCallback(callback TaskCallback)
 	GetMetrics() *TaskMetrics

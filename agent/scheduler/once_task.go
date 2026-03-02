@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/icooclaw/icooclaw/internal/storage"
 )
 
 /**
@@ -14,7 +12,7 @@ import (
  */
 type OnceTaskRunner struct {
 	name     string
-	task     *storage.Task
+	task     *TaskInfo
 	logger   *slog.Logger
 	status   TaskRunStatus
 	taskType TaskType
@@ -29,7 +27,7 @@ type OnceTaskRunner struct {
 	metrics TaskMetrics
 }
 
-func NewOnceTaskRunner(name string, task *storage.Task, logger *slog.Logger) (*OnceTaskRunner, error) {
+func NewOnceTaskRunner(name string, task *TaskInfo, logger *slog.Logger) (*OnceTaskRunner, error) {
 	return &OnceTaskRunner{
 		name:     name,
 		task:     task,
@@ -104,7 +102,7 @@ func (r *OnceTaskRunner) GetName() string {
 }
 
 // GetInfo 获取任务信息
-func (r *OnceTaskRunner) GetInfo() *storage.Task {
+func (r *OnceTaskRunner) GetInfo() *TaskInfo {
 	return r.task
 }
 

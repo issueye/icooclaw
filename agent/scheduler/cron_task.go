@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/adhocore/gronx"
-	"github.com/icooclaw/icooclaw/internal/storage"
 )
 
 // CronParser Cron 表达式解析器
@@ -53,7 +52,7 @@ func (p *CronParser) ShouldRun(expr string, now time.Time) bool {
  */
 type CronTaskRunner struct {
 	name       string
-	task       *storage.Task
+	task       *TaskInfo
 	cronExpr   string
 	logger     *slog.Logger
 	cronParser *CronParser
@@ -72,7 +71,7 @@ type CronTaskRunner struct {
 	metrics TaskMetrics
 }
 
-func NewCronTaskRunner(name string, task *storage.Task, cronExpr string, logger *slog.Logger) (*CronTaskRunner, error) {
+func NewCronTaskRunner(name string, task *TaskInfo, cronExpr string, logger *slog.Logger) (*CronTaskRunner, error) {
 	now := time.Now()
 	var nextRun time.Time
 
@@ -195,7 +194,7 @@ func (r *CronTaskRunner) GetName() string {
 }
 
 // GetInfo 获取任务信息
-func (r *CronTaskRunner) GetInfo() *storage.Task {
+func (r *CronTaskRunner) GetInfo() *TaskInfo {
 	return r.task
 }
 
