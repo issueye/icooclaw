@@ -68,8 +68,7 @@ Examples:
 		if err := checkInitialized(); err != nil {
 			return fmt.Errorf("cron list: %w", err)
 		}
-		listCronTasks()
-		return nil
+		return listCronTasks()
 	},
 }
 
@@ -88,7 +87,13 @@ func addCronTask(name, cronExpr, message string) error {
 		return fmt.Errorf("invalid cron expression: %s", cronExpr)
 	}
 
-	// 创建任务
+	// 计算下次执行时间
+	nextRun, ok := cronParser.NextRun(cronExpr, time.Now())
+	if !ok {
+		return fmt.Errorf("failed to calculate next run time")
+	}
+
+	// 创建任务存储记录
 	task := &storage.Task{
 		Name:        name,
 		CronExpr:    cronExpr,
@@ -96,25 +101,65 @@ func addCronTask(name, cronExpr, message string) error {
 		Channel:     "websocket", // 默认通道
 		ChatID:      "default",
 		Enabled:     true,
-		NextRunAt:   time.Now(),
+		NextRunAt:   nextRun,
 		Description: "Created via CLI",
 	}
 
-	// 添加到调度器
-	if err := schedulerInst.AddTaskRunner(task); err != nil {
-		return fmt.Errorf("add task: %w", err)
+	// 保存到数据库
+	store := agentInstance.Storage()
+	if err := store.CreateTask(task); err != nil {
+		return fmt.Errorf("save task to database: %w", err)
+	}
+
+	// 如果调度器正在运行，创建 TaskRunner 并添加
+	if schedulerInst != nil && schedulerInst.IsRunning() {
+		taskInfo := &scheduler.TaskInfo{
+			ID:          task.ID,
+			Name:        task.Name,
+			Description: task.Description,
+			Type:        scheduler.TaskTypeCron,
+			CronExpr:    task.CronExpr,
+			Message:     task.Message,
+			Channel:     task.Channel,
+			ChatID:      task.ChatID,
+			Enabled:     task.Enabled,
+			NextRunAt:   task.NextRunAt,
+			LastRunAt:   task.LastRunAt,
+		}
+
+		runner, err := scheduler.NewCronTaskRunner(name, taskInfo, cronExpr, logger)
+		if err != nil {
+			logger.Warn("Failed to create task runner", "error", err)
+		} else if err := schedulerInst.AddTaskRunner(runner); err != nil {
+			logger.Warn("Failed to add task runner to scheduler", "error", err)
+		}
 	}
 
 	fmt.Printf("Task '%s' added successfully\n", name)
 	fmt.Printf("  Cron: %s\n", cronExpr)
 	fmt.Printf("  Message: %s\n", message)
+	fmt.Printf("  Next run: %s\n", nextRun.Format("2006-01-02 15:04:05"))
 	return nil
 }
 
 // removeCronTask 删除定时任务
 func removeCronTask(name string) error {
-	if err := schedulerInst.RemoveTask(name); err != nil {
-		return fmt.Errorf("remove task: %w", err)
+	// 从调度器移除
+	if schedulerInst != nil && schedulerInst.IsRunning() {
+		if err := schedulerInst.RemoveTaskRunner(name); err != nil {
+			logger.Debug("Task runner not found in scheduler", "name", name)
+		}
+	}
+
+	// 从数据库删除
+	store := agentInstance.Storage()
+	task, err := store.GetTaskByName(name)
+	if err != nil {
+		return fmt.Errorf("task not found: %s", name)
+	}
+
+	if err := store.DeleteTask(task.ID); err != nil {
+		return fmt.Errorf("delete task from database: %w", err)
 	}
 
 	fmt.Printf("Task '%s' removed successfully\n", name)
@@ -122,39 +167,45 @@ func removeCronTask(name string) error {
 }
 
 // listCronTasks 列出定时任务
-func listCronTasks() {
-	tasks := schedulerInst.ListTasks()
+func listCronTasks() error {
+	store := agentInstance.Storage()
+	tasks, err := store.GetAllTasks()
+	if err != nil {
+		return fmt.Errorf("get tasks: %w", err)
+	}
 
 	if len(tasks) == 0 {
 		fmt.Println("No scheduled tasks found.")
-		return
+		return nil
 	}
 
 	fmt.Println("Scheduled tasks:")
 	fmt.Println()
 
-	for _, name := range tasks {
-		task := schedulerInst.GetTask(name)
-		if task == nil {
-			continue
-		}
-
+	for _, task := range tasks {
 		status := "disabled"
 		if task.Enabled {
 			status = "enabled"
 		}
 
-		nextRun := "none"
-		if next, ok := schedulerInst.GetTaskNextRun(name); ok {
-			nextRun = next.Format("2006-01-02 15:04:05")
+		nextRun := "not scheduled"
+		if !task.NextRunAt.IsZero() {
+			nextRun = task.NextRunAt.Format("2006-01-02 15:04:05")
 		}
 
-		fmt.Printf("  Name: %s\n", name)
+		lastRun := "never"
+		if !task.LastRunAt.IsZero() {
+			lastRun = task.LastRunAt.Format("2006-01-02 15:04:05")
+		}
+
+		fmt.Printf("  Name: %s\n", task.Name)
 		fmt.Printf("  Status: %s\n", status)
 		fmt.Printf("  Cron: %s\n", task.CronExpr)
 		fmt.Printf("  Message: %s\n", task.Message)
 		fmt.Printf("  Next run: %s\n", nextRun)
-		fmt.Printf("  Last run: %s\n", task.LastRunAt.Format("2006-01-02 15:04:05"))
+		fmt.Printf("  Last run: %s\n", lastRun)
 		fmt.Println()
 	}
+
+	return nil
 }
