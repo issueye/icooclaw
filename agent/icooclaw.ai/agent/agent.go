@@ -150,7 +150,12 @@ func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 				continue
 			}
 
-			go a.handleMessage(ctx, msg)
+			// 为每个消息处理创建独立的上下文，避免 goroutine 泄漏
+			msgCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+			go func(ctx context.Context, msg icooclawbus.InboundMessage) {
+				defer cancel()
+				a.handleMessage(ctx, msg)
+			}(msgCtx, msg)
 		}
 	}
 }
@@ -390,7 +395,7 @@ func (h *LoopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName 
 			"",
 		)
 		if err != nil {
-			h.agent.logger.Error("保存工具调用消息失败", "error", err, "tool", toolName)
+			h.agent.logger.Error("Failed to save tool call message", "tool", toolName, "error", err)
 		}
 	}
 
@@ -426,7 +431,7 @@ func (h *LoopHooks) OnToolResult(ctx context.Context, toolCallID string, toolNam
 			"",
 		)
 		if err != nil {
-			h.agent.logger.Error("保存工具结果消息失败", "error", err, "tool", toolName)
+			h.agent.logger.Error("Failed to save tool result message", "tool", toolName, "error", err)
 		}
 	}
 

@@ -151,34 +151,37 @@ func (m *MemoryStore) Consolidate(session *storage.Session) error {
 	// 检查是否达到阈值
 	m.mu.Lock()
 	count := m.sessionMessageCounts[session.ID]
-	if count < m.config.ConsolidationThreshold {
-		m.mu.Unlock()
-		return nil
-	}
 	m.mu.Unlock()
 
-	// 执行摘要
-	if m.config.SummaryEnabled {
-		summary, err := m.summarizeMessages(messages)
-		if err != nil {
-			m.logger.Warn("Failed to summarize messages", "error", err)
-		} else {
-			// 保存摘要
-			summaryKey := fmt.Sprintf("summary_%d", session.ID)
-			if err := m.RememberHistory(summaryKey, summary); err != nil {
-				m.logger.Warn("Failed to save summary", "error", err)
-			}
-
-			// 更新最后整合时间
-			m.mu.Lock()
-			m.lastConsolidation[session.ID] = time.Now()
-			m.sessionMessageCounts[session.ID] = 0 // 重置计数
-			m.mu.Unlock()
-
-			m.logger.Info("Memory consolidated", "session_id", session.ID, "summary_length", len(summary))
-		}
+	if count < m.config.ConsolidationThreshold {
+		return nil
 	}
 
+	// 执行摘要
+	if !m.config.SummaryEnabled {
+		return nil
+	}
+
+	summary, err := m.summarizeMessages(messages)
+	if err != nil {
+		m.logger.Warn("Failed to summarize messages", "error", err)
+		return nil
+	}
+
+	// 保存摘要
+	summaryKey := fmt.Sprintf("summary_%d", session.ID)
+	if err := m.RememberHistory(summaryKey, summary); err != nil {
+		m.logger.Warn("Failed to save summary", "error", err)
+		return nil
+	}
+
+	// 更新最后整合时间
+	m.mu.Lock()
+	m.lastConsolidation[session.ID] = time.Now()
+	m.sessionMessageCounts[session.ID] = 0
+	m.mu.Unlock()
+
+	m.logger.Info("Memory consolidated", "session_id", session.ID, "summary_length", len(summary))
 	return nil
 }
 
@@ -669,20 +672,23 @@ func (m *MemoryStore) EnforceSessionLimit(sessionID uint) error {
 		return err
 	}
 
-	if len(memories) > m.config.MaxSessionMemories {
-		// 删除最旧的非置顶记忆
-		var toDelete []uint
-		for _, mem := range memories {
-			if !mem.IsPinned {
-				toDelete = append(toDelete, mem.ID)
-				if len(memories)-len(toDelete) <= m.config.MaxSessionMemories {
-					break
-				}
+	if len(memories) <= m.config.MaxSessionMemories {
+		return nil
+	}
+
+	// 收集需要删除的非置顶记忆 ID
+	var toDelete []uint
+	for _, mem := range memories {
+		if !mem.IsPinned {
+			toDelete = append(toDelete, mem.ID)
+			if len(memories)-len(toDelete) <= m.config.MaxSessionMemories {
+				break
 			}
 		}
-		if len(toDelete) > 0 {
-			return m.storage.BatchDeleteMemories(toDelete)
-		}
+	}
+
+	if len(toDelete) > 0 {
+		return m.storage.BatchDeleteMemories(toDelete)
 	}
 	return nil
 }
@@ -694,20 +700,23 @@ func (m *MemoryStore) EnforceUserLimit(userID string) error {
 		return err
 	}
 
-	if len(memories) > m.config.MaxUserMemories {
-		// 删除最旧的非置顶记忆
-		var toDelete []uint
-		for _, mem := range memories {
-			if !mem.IsPinned {
-				toDelete = append(toDelete, mem.ID)
-				if len(memories)-len(toDelete) <= m.config.MaxUserMemories {
-					break
-				}
+	if len(memories) <= m.config.MaxUserMemories {
+		return nil
+	}
+
+	// 收集需要删除的非置顶记忆 ID
+	var toDelete []uint
+	for _, mem := range memories {
+		if !mem.IsPinned {
+			toDelete = append(toDelete, mem.ID)
+			if len(memories)-len(toDelete) <= m.config.MaxUserMemories {
+				break
 			}
 		}
-		if len(toDelete) > 0 {
-			return m.storage.BatchDeleteMemories(toDelete)
-		}
+	}
+
+	if len(toDelete) > 0 {
+		return m.storage.BatchDeleteMemories(toDelete)
 	}
 	return nil
 }
@@ -752,7 +761,7 @@ func (m *MemoryStore) GetRelevantMemoriesForSession(sessionID uint, query string
 	}
 
 	// 3. 合并结果，优先使用会话级别记忆
-	var results []string
+	results := make([]string, 0, len(sessionMemories)+len(searchResults))
 
 	// 添加会话记忆
 	for _, mem := range sessionMemories {
@@ -761,7 +770,7 @@ func (m *MemoryStore) GetRelevantMemoriesForSession(sessionID uint, query string
 		}
 	}
 
-	// 添加搜索结果
+	// 添加搜索结果（排除已添加的会话记忆）
 	for _, mem := range searchResults {
 		if !mem.IsDeleted && mem.Type != "session" {
 			results = append(results, fmt.Sprintf("[%s] %s", mem.Type, mem.Content))

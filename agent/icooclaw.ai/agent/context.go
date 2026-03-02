@@ -301,61 +301,59 @@ func (a *Agent) UpdateMemoryFile(section, content string) error {
 // updateMarkdownSection 更新 Markdown 文件中指定部分的内容
 func updateMarkdownSection(content, section, newContent string) (string, error) {
 	lines := strings.Split(content, "\n")
-	result := strings.Builder{}
+	result := make([]string, 0, len(lines)+10)
 	inSection := false
 	sectionFound := false
-	updated := false
+	sectionWritten := false
 
-	for _, line := range lines {
+	sectionHeader := "## " + section
+
+	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		// 检查是否到达目标部分
+		// 检查是否是 ## 标题
 		if strings.HasPrefix(trimmed, "##") {
-			if inSection && !updated {
-				// 到达下一个部分，需要插入新内容
-				result.WriteString(newContent)
-				result.WriteString("\n")
-				updated = true
+			// 如果之前在目标部分内且还未写入新内容，先写入新内容
+			if inSection && !sectionWritten {
+				result = append(result, strings.TrimRight(newContent, "\n"))
+				sectionWritten = true
 			}
-			inSection = false
 
 			// 检查是否是目标部分
-			if strings.Contains(trimmed, section) {
+			if strings.HasPrefix(strings.TrimSpace(line), sectionHeader) ||
+				strings.Contains(trimmed, section) {
 				inSection = true
 				sectionFound = true
+				// 写入标题行
+				result = append(result, line)
+				continue
+			} else {
+				inSection = false
 			}
-
-			// 标题行始终写入
-			result.WriteString(line)
-			result.WriteString("\n")
-			continue
 		}
 
-		// 如果在目标部分内，跳过原有内容（保留注释外的）
-		if inSection && !updated {
-			// 检查是否是注释行或空行
-			if strings.HasPrefix(trimmed, "<!--") || strings.HasPrefix(trimmed, "<!-") || (trimmed == "") {
-				result.WriteString(line)
-				result.WriteString("\n")
+		// 如果在目标部分内，跳过原有内容（保留注释和空行）
+		if inSection {
+			if trimmed == "" || strings.HasPrefix(trimmed, "<!") {
+				result = append(result, line)
 			}
 			continue
 		}
 
-		result.WriteString(line)
-		result.WriteString("\n")
+		result = append(result, line)
+
+		// 如果是最后一个元素且部分未找到，追加新部分
+		if i == len(lines)-1 && !sectionFound {
+			result = append(result, "", fmt.Sprintf("## %s", section), "", newContent)
+		}
 	}
 
-	// 如果部分不存在，追加到文件末尾
-	if !sectionFound {
-		result.WriteString(fmt.Sprintf("\n## %s\n\n%s\n", section, newContent))
+	// 如果部分已找到但未写入内容（在文件末尾的情况）
+	if sectionFound && !sectionWritten {
+		result = append(result, strings.TrimRight(newContent, "\n"))
 	}
 
-	if !updated && sectionFound {
-		result.WriteString(newContent)
-		result.WriteString("\n")
-	}
-
-	return result.String(), nil
+	return strings.Join(result, "\n"), nil
 }
 
 // updateLastUpdated 更新最后更新时间

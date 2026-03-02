@@ -64,7 +64,6 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 	// 创建流式回调状态
 	streamState := &streamCallbackState{
 		content:          "",
-		toolCalls:        nil,
 		reasoningContent: "",
 		hooks:            hooks,
 		logger:           logger,
@@ -225,7 +224,6 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 // streamCallbackState 流式回调状态
 type streamCallbackState struct {
 	content          string
-	toolCalls        []provider.ToolCall
 	reasoningContent string
 	hooks            hooks.ReActHooks
 	logger           *slog.Logger
@@ -270,20 +268,21 @@ func (r *ReActAgent) createStreamCallback(state *streamCallbackState) provider.S
 		// 处理工具调用 - StreamToolCall 需要按 index 分组累积
 		for _, tc := range chunk.ToolCalls {
 			index := tc.Index
-			if existing, ok := state.toolCallsData[index]; ok {
+			tcData, exists := state.toolCallsData[index]
+			if exists {
 				// 累积 arguments
 				if tc.Arguments != "" {
-					existing.args.WriteString(tc.Arguments)
+					tcData.args.WriteString(tc.Arguments)
 				}
 				// 更新 ID 和 Type
 				if tc.ID != "" {
-					existing.id = tc.ID
+					tcData.id = tc.ID
 				}
 				if tc.Type != "" {
-					existing.typ = tc.Type
+					tcData.typ = tc.Type
 				}
 				if tc.Name != "" {
-					existing.name = tc.Name
+					tcData.name = tc.Name
 				}
 			} else {
 				tcData := &struct {

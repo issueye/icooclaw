@@ -282,12 +282,14 @@ func Load() (*Config, error) {
 
 // extractExtra 从配置中提取额外字段
 func extractExtra(m map[string]interface{}) map[string]string {
-	result := make(map[string]string)
+	result := make(map[string]string, len(m))
 	for k, v := range m {
-		if k != "enabled" && k != "token" {
-			if s, ok := v.(string); ok {
-				result[k] = s
-			}
+		// 跳过已知配置项
+		if k == "enabled" || k == "token" {
+			continue
+		}
+		if s, ok := v.(string); ok {
+			result[k] = s
 		}
 	}
 	return result
@@ -295,68 +297,68 @@ func extractExtra(m map[string]interface{}) map[string]string {
 
 // InitLogger 初始化日志系统
 func InitLogger(level string, format string, output string) *slog.Logger {
-	var handler slog.Handler
-
 	opts := &slog.HandlerOptions{
 		AddSource: true,
-	}
-
-	switch level {
-	case "debug":
-		opts.Level = slog.LevelDebug
-	case "info":
-		opts.Level = slog.LevelInfo
-	case "warn":
-		opts.Level = slog.LevelWarn
-	case "error":
-		opts.Level = slog.LevelError
-	default:
-		opts.Level = slog.LevelInfo
+		Level:     parseLogLevel(level),
 	}
 
 	// 如果指定了输出文件，则同时输出到文件和控制台
 	if output != "" {
-		// 确保日志目录存在
-		logDir := filepath.Dir(output)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
-			slog.Warn("failed to create log directory, using stdout only", "error", err)
-			if format == "json" {
-				handler = slog.NewJSONHandler(os.Stdout, opts)
-			} else {
-				handler = slog.NewTextHandler(os.Stdout, opts)
-			}
+		if handler := createFileHandler(output, format, opts); handler != nil {
 			return slog.New(handler)
 		}
-
-		// 打开日志文件
-		logFile, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			slog.Warn("failed to open log file, using stdout only", "error", err)
-			if format == "json" {
-				handler = slog.NewJSONHandler(os.Stdout, opts)
-			} else {
-				handler = slog.NewTextHandler(os.Stdout, opts)
-			}
-			return slog.New(handler)
-		}
-
-		// 创建同时输出到文件和 stdout 的 io.Writer
-		fileWriter := io.MultiWriter(logFile, os.Stdout)
-
-		if format == "json" {
-			handler = slog.NewJSONHandler(fileWriter, opts)
-		} else {
-			handler = slog.NewTextHandler(fileWriter, opts)
-		}
-	} else {
-		if format == "json" {
-			handler = slog.NewJSONHandler(os.Stdout, opts)
-		} else {
-			handler = slog.NewTextHandler(os.Stdout, opts)
-		}
+		// 文件创建失败，回退到 stdout
 	}
 
+	// 输出到 stdout
+	var handler slog.Handler
+	if format == "json" {
+		handler = slog.NewJSONHandler(os.Stdout, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, opts)
+	}
 	return slog.New(handler)
+}
+
+// parseLogLevel 解析日志级别
+func parseLogLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// createFileHandler 创建文件日志处理器
+func createFileHandler(output, format string, opts *slog.HandlerOptions) slog.Handler {
+	// 确保日志目录存在
+	logDir := filepath.Dir(output)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		slog.Warn("Failed to create log directory, using stdout only", "error", err)
+		return nil
+	}
+
+	// 打开日志文件
+	logFile, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		slog.Warn("Failed to open log file, using stdout only", "error", err)
+		return nil
+	}
+
+	// 创建同时输出到文件和 stdout 的 io.Writer
+	fileWriter := io.MultiWriter(logFile, os.Stdout)
+
+	if format == "json" {
+		return slog.NewJSONHandler(fileWriter, opts)
+	}
+	return slog.NewTextHandler(fileWriter, opts)
 }
 
 // TemplatesFS 嵌入的模板文件系统，由主程序设置
