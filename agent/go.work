@@ -6,4 +6,5 @@ use (
 	./icooclaw.scheduler
 	./icooclaw.script
 	./icooclaw.utils
+	./icooclaw.ai
 )
