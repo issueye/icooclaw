@@ -9,20 +9,20 @@ import (
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "配置管理",
-	Long: `管理配置设置。
+	Short: "Configuration management",
+	Long: `Manage configuration settings.
 
-子命令:
-  get <key>             获取配置值
-  set <key> <value>    设置配置值`,
+Subcommands:
+  get <key>           Get configuration value
+  set <key> <value>   Set configuration value`,
 }
 
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
-	Short: "获取配置值",
-	Long: `通过键获取配置值。
+	Short: "Get configuration value",
+	Long: `Get configuration value by key.
 
-示例:
+Examples:
   icooclaw config get log.level
   icooclaw config get agents.default_provider`,
 	Args: cobra.ExactArgs(1),
@@ -34,11 +34,11 @@ var configGetCmd = &cobra.Command{
 
 var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
-	Short: "设置配置值",
-	Long: `通过键设置配置值。
-注意: 这只设置内存中的值。要持久化，请保存到配置文件。
+	Short: "Set configuration value",
+	Long: `Set configuration value by key.
+Note: This only sets the value in memory. To persist, save to config file.
 
-示例:
+Examples:
   icooclaw config set log.level debug
   icooclaw config set agents.default_provider openai`,
 	Args: cobra.ExactArgs(2),
@@ -58,7 +58,7 @@ func init() {
 func getConfig(key string) {
 	value := viper.Get(key)
 	if value == nil {
-		fmt.Printf("未找到键: %s\n", key)
+		fmt.Printf("Key not found: %s\n", key)
 		return
 	}
 
@@ -66,18 +66,16 @@ func getConfig(key string) {
 }
 
 func setConfig(key, value string) {
-	// Try to determine the type
+	// 尝试推断类型
 	switch value {
-	case "true", "false":
-		viper.Set(key, value == "true")
-	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		// Check if it's a number
-		viper.Set(key, value)
+	case "true":
+		viper.Set(key, true)
+	case "false":
+		viper.Set(key, false)
 	default:
-		// Try to parse as other types
 		viper.Set(key, value)
 	}
 
-	fmt.Printf("已设置 %s = %s\n", key, value)
-	fmt.Println("注意: 此更改仅在内存中。重启应用程序以使更改生效。")
+	fmt.Printf("Set %s = %s\n", key, value)
+	fmt.Println("Note: This change is in memory only. Restart the application for changes to take effect.")
 }

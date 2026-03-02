@@ -4,6 +4,7 @@ use (
 	./icooclaw.ai
 	./icooclaw.bus
 	./icooclaw.channel
+	./icooclaw.cmd
 	./icooclaw.scheduler
 	./icooclaw.script
 	./icooclaw.utils

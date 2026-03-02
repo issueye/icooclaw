@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/icooclaw/icooclaw/cmd/icooclaw/commands"
+	"icooclaw.cmd/icooclaw/commands"
 )
 
 func main() {
