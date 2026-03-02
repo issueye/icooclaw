@@ -6,19 +6,38 @@ import (
 	"gorm.io/gorm"
 )
 
+type TaskType int
+
+const (
+	TaskTypeImmediate TaskType = iota // 立即执行任务
+	TaskTypeCron                      // cron 任务
+)
+
+func (t TaskType) String() string {
+	switch t {
+	case TaskTypeImmediate:
+		return "immediate"
+	case TaskTypeCron:
+		return "cron"
+	default:
+		return "unknown"
+	}
+}
+
 // Task 定时任务模型
 type Task struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"size:100;uniqueIndex" json:"name"`
-	Description string    `gorm:"size:500" json:"description"`
-	CronExpr    string    `gorm:"size:100" json:"cron_expr"` // Cron表达式
-	Interval    int       `gorm:"default:0" json:"interval"` // 固定间隔(秒)
-	Message     string    `gorm:"type:text" json:"message"`  // 触发消息
-	Channel     string    `gorm:"size:50" json:"channel"`    // 投递通道
-	ChatID      string    `gorm:"size:255" json:"chat_id"`   // 投递目标
-	Enabled     bool      `gorm:"default:true" json:"enabled"`
-	NextRunAt   time.Time `gorm:"index" json:"next_run_at"` // 下次执行时间
-	LastRunAt   time.Time `json:"last_run_at"`              // 上次执行时间
+	Description string    `gorm:"size:500" json:"description"` // 任务描述
+	Type        TaskType  `gorm:"default:0" json:"type"`       // 任务类型 0 立即执行任务， 1 cron 任务
+	CronExpr    string    `gorm:"size:100" json:"cron_expr"`   // Cron表达式
+	Interval    int       `gorm:"default:0" json:"interval"`   // 固定间隔(秒)
+	Message     string    `gorm:"type:text" json:"message"`    // 触发消息
+	Channel     string    `gorm:"size:50" json:"channel"`      // 投递通道
+	ChatID      string    `gorm:"size:255" json:"chat_id"`     // 投递目标
+	Enabled     bool      `gorm:"default:true" json:"enabled"` // 是否启用
+	NextRunAt   time.Time `gorm:"index" json:"next_run_at"`    // 下次执行时间
+	LastRunAt   time.Time `json:"last_run_at"`                 // 上次执行时间
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/icooclaw/icooclaw/internal/agent/tools"
 	"github.com/icooclaw/icooclaw/internal/bus"
 	"github.com/icooclaw/icooclaw/internal/config"
 	"github.com/icooclaw/icooclaw/internal/provider"
+	"github.com/icooclaw/icooclaw/internal/react/tools"
 	"github.com/icooclaw/icooclaw/internal/skill"
 	"github.com/icooclaw/icooclaw/internal/storage"
 )
@@ -101,6 +101,10 @@ func (a *Agent) Config() config.AgentSettings {
 // Logger 获取日志
 func (a *Agent) Logger() *slog.Logger {
 	return a.logger
+}
+
+func (a *Agent) Skills() *skill.Loader {
+	return a.skills
 }
 
 // RegisterTool 注册工具
@@ -229,7 +233,7 @@ func (a *Agent) handleMessage(ctx context.Context, msg bus.InboundMessage) {
 	config.Tools = a.Tools()
 	config.Session = session
 	config.Logger = a.logger
-	config.Hooks = &loopHooks{agent: a, onChunk: onChunk, chatID: msg.ChatID, clientID: clientID, session: session}
+	config.Hooks = &hook.loopHooks{agent: a, onChunk: onChunk, chatID: msg.ChatID, clientID: clientID, session: session}
 
 	reactAgent := NewReActAgent(config)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)

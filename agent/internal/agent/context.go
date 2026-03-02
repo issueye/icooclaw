@@ -27,7 +27,7 @@ func NewContextBuilder(agent *Agent, session *storage.Session) *ContextBuilder {
 	return &ContextBuilder{
 		agent:   agent,
 		session: session,
-		logger:  agent.logger,
+		logger:  agent.Logger(),
 	}
 }
 
@@ -97,7 +97,7 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 	}
 
 	// 添加技能提示词
-	skills := cb.agent.skills.GetLoaded()
+	skills := cb.agent.Skills().GetLoaded()
 	for _, sk := range skills {
 		parts = append(parts, "", fmt.Sprintf("## Skill: %s", sk.Name))
 		parts = append(parts, sk.Content)
