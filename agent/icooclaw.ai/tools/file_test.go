@@ -12,7 +12,9 @@ import (
 )
 
 func TestResolveToolPath(t *testing.T) {
-	workspace := filepath.Join("home", "user", "workspace")
+	// 使用绝对路径作为工作区，避免 ExpandPath 转换导致的不一致
+	workspace, err := filepath.Abs(filepath.Join("home", "user", "workspace"))
+	require.NoError(t, err)
 
 	tests := []struct {
 		name      string

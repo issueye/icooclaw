@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -75,7 +76,9 @@ func TestCreateJSTool_InvalidName(t *testing.T) {
 		"code":        "function execute(params) { return 'test'; }",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "reserved")
+	// 错误消息可能是中文 "保留名称" 或英文 "reserved"
+	assert.True(t, strings.Contains(err.Error(), "reserved") || strings.Contains(err.Error(), "保留"),
+		"expected error to contain 'reserved' or '保留', got: %s", err.Error())
 
 	// Test with invalid characters
 	_, err = tool.Execute(context.Background(), map[string]interface{}{
@@ -84,7 +87,9 @@ func TestCreateJSTool_InvalidName(t *testing.T) {
 		"code":        "function execute(params) { return 'test'; }",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "can only contain")
+	// 错误消息可能是中文 "只能包含字母" 或英文 "can only contain"
+	assert.True(t, strings.Contains(err.Error(), "can only contain") || strings.Contains(err.Error(), "只能包含"),
+		"expected error to contain 'can only contain' or '只能包含', got: %s", err.Error())
 }
 
 func TestCreateJSTool_UnsafeCode(t *testing.T) {
@@ -148,7 +153,9 @@ func TestCreateJSTool_Overwrite(t *testing.T) {
 		"code":        "function execute(params) { return 'v2'; }",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists")
+	// 错误消息可能是中文 "已存在" 或英文 "already exists"
+	assert.True(t, strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "已存在"),
+		"expected error to contain 'already exists' or '已存在', got: %s", err.Error())
 
 	// Create with overwrite
 	_, err = tool.Execute(context.Background(), map[string]interface{}{
@@ -252,7 +259,9 @@ func TestDeleteJSTool_CannotDeleteBuiltin(t *testing.T) {
 		"name": "file_read",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot delete built-in tool")
+	// 错误消息可能是中文 "不能删除内置工具" 或英文 "cannot delete built-in tool"
+	assert.True(t, strings.Contains(err.Error(), "cannot delete built-in tool") || strings.Contains(err.Error(), "不能删除内置工具") || strings.Contains(err.Error(), "内置工具"),
+		"expected error to contain 'cannot delete built-in tool' or '内置工具', got: %s", err.Error())
 }
 
 func TestValidateToolName(t *testing.T) {

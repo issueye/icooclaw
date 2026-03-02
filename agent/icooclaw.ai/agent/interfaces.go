@@ -24,6 +24,11 @@ type StorageInterface interface {
 	AddMessage(sessionID uint, role, content, toolCalls, toolCallID, toolName, reasoningContent string) (*storage.Message, error)
 	GetSession(sessionID uint) (*storage.Session, error)
 	UpdateSessionMetadata(sessionID uint, metadata string) error
+	// Task operations
+	CreateTask(task *storage.Task) error
+	GetTaskByName(name string) (*storage.Task, error)
+	GetAllTasks() ([]storage.Task, error)
+	DeleteTask(id uint) error
 }
 
 // 确保 *storage.Storage 实现该接口

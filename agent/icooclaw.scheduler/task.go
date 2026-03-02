@@ -77,3 +77,15 @@ type TaskRunner interface {
 type TaskExecutor interface {
 	Execute(ctx context.Context) error
 }
+
+/**
+ * TaskMessageSender 任务消息发送接口
+ * 用于任务执行时发送消息到指定通道
+ */
+type TaskMessageSender interface {
+	// SendTaskMessage 发送任务消息
+	// channel: 目标通道 (如 "websocket", "webhook")
+	// chatID: 目标会话 ID
+	// message: 消息内容
+	SendTaskMessage(ctx context.Context, channel, chatID, message string) error
+}

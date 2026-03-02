@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"icooclaw.ai/config"
@@ -413,6 +416,92 @@ func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
 	}
 
 	return metadata.RolePrompt, nil
+}
+
+// GetMemoryFile 读取 memory/MEMORY.md 文件内容
+func (a *Agent) GetMemoryFile() (string, error) {
+	if a.workspace == "" {
+		return "", fmt.Errorf("workspace not set")
+	}
+
+	memoryPath := filepath.Join(a.workspace, "memory", "MEMORY.md")
+	data, err := os.ReadFile(memoryPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read memory file: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// UpdateMemoryFile 更新 memory/MEMORY.md 文件内容
+func (a *Agent) UpdateMemoryFile(section, content string) error {
+	if a.workspace == "" {
+		return fmt.Errorf("workspace not set")
+	}
+
+	memoryPath := filepath.Join(a.workspace, "memory", "MEMORY.md")
+
+	// 读取现有内容
+	var fileContent string
+	if data, err := os.ReadFile(memoryPath); err == nil {
+		fileContent = string(data)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read memory file: %w", err)
+	} else {
+		// 文件不存在，创建默认内容
+		fileContent = `# 记忆
+
+此文件存储长期记忆和重要信息。
+
+## 重要事实
+
+<!-- 重要事实和信息将存储在这里 -->
+
+## 用户偏好
+
+<!-- 用户偏好和设置 -->
+
+## 学到的知识
+
+<!-- 从对话中学习的知识 -->
+
+## 最后更新
+
+<!-- 最后记忆更新的时间戳 -->`
+	}
+
+	// 更新指定部分
+	updated := false
+	lines := strings.Split(fileContent, "\n")
+	var result strings.Builder
+	currentSection := ""
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## ") {
+			currentSection = strings.TrimSpace(strings.TrimPrefix(line, "## "))
+		}
+
+		if currentSection == section && strings.Contains(line, "<!--") && !updated {
+			// 找到要更新的部分，替换内容
+			result.WriteString(fmt.Sprintf("%s\n", content))
+			updated = true
+			continue
+		}
+
+		result.WriteString(line + "\n")
+	}
+
+	if !updated {
+		result.WriteString(fmt.Sprintf("\n最后更新: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	}
+
+	// 确保目录存在
+	memoryDir := filepath.Dir(memoryPath)
+	if err := os.MkdirAll(memoryDir, 0755); err != nil {
+		return fmt.Errorf("failed to create memory directory: %w", err)
+	}
+
+	return os.WriteFile(memoryPath, []byte(result.String()), 0644)
 }
 
 // LoopHooks ReAct 钩子实现（解耦版本）
