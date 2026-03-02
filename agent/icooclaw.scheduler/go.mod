@@ -1,4 +1,4 @@
-module scheduler
+module icooclaw.scheduler
 
 go 1.24.11
 

@@ -2,12 +2,12 @@ package script
 
 import (
 	"context"
-	"script/config"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"icooclaw.script/config"
 )
 
 func TestEngine_Run(t *testing.T) {

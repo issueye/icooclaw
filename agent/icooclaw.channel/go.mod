@@ -1,4 +1,4 @@
-module github.com/icooclaw/channel
+module icooclaw.channel
 
 go 1.24.0
 

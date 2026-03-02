@@ -1,7 +1,9 @@
 go 1.24.11
 
 use (
-	./bus
-	./channel
-	./scheduler
+	./icooclaw.bus
+	./icooclaw.channel
+	./icooclaw.scheduler
+	./icooclaw.script
+	./icooclaw.utils
 )
