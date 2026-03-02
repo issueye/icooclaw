@@ -22,7 +22,6 @@ import (
 	bus "icooclaw.bus"
 	channel "icooclaw.channel"
 	scheduler "icooclaw.scheduler"
-	utils "icooclaw.utils"
 )
 
 // 全局组件
@@ -76,11 +75,12 @@ func initComponents() error {
 	logger = config.InitLogger(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output)
 	slog.SetDefault(logger)
 
-	// Step 3: 初始化工作空间
-	workspace, err := initWorkspace()
+	// Step 3: 初始化工作空间（检查并创建关键文件）
+	wsConfig, err := config.InitWorkspaceWithConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("init workspace: %w", err)
 	}
+	workspace := wsConfig.Path
 
 	// Step 4: 初始化数据库
 	if db, err = storage.InitDB(cfg.Database.Path); err != nil {
@@ -307,27 +307,6 @@ func (a *schedulerConfigAdapter) GetWorkspace() string {
 }
 
 // ============ 初始化函数 ============
-
-// initWorkspace 初始化工作空间
-func initWorkspace() (string, error) {
-	workspace, err := utils.ExpandPath(cfg.Workspace)
-	if err != nil {
-		return "", fmt.Errorf("expand workspace path: %w", err)
-	}
-
-	if workspace == "" {
-		workspace = cfg.Tools.Workspace
-	}
-
-	if workspace != "" {
-		if err := config.InitWorkspace(workspace); err != nil {
-			return "", fmt.Errorf("init workspace directory: %w", err)
-		}
-		logger.Info("Workspace initialized", "path", workspace)
-	}
-
-	return workspace, nil
-}
 
 // initDefaultAgent 初始化默认 Agent
 func initDefaultAgent(workspace string) error {
