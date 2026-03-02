@@ -17,17 +17,29 @@ import (
 
 // ContextBuilder 上下文构建器
 type ContextBuilder struct {
-	agent   *Agent
+	agent   AgentContext
 	session *storage.Session
 	logger  *slog.Logger
+	fs      FileSystemInterface
 }
 
 // NewContextBuilder 创建上下文构建器
-func NewContextBuilder(agent *Agent, session *storage.Session) *ContextBuilder {
+func NewContextBuilder(agent AgentContext, session *storage.Session) *ContextBuilder {
 	return &ContextBuilder{
 		agent:   agent,
 		session: session,
 		logger:  agent.Logger(),
+		fs:      OsFileSystem{},
+	}
+}
+
+// ContextBuilderOption 上下文构建器选项
+type ContextBuilderOption func(*ContextBuilder)
+
+// WithFileSystem 设置文件系统实现
+func WithFileSystem(fs FileSystemInterface) ContextBuilderOption {
+	return func(cb *ContextBuilder) {
+		cb.fs = fs
 	}
 }
 
@@ -104,7 +116,7 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 	}
 
 	// 添加记忆
-	memories, err := cb.agent.memory.GetAll()
+	memories, err := cb.agent.Memory().GetAll()
 	if err == nil && len(memories) > 0 {
 		parts = append(parts, "", "## Long-term Memory")
 		for _, mem := range memories {
@@ -125,8 +137,8 @@ func (cb *ContextBuilder) readTemplateFile(filename string) string {
 
 	// 优先读取 workspace 目录下的文件
 	workspacePath := filepath.Join(workspace, filename)
-	if _, err := os.Stat(workspacePath); err == nil {
-		content, err := os.ReadFile(workspacePath)
+	if _, err := cb.fs.Stat(workspacePath); err == nil {
+		content, err := cb.fs.ReadFile(workspacePath)
 		if err == nil {
 			cb.logger.Debug("Read template from workspace", "file", filename, "path", workspacePath)
 			return string(content)
@@ -135,15 +147,15 @@ func (cb *ContextBuilder) readTemplateFile(filename string) string {
 
 	// 回退到 templates 目录
 	templatePath := filepath.Join(workspace, "..", "templates", filename)
-	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+	if _, err := cb.fs.Stat(templatePath); os.IsNotExist(err) {
 		templatePath = filepath.Join("templates", filename)
-		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		if _, err := cb.fs.Stat(templatePath); os.IsNotExist(err) {
 			cb.logger.Debug("Template file not found", "file", filename)
 			return ""
 		}
 	}
 
-	content, err := os.ReadFile(templatePath)
+	content, err := cb.fs.ReadFile(templatePath)
 	if err != nil {
 		cb.logger.Warn("Failed to read template file", "file", templatePath, "error", err)
 		return ""
@@ -160,7 +172,7 @@ func (cb *ContextBuilder) readMemoryFile() string {
 	}
 
 	memoryPath := filepath.Join(workspace, "memory", "MEMORY.md")
-	data, err := os.ReadFile(memoryPath)
+	data, err := cb.fs.ReadFile(memoryPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			cb.logger.Warn("Failed to read memory file", "error", err)
@@ -225,7 +237,6 @@ func (cb *ContextBuilder) hasUserPreference(content string) bool {
 }
 
 // CheckUserPreferenceSet 检查用户是否已设置偏好
-// 返回 true 表示已设置，返回 false 表示未设置
 func (cb *ContextBuilder) CheckUserPreferenceSet() bool {
 	workspace := cb.agent.Workspace()
 	if workspace == "" {
@@ -233,7 +244,7 @@ func (cb *ContextBuilder) CheckUserPreferenceSet() bool {
 	}
 
 	memoryPath := filepath.Join(workspace, "memory", "MEMORY.md")
-	data, err := os.ReadFile(memoryPath)
+	data, err := cb.fs.ReadFile(memoryPath)
 	if err != nil {
 		return false
 	}
@@ -242,8 +253,8 @@ func (cb *ContextBuilder) CheckUserPreferenceSet() bool {
 }
 
 // UpdateMemoryFile 更新 memory/MEMORY.md 文件
-func (a *Agent) UpdateMemoryFile(section, content string) error {
-	workspace := a.Workspace()
+func (cb *ContextBuilder) UpdateMemoryFile(section, content string) error {
+	workspace := cb.agent.Workspace()
 	if workspace == "" {
 		return fmt.Errorf("workspace not set")
 	}
@@ -252,7 +263,7 @@ func (a *Agent) UpdateMemoryFile(section, content string) error {
 
 	// 读取现有内容
 	var fileContent string
-	if data, err := os.ReadFile(memoryPath); err == nil {
+	if data, err := cb.fs.ReadFile(memoryPath); err == nil {
 		fileContent = string(data)
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read memory file: %w", err)
@@ -290,11 +301,11 @@ func (a *Agent) UpdateMemoryFile(section, content string) error {
 	updatedContent = updateLastUpdated(updatedContent)
 
 	// 写入文件
-	if err := os.WriteFile(memoryPath, []byte(updatedContent), 0644); err != nil {
+	if err := cb.fs.WriteFile(memoryPath, []byte(updatedContent), 0644); err != nil {
 		return fmt.Errorf("failed to write memory file: %w", err)
 	}
 
-	a.logger.Info("Memory file updated", "section", section)
+	cb.logger.Info("Memory file updated", "section", section)
 	return nil
 }
 
@@ -395,14 +406,14 @@ func updateLastUpdated(content string) string {
 }
 
 // GetMemoryFile 读取 memory/MEMORY.md 文件内容
-func (a *Agent) GetMemoryFile() (string, error) {
-	workspace := a.Workspace()
+func (cb *ContextBuilder) GetMemoryFile() (string, error) {
+	workspace := cb.agent.Workspace()
 	if workspace == "" {
 		return "", fmt.Errorf("workspace not set")
 	}
 
 	memoryPath := filepath.Join(workspace, "memory", "MEMORY.md")
-	data, err := os.ReadFile(memoryPath)
+	data, err := cb.fs.ReadFile(memoryPath)
 	if err != nil {
 		return "", err
 	}
@@ -411,8 +422,8 @@ func (a *Agent) GetMemoryFile() (string, error) {
 }
 
 // GetMemoryFilePath 获取 memory/MEMORY.md 文件路径
-func (a *Agent) GetMemoryFilePath() string {
-	workspace := a.Workspace()
+func (cb *ContextBuilder) GetMemoryFilePath() string {
+	workspace := cb.agent.Workspace()
 	if workspace == "" {
 		return ""
 	}

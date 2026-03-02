@@ -19,49 +19,105 @@ import (
 	icooclawbus "icooclaw.bus"
 )
 
+// SessionMetadata 会话元数据
 type SessionMetadata struct {
 	RolePrompt string `json:"role_prompt"`
 }
 
+// Agent Agent 核心结构体
 type Agent struct {
 	name      string
 	provider  provider.Provider
-	tools     *tools.Registry
-	storage   *storage.Storage
-	memory    *memory.MemoryStore
-	skills    *skill.Loader
+	tools     ToolRegistryInterface
+	storage   StorageInterface
+	memory    MemoryStoreInterface
+	skills    SkillLoaderInterface
 	config    config.AgentSettings
-	bus       *icooclawbus.MessageBus
+	bus       MessageBusInterface
 	logger    *slog.Logger
 	workspace string
 }
 
+// AgentOption Agent 选项函数
+type AgentOption func(*Agent)
+
+// WithTools 设置工具注册表
+func WithTools(registry ToolRegistryInterface) AgentOption {
+	return func(a *Agent) {
+		a.tools = registry
+	}
+}
+
+// WithMemoryStore 设置记忆存储
+func WithMemoryStore(store MemoryStoreInterface) AgentOption {
+	return func(a *Agent) {
+		a.memory = store
+	}
+}
+
+// WithSkillLoader 设置技能加载器
+func WithSkillLoader(loader SkillLoaderInterface) AgentOption {
+	return func(a *Agent) {
+		a.skills = loader
+	}
+}
+
+// WithMessageBus 设置消息总线
+func WithMessageBus(bus MessageBusInterface) AgentOption {
+	return func(a *Agent) {
+		a.bus = bus
+	}
+}
+
+// NewAgent 创建 Agent 实例（使用函数式选项模式）
 func NewAgent(
 	name string,
 	provider provider.Provider,
-	storage *storage.Storage,
+	storageIntf StorageInterface,
 	config config.AgentSettings,
 	logger *slog.Logger,
 	workspace string,
+	opts ...AgentOption,
 ) *Agent {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
-	return &Agent{
-		name:     name,
-		provider: provider,
-		tools:    tools.NewRegistry(),
-		storage:  storage,
-		memory: memory.NewMemoryStoreWithConfig(storage, logger, memory.MemoryConfig{
-			ConsolidationThreshold: 50,
-			SummaryEnabled:         true,
-		}),
-		skills:    skill.NewLoader(storage, logger),
+	agent := &Agent{
+		name:      name,
+		provider:  provider,
+		tools:     tools.NewRegistry(), // 默认实现
+		storage:   storageIntf,
 		config:    config,
 		logger:    logger,
 		workspace: workspace,
 	}
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(agent)
+	}
+
+	// 如果没有提供，使用默认实现（需要具体类型）
+	if agent.memory == nil {
+		if storageImpl, ok := storageIntf.(*storage.Storage); ok {
+			agent.memory = memory.NewMemoryStoreWithConfig(storageImpl, logger, memory.MemoryConfig{
+				ConsolidationThreshold: 50,
+				SummaryEnabled:         true,
+			})
+		} else {
+			logger.Warn("Storage is not *storage.Storage, skipping memory initialization")
+		}
+	}
+	if agent.skills == nil {
+		if storageImpl, ok := storageIntf.(*storage.Storage); ok {
+			agent.skills = skill.NewLoader(storageImpl, logger)
+		} else {
+			logger.Warn("Storage is not *storage.Storage, skipping skills initialization")
+		}
+	}
+
+	return agent
 }
 
 func (a *Agent) Workspace() string {
@@ -76,15 +132,15 @@ func (a *Agent) Provider() provider.Provider {
 	return a.provider
 }
 
-func (a *Agent) Tools() *tools.Registry {
+func (a *Agent) Tools() ToolRegistryInterface {
 	return a.tools
 }
 
-func (a *Agent) SetTools(registry *tools.Registry) {
+func (a *Agent) SetTools(registry ToolRegistryInterface) {
 	a.tools = registry
 }
 
-func (a *Agent) Storage() *storage.Storage {
+func (a *Agent) Storage() StorageInterface {
 	return a.storage
 }
 
@@ -96,11 +152,11 @@ func (a *Agent) Logger() *slog.Logger {
 	return a.logger
 }
 
-func (a *Agent) Skills() *skill.Loader {
+func (a *Agent) Skills() SkillLoaderInterface {
 	return a.skills
 }
 
-func (a *Agent) Memory() *memory.MemoryStore {
+func (a *Agent) Memory() MemoryStoreInterface {
 	return a.memory
 }
 
@@ -126,7 +182,7 @@ func (a *Agent) Init(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
+func (a *Agent) Run(ctx context.Context, messageBus MessageBusInterface) {
 	a.bus = messageBus
 	if err := a.Init(ctx); err != nil {
 		a.logger.Error("Failed to initialize agent", "error", err)
@@ -213,12 +269,21 @@ func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessag
 		}
 	}
 
+	// 使用解耦的 LoopHooks
 	reactCfg := NewReActConfig()
 	reactCfg.Provider = a.Provider()
 	reactCfg.Tools = a.Tools()
 	reactCfg.Session = session
 	reactCfg.Logger = a.logger
-	reactCfg.Hooks = NewLoopHooks(a, onChunk, msg.ChatID, clientID, session)
+	reactCfg.Hooks = NewLoopHooks(
+		a.storage,
+		a.bus,
+		onChunk,
+		msg.ChatID,
+		clientID,
+		session,
+		a.logger,
+	)
 
 	reactAgent := NewReActAgent(reactCfg)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
@@ -350,21 +415,34 @@ func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
 	return metadata.RolePrompt, nil
 }
 
+// LoopHooks ReAct 钩子实现（解耦版本）
 type LoopHooks struct {
-	agent    *Agent
+	storage  StorageInterface
+	bus      MessageBusInterface
 	onChunk  hooks.OnChunkFunc
 	chatID   string
 	clientID string
 	session  *storage.Session
+	logger   *slog.Logger
 }
 
-func NewLoopHooks(agent *Agent, onChunk hooks.OnChunkFunc, chatID, clientID string, session *storage.Session) *LoopHooks {
+// NewLoopHooks 创建解耦的 LoopHooks
+func NewLoopHooks(
+	storage StorageInterface,
+	bus MessageBusInterface,
+	onChunk hooks.OnChunkFunc,
+	chatID, clientID string,
+	session *storage.Session,
+	logger *slog.Logger,
+) *LoopHooks {
 	return &LoopHooks{
-		agent:    agent,
+		storage:  storage,
+		bus:      bus,
 		onChunk:  onChunk,
 		chatID:   chatID,
 		clientID: clientID,
 		session:  session,
+		logger:   logger,
 	}
 }
 
@@ -384,8 +462,8 @@ func (h *LoopHooks) OnLLMResponse(ctx context.Context, content, reasoningContent
 }
 
 func (h *LoopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error {
-	if h.agent.storage != nil && h.session != nil {
-		_, err := h.agent.storage.AddMessage(
+	if h.storage != nil && h.session != nil {
+		_, err := h.storage.AddMessage(
 			h.session.ID,
 			consts.RoleToolCall.ToString(),
 			"",
@@ -395,12 +473,12 @@ func (h *LoopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName 
 			"",
 		)
 		if err != nil {
-			h.agent.logger.Error("Failed to save tool call message", "tool", toolName, "error", err)
+			h.logger.Error("Failed to save tool call message", "tool", toolName, "error", err)
 		}
 	}
 
-	if h.agent.bus != nil {
-		h.agent.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+	if h.bus != nil {
+		h.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
 			Type:       "tool_call",
 			ID:         toolCallID,
 			ToolCallID: toolCallID,
@@ -416,12 +494,12 @@ func (h *LoopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName 
 }
 
 func (h *LoopHooks) OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error {
-	if h.agent.storage != nil && h.session != nil {
+	if h.storage != nil && h.session != nil {
 		resultContent := result.Content
 		if result.Error != nil {
 			resultContent = fmt.Sprintf("Error: %v", result.Error)
 		}
-		_, err := h.agent.storage.AddMessage(
+		_, err := h.storage.AddMessage(
 			h.session.ID,
 			consts.RoleTool.ToString(),
 			resultContent,
@@ -431,18 +509,18 @@ func (h *LoopHooks) OnToolResult(ctx context.Context, toolCallID string, toolNam
 			"",
 		)
 		if err != nil {
-			h.agent.logger.Error("Failed to save tool result message", "tool", toolName, "error", err)
+			h.logger.Error("Failed to save tool result message", "tool", toolName, "error", err)
 		}
 	}
 
-	if h.agent.bus != nil {
+	if h.bus != nil {
 		status := "completed"
 		errorMsg := ""
 		if result.Error != nil {
 			status = "error"
 			errorMsg = result.Error.Error()
 		}
-		h.agent.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+		h.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
 			Type:       "tool_result",
 			ID:         toolCallID,
 			ToolCallID: toolCallID,
