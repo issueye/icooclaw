@@ -24,10 +24,11 @@ import (
 
 // Engine 脚本引擎
 type Engine struct {
-	vm      *goja.Runtime
-	cfg     *config.Config
-	logger  *slog.Logger
-	context context.Context
+	vm       *goja.Runtime
+	cfg      *config.Config
+	logger   *slog.Logger
+	context  context.Context
+	Builtins []builtons.ObjectRegister
 }
 
 // NewEngine 创建新的脚本引擎
@@ -44,10 +45,11 @@ func NewEngine(cfg *config.Config, logger *slog.Logger) *Engine {
 	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
 	engine := &Engine{
-		vm:      vm,
-		cfg:     cfg,
-		logger:  logger,
-		context: context.Background(),
+		vm:       vm,
+		cfg:      cfg,
+		logger:   logger,
+		context:  context.Background(),
+		Builtins: []builtons.ObjectRegister{},
 	}
 
 	engine.setupBuiltins()
@@ -121,71 +123,28 @@ func (e *Engine) SetContext(ctx context.Context) {
 func (e *Engine) setupBuiltins() {
 	// console 对象
 	consoleObj := builtons.NewConsole(e.logger)
-	e.SetGlobal("console", map[string]interface{}{
-		"log":     consoleObj.Log,
-		"info":    consoleObj.Info,
-		"debug":   consoleObj.Debug,
-		"warn":    consoleObj.Warn,
-		"error":   consoleObj.Error,
-		"table":   consoleObj.Table,
-		"time":    consoleObj.Time,
-		"timeEnd": consoleObj.TimeEnd,
-	})
+	e.Builtins = append(e.Builtins, consoleObj)
 
 	// fs 文件系统对象
 	fsObj := builtons.NewFileSystem(e.cfg, e.logger)
-	e.SetGlobal("fs", map[string]interface{}{
-		"readFile":       fsObj.ReadFile,
-		"readFileBytes":  fsObj.ReadFileBytes,
-		"writeFile":      fsObj.WriteFile,
-		"writeFileBytes": fsObj.WriteFileBytes,
-		"appendFile":     fsObj.AppendFile,
-		"deleteFile":     fsObj.DeleteFile,
-		"exists":         fsObj.Exists,
-		"isDir":          fsObj.IsDir,
-		"isFile":         fsObj.IsFile,
-		"listDir":        fsObj.ListDir,
-		"mkdir":          fsObj.Mkdir,
-		"mkdirAll":       fsObj.MkdirAll,
-		"rmdir":          fsObj.Rmdir,
-		"copyFile":       fsObj.CopyFile,
-		"moveFile":       fsObj.MoveFile,
-		"getInfo":        fsObj.GetInfo,
-	})
+	e.Builtins = append(e.Builtins, fsObj)
 
 	// http HTTP 客户端对象
 	httpObj := builtons.NewHTTPClient(e.cfg, e.logger)
-	e.SetGlobal("http", map[string]interface{}{
-		"get":      httpObj.Get,
-		"post":     httpObj.Post,
-		"postJSON": httpObj.PostJSON,
-		"request":  httpObj.Request,
-		"download": httpObj.Download,
-	})
+	e.Builtins = append(e.Builtins, httpObj)
 
 	// shell 命令执行对象
 	shellObj := builtons.NewShellExec(e.context, e.cfg, e.logger)
-	e.SetGlobal("shell", map[string]interface{}{
-		"exec":            shellObj.Exec,
-		"execWithTimeout": shellObj.ExecWithTimeout,
-		"execInDir":       shellObj.ExecInDir,
-		"pipe":            shellObj.Pipe,
-	})
+	e.Builtins = append(e.Builtins, shellObj)
 
 	// utils 工具函数对象
 	utilsObj := builtons.NewUtils()
-	e.SetGlobal("utils", map[string]interface{}{
-		"sleep":      utilsObj.Sleep,
-		"now":        utilsObj.Now,
-		"timestamp":  utilsObj.Timestamp,
-		"formatTime": utilsObj.FormatTime,
-		"parseTime":  utilsObj.ParseTime,
-		"env":        utilsObj.Env,
-		"envOr":      utilsObj.EnvOr,
-		"cwd":        utilsObj.Cwd,
-		"hostname":   utilsObj.Hostname,
-		"uuid":       utilsObj.UUID,
-	})
+	e.Builtins = append(e.Builtins, utilsObj)
+
+	// 设置所有内置对象
+	for _, builton := range e.Builtins {
+		e.SetGlobal(builton.Name(), builton.Object())
+	}
 
 	// 标准库扩展
 	e.setupStdLib()

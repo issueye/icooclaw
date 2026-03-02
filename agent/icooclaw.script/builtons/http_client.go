@@ -29,6 +29,20 @@ func NewHTTPClient(cfg *config.Config, logger *slog.Logger) *httpClient {
 	}
 }
 
+func (h *httpClient) Name() string {
+	return "http"
+}
+
+func (h *httpClient) Object() map[string]interface{} {
+	return map[string]interface{}{
+		"get":      h.Get,
+		"post":     h.Post,
+		"postJSON": h.PostJSON,
+		"request":  h.Request,
+		"download": h.Download,
+	}
+}
+
 // Get 发送 GET 请求
 func (h *httpClient) Get(url string) (map[string]interface{}, error) {
 	return h.Request("GET", url, nil, nil)

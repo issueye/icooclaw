@@ -14,6 +14,25 @@ func NewUtils() *Utils {
 	return &Utils{}
 }
 
+func (u *Utils) Name() string {
+	return "utils"
+}
+
+func (u *Utils) Object() map[string]interface{} {
+	return map[string]interface{}{
+		"sleep":      u.Sleep,
+		"now":        u.Now,
+		"timestamp":  u.Timestamp,
+		"formatTime": u.FormatTime,
+		"parseTime":  u.ParseTime,
+		"env":        u.Env,
+		"envOr":      u.EnvOr,
+		"cwd":        u.Cwd,
+		"hostname":   u.Hostname,
+		"uuid":       u.UUID,
+	}
+}
+
 // Sleep 休眠
 func (u *Utils) Sleep(ms int) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)

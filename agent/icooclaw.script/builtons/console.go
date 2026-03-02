@@ -19,6 +19,23 @@ func NewConsole(logger *slog.Logger) *Console {
 	return &Console{logger: logger}
 }
 
+func (c *Console) Name() string {
+	return "console"
+}
+
+func (c *Console) Object() map[string]interface{} {
+	return map[string]interface{}{
+		"log":     c.Log,
+		"info":    c.Info,
+		"debug":   c.Debug,
+		"warn":    c.Warn,
+		"error":   c.Error,
+		"table":   c.Table,
+		"time":    c.Time,
+		"timeEnd": c.TimeEnd,
+	}
+}
+
 func (c *Console) Log(args ...interface{}) {
 	c.logger.Info(fmt.Sprint(args...))
 }

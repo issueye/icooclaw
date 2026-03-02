@@ -25,6 +25,31 @@ func NewFileSystem(cfg *config.Config, logger *slog.Logger) *FileSystem {
 	}
 }
 
+func (fs *FileSystem) Name() string {
+	return "fs"
+}
+
+func (fs *FileSystem) Object() map[string]interface{} {
+	return map[string]interface{}{
+		"readFile":       fs.ReadFile,
+		"readFileBytes":  fs.ReadFileBytes,
+		"writeFile":      fs.WriteFile,
+		"writeFileBytes": fs.WriteFileBytes,
+		"appendFile":     fs.AppendFile,
+		"deleteFile":     fs.DeleteFile,
+		"exists":         fs.Exists,
+		"isDir":          fs.IsDir,
+		"isFile":         fs.IsFile,
+		"listDir":        fs.ListDir,
+		"mkdir":          fs.Mkdir,
+		"mkdirAll":       fs.MkdirAll,
+		"rmdir":          fs.Rmdir,
+		"copyFile":       fs.CopyFile,
+		"moveFile":       fs.MoveFile,
+		"getInfo":        fs.GetInfo,
+	}
+}
+
 func (fs *FileSystem) GetCfg() *config.Config {
 	return fs.cfg
 }

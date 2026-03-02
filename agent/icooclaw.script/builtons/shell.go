@@ -29,6 +29,19 @@ func NewShellExec(ctx context.Context, cfg *config.Config, logger *slog.Logger) 
 	}
 }
 
+func (s *shellExec) Name() string {
+	return "shell"
+}
+
+func (s *shellExec) Object() map[string]interface{} {
+	return map[string]interface{}{
+		"exec":            s.Exec,
+		"execWithTimeout": s.ExecWithTimeout,
+		"execInDir":       s.ExecInDir,
+		"pipe":            s.Pipe,
+	}
+}
+
 // Exec 执行命令
 func (s *shellExec) Exec(command string) (map[string]interface{}, error) {
 	return s.ExecWithTimeout(command, s.cfg.ExecTimeout)
