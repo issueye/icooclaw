@@ -135,6 +135,12 @@ func (a *Agent) Provider() provider.Provider {
 	return a.provider
 }
 
+// SetProvider 设置 Provider（用于运行时切换模型）
+func (a *Agent) SetProvider(p provider.Provider) {
+	a.provider = p
+	a.logger.Info("Provider switched", "name", p.GetName(), "model", p.GetDefaultModel())
+}
+
 func (a *Agent) Tools() ToolRegistryInterface {
 	return a.tools
 }

@@ -114,6 +114,8 @@ type Provider interface {
 	ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error
 	GetDefaultModel() string
 	GetName() string
+	GetAPIKey() string
+	GetAPIBase() string
 }
 
 type OpenAIToolCall struct {
@@ -173,6 +175,16 @@ func (p *BaseProvider) GetDefaultModel() string {
 // GetName 获取名称
 func (p *BaseProvider) GetName() string {
 	return p.Name
+}
+
+// GetAPIKey 获取 API Key
+func (p *BaseProvider) GetAPIKey() string {
+	return p.APIKey
+}
+
+// GetAPIBase 获取 API Base URL
+func (p *BaseProvider) GetAPIBase() string {
+	return p.APIBase
 }
 
 // Chat 实现Provider接口

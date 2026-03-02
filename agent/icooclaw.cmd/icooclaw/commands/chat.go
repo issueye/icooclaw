@@ -209,6 +209,7 @@ func (c *CLI) sendMessage(ctx context.Context, input string) error {
 
 // switchModel 切换模型
 func (c *CLI) switchModel(model string) error {
+	// 格式: provider/model 或 model
 	if strings.Contains(model, "/") {
 		parts := strings.SplitN(model, "/", 2)
 		providerName := parts[0]
@@ -219,14 +220,27 @@ func (c *CLI) switchModel(model string) error {
 			return fmt.Errorf("provider not found: %s", providerName)
 		}
 
-		c.logger.Info("Model switched", "provider", providerName, "model", modelName)
-		fmt.Printf("Model switched: %s (via %s)\n", modelName, providerName)
-		_ = p // TODO: 实际切换逻辑
+		// 切换 Provider
+		c.agent.SetProvider(p)
+		fmt.Printf("✓ Switched to %s (model: %s)\n", providerName, modelName)
 		return nil
 	}
 
-	c.logger.Info("Model switched", "model", model)
-	fmt.Printf("Model: %s\n", model)
+	// 仅切换模型名称（使用当前 provider）
+	currentProvider := c.agent.Provider()
+	if currentProvider == nil {
+		return errors.New("no provider available")
+	}
+
+	// 创建新的 provider 实例（使用新模型）
+	newProvider := provider.NewOpenAICompatibleProvider(
+		currentProvider.GetName(),
+		currentProvider.GetAPIKey(),
+		currentProvider.GetAPIBase(),
+		model,
+	)
+	c.agent.SetProvider(newProvider)
+	fmt.Printf("✓ Model switched to: %s\n", model)
 	return nil
 }
 
