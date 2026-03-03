@@ -8,6 +8,7 @@
 |------|------|
 | [architecture.md](./architecture.md) | 模块架构总览，包含架构图、模块说明、接口设计等 |
 | [module-dependencies.md](./module-dependencies.md) | 模块依赖关系详解，包含依赖图、依赖矩阵、外部依赖等 |
+| [optimization-suggestions.md](./optimization-suggestions.md) | 优化建议文档，包含代码质量、架构设计、性能优化、安全性改进等 |
 
 ## 快速导航
 
