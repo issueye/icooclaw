@@ -20,7 +20,7 @@ import (
 type RESTGateway struct {
 	workspace   string
 	config      *config.Config
-	logger      Logger
+	logger      *slog.Logger
 	dataStorage *storage.Storage
 	server      *http.Server
 	router      *chi.Mux

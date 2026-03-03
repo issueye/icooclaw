@@ -383,8 +383,8 @@
             class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             @click.self="closeProviderDialog"
         >
-            <div class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4">
-                <div class="p-4 border-b border-border">
+            <div class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-4 border-b border-border sticky top-0 bg-bg-secondary z-10">
                     <h2 class="text-lg font-medium">
                         {{ editingProvider ? "编辑 Provider" : "添加 Provider" }}
                     </h2>
@@ -430,17 +430,55 @@
                         />
                         <p class="text-xs text-text-secondary mt-1">可选，用于自定义 API 端点</p>
                     </div>
+                    
+                    <!-- 模型列表 -->
                     <div>
-                        <label class="block text-sm text-text-secondary mb-2">默认模型</label>
-                        <input
-                            v-model="providerForm.model"
-                            type="text"
-                            placeholder="gpt-4, claude-3-opus, deepseek-chat"
-                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
-                        />
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm text-text-secondary">支持的模型</label>
+                            <button
+                                @click="addModel"
+                                type="button"
+                                class="text-xs text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
+                            >
+                                <PlusIcon :size="14" />
+                                添加模型
+                            </button>
+                        </div>
+                        
+                        <div v-if="providerForm.models.length > 0" class="space-y-2">
+                            <div
+                                v-for="(model, index) in providerForm.models"
+                                :key="index"
+                                class="flex items-center gap-2"
+                            >
+                                <input
+                                    v-model="model.name"
+                                    type="text"
+                                    placeholder="模型名称 (如 gpt-4)"
+                                    class="flex-1 px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
+                                />
+                                <input
+                                    v-model="model.alias"
+                                    type="text"
+                                    placeholder="别名 (可选)"
+                                    class="w-32 px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
+                                />
+                                <button
+                                    @click="removeModel(index)"
+                                    type="button"
+                                    class="p-2 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-red-500 transition-colors"
+                                >
+                                    <XIcon :size="16" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div v-else class="text-text-secondary text-sm py-3 text-center border border-dashed border-border rounded-lg">
+                            暂无模型，点击上方按钮添加
+                        </div>
                     </div>
                 </div>
-                <div class="p-4 border-t border-border flex justify-end gap-3">
+                <div class="p-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-bg-secondary">
                     <button
                         @click="closeProviderDialog"
                         class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
@@ -468,6 +506,7 @@ import {
     Plus as PlusIcon,
     Edit as EditIcon,
     Trash as TrashIcon,
+    X as XIcon,
     Bot as BotIcon,
     Sparkles as SparklesIcon,
     ChevronRight as ChevronRightIcon,
@@ -532,7 +571,7 @@ const providerForm = reactive({
     enabled: true,
     apiKey: "",
     apiBase: "",
-    model: ""
+    models: [] // { name: string, alias: string }
 });
 
 // 是否有修改
@@ -545,6 +584,12 @@ const hasChanges = computed(() => {
 // 获取 Provider 模型名称
 function getProviderModel(provider) {
     try {
+        // 优先从 LLMs 字段获取
+        if (provider.llms && provider.llms.length > 0) {
+            const names = provider.llms.map(l => l.alias || l.name);
+            return names.slice(0, 3).join(', ') + (names.length > 3 ? '...' : '');
+        }
+        // 兼容旧的 config 字段
         const config = JSON.parse(provider.config || '{}');
         return config.model || '-';
     } catch {
@@ -634,7 +679,7 @@ function openAddProvider() {
     providerForm.enabled = true;
     providerForm.apiKey = "";
     providerForm.apiBase = "";
-    providerForm.model = "";
+    providerForm.models = [];
     showProviderDialog.value = true;
 }
 
@@ -643,17 +688,17 @@ function openEditProvider(provider) {
     editingProvider.value = provider;
     providerForm.name = provider.name;
     providerForm.enabled = provider.enabled;
+    providerForm.apiKey = provider.api_key || "";
+    providerForm.apiBase = provider.base_url || "";
     
-    // 解析 config
-    try {
-        const config = JSON.parse(provider.config || '{}');
-        providerForm.apiKey = config.api_key || "";
-        providerForm.apiBase = config.api_base || "";
-        providerForm.model = config.model || "";
-    } catch {
-        providerForm.apiKey = "";
-        providerForm.apiBase = "";
-        providerForm.model = "";
+    // 解析 LLMs 字段
+    if (provider.llms && provider.llms.length > 0) {
+        providerForm.models = provider.llms.map(l => ({
+            name: l.name || "",
+            alias: l.model || "" // alias 字段在 storage 中是 model
+        }));
+    } else {
+        providerForm.models = [];
     }
     
     showProviderDialog.value = true;
@@ -665,22 +710,36 @@ function closeProviderDialog() {
     editingProvider.value = null;
 }
 
+// 添加模型
+function addModel() {
+    providerForm.models.push({ name: "", alias: "" });
+}
+
+// 删除模型
+function removeModel(index) {
+    providerForm.models.splice(index, 1);
+}
+
 // 保存 Provider
 async function handleSaveProvider() {
     if (!providerForm.name) return;
 
     savingProvider.value = true;
     
-    const config = {
-        api_key: providerForm.apiKey,
-        api_base: providerForm.apiBase,
-        model: providerForm.model
-    };
-    
+    // 构建 LLMs 数据
+    const llms = providerForm.models
+        .filter(m => m.name) // 过滤空模型
+        .map(m => ({
+            name: m.name,
+            model: m.alias || m.name // alias 存储到 model 字段
+        }));
+
     const data = {
         name: providerForm.name,
         enabled: providerForm.enabled,
-        config: JSON.stringify(config)
+        api_key: providerForm.apiKey,
+        base_url: providerForm.apiBase,
+        llms: llms
     };
 
     try {
