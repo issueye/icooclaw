@@ -19,6 +19,7 @@ type Handlers struct {
 	Provider *handlers.ProviderHandler
 	Skill    *handlers.SkillHandler
 	Channel  *handlers.ChannelHandler
+	Config   *handlers.ConfigHandler
 }
 
 // NewHandlers 创建所有处理器
@@ -33,6 +34,7 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 		Provider: handlers.NewProviderHandler(logger, storage),
 		Skill:    handlers.NewSkillHandler(logger, storage),
 		Channel:  handlers.NewChannelHandler(logger, storage),
+		Config:   handlers.NewConfigHandler(logger),
 	}
 }
 
@@ -127,6 +129,21 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Post("/get", h.Channel.GetByID)
 		r.Get("/all", h.Channel.GetAll)
 		r.Get("/enabled", h.Channel.GetEnabled)
+	})
+
+	// Config 路由
+	r.Route("/api/v1/config", func(r chi.Router) {
+		r.Get("/", h.Config.GetConfig)              // 获取配置
+		r.Post("/update", h.Config.UpdateConfig)    // 更新配置
+		r.Post("/overwrite", h.Config.OverwriteConfig) // 覆盖配置文件
+		r.Get("/file", h.Config.GetConfigFileContent)  // 获取配置文件内容
+		r.Get("/json", h.Config.GetConfigJSON)         // 获取 JSON 格式配置
+	})
+
+	// Workspace 路由
+	r.Route("/api/v1/workspace", func(r chi.Router) {
+		r.Get("/", h.Config.GetWorkspace)    // 获取工作区
+		r.Post("/set", h.Config.SetWorkspace) // 设置工作区
 	})
 }
 
