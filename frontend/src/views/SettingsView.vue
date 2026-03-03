@@ -13,7 +13,7 @@
                     <h1 class="text-lg font-semibold">设置</h1>
                 </div>
             </div>
-            
+
             <nav class="p-2">
                 <button
                     v-for="item in menuItems"
@@ -147,7 +147,7 @@
                                 刷新
                             </button>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="block text-xs text-text-secondary mb-1">文件路径</label>
                             <div class="text-sm text-text-secondary">{{ configPath || '-' }}</div>
@@ -183,9 +183,18 @@
 
                 <!-- Provider 设置 -->
                 <section v-if="activeSection === 'provider'" class="space-y-6">
-                    <div>
-                        <h2 class="text-xl font-semibold mb-1">LLM Provider</h2>
-                        <p class="text-text-secondary text-sm">管理 AI 模型提供商配置</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-semibold mb-1">LLM Provider</h2>
+                            <p class="text-text-secondary text-sm">管理 AI 模型提供商配置</p>
+                        </div>
+                        <button
+                            @click="openAddProvider"
+                            class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                            <PlusIcon :size="16" />
+                            添加 Provider
+                        </button>
                     </div>
 
                     <div v-if="loading" class="text-text-secondary text-center py-8">
@@ -213,24 +222,46 @@
                                         </div>
                                     </div>
                                 </div>
-                                <span
-                                    :class="[
-                                        'text-xs px-2 py-1 rounded',
-                                        provider.enabled
-                                            ? 'bg-green-500/20 text-green-400'
-                                            : 'bg-bg-tertiary text-text-secondary'
-                                    ]"
-                                >
-                                    {{ provider.enabled ? "已启用" : "未启用" }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        :class="[
+                                            'text-xs px-2 py-1 rounded',
+                                            provider.enabled
+                                                ? 'bg-green-500/20 text-green-400'
+                                                : 'bg-bg-tertiary text-text-secondary'
+                                        ]"
+                                    >
+                                        {{ provider.enabled ? "已启用" : "未启用" }}
+                                    </span>
+                                    <button
+                                        @click="openEditProvider(provider)"
+                                        class="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-accent transition-colors"
+                                        title="编辑"
+                                    >
+                                        <EditIcon :size="16" />
+                                    </button>
+                                    <button
+                                        @click="handleDeleteProvider(provider)"
+                                        class="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-red-500 transition-colors"
+                                        title="删除"
+                                    >
+                                        <TrashIcon :size="16" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div v-else class="bg-bg-secondary rounded-xl border border-border p-8 text-center">
-                        <div class="text-text-secondary text-sm">
-                            无法获取 Provider 信息，请检查后端服务是否运行
+                        <div class="text-text-secondary text-sm mb-4">
+                            暂无 Provider 配置
                         </div>
+                        <button
+                            @click="openAddProvider"
+                            class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors"
+                        >
+                            添加第一个 Provider
+                        </button>
                     </div>
                 </section>
 
@@ -345,15 +376,98 @@
                 </div>
             </div>
         </main>
+
+        <!-- Provider 编辑对话框 -->
+        <div
+            v-if="showProviderDialog"
+            class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            @click.self="closeProviderDialog"
+        >
+            <div class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4">
+                <div class="p-4 border-b border-border">
+                    <h2 class="text-lg font-medium">
+                        {{ editingProvider ? "编辑 Provider" : "添加 Provider" }}
+                    </h2>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">Provider 名称</label>
+                        <input
+                            v-model="providerForm.name"
+                            type="text"
+                            placeholder="例如: openai, anthropic, deepseek"
+                            :disabled="!!editingProvider"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors disabled:opacity-50"
+                        />
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input
+                            v-model="providerForm.enabled"
+                            type="checkbox"
+                            id="provider-enabled"
+                            class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
+                        />
+                        <label for="provider-enabled" class="text-sm">
+                            启用此 Provider
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">API Key</label>
+                        <input
+                            v-model="providerForm.apiKey"
+                            type="password"
+                            placeholder="sk-..."
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">API Base URL</label>
+                        <input
+                            v-model="providerForm.apiBase"
+                            type="text"
+                            placeholder="https://api.openai.com/v1"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+                        />
+                        <p class="text-xs text-text-secondary mt-1">可选，用于自定义 API 端点</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">默认模型</label>
+                        <input
+                            v-model="providerForm.model"
+                            type="text"
+                            placeholder="gpt-4, claude-3-opus, deepseek-chat"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+                        />
+                    </div>
+                </div>
+                <div class="p-4 border-t border-border flex justify-end gap-3">
+                    <button
+                        @click="closeProviderDialog"
+                        class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
+                    >
+                        取消
+                    </button>
+                    <button
+                        @click="handleSaveProvider"
+                        :disabled="!providerForm.name"
+                        class="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+                    >
+                        {{ savingProvider ? "保存中..." : "保存" }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, onMounted, computed, watch, reactive } from "vue";
 import { useRouter } from "vue-router";
 import {
     ArrowLeft as ArrowLeftIcon,
-    Settings as SettingsIcon,
+    Plus as PlusIcon,
+    Edit as EditIcon,
+    Trash as TrashIcon,
     Bot as BotIcon,
     Sparkles as SparklesIcon,
     ChevronRight as ChevronRightIcon,
@@ -409,6 +523,18 @@ const providers = ref([]);
 const loading = ref(true);
 const apiHealth = ref("checking");
 
+// Provider 对话框
+const showProviderDialog = ref(false);
+const editingProvider = ref(null);
+const savingProvider = ref(false);
+const providerForm = reactive({
+    name: "",
+    enabled: true,
+    apiKey: "",
+    apiBase: "",
+    model: ""
+});
+
 // 是否有修改
 const hasChanges = computed(() => {
     return wsUrl.value !== chatStore.wsUrl ||
@@ -462,7 +588,7 @@ async function loadWorkspace() {
 // 设置工作区
 async function handleSetWorkspace() {
     if (!workspace.value) return;
-    
+
     savingWorkspace.value = true;
     try {
         await api.setWorkspace(workspace.value);
@@ -489,7 +615,7 @@ async function loadConfigFile() {
 // 覆盖配置文件
 async function handleOverwriteConfig() {
     if (!configContent.value) return;
-    
+
     savingConfig.value = true;
     try {
         await api.overwriteConfig(configContent.value);
@@ -499,6 +625,99 @@ async function handleOverwriteConfig() {
         alert("保存配置文件失败: " + error.message);
     }
     savingConfig.value = false;
+}
+
+// 打开添加 Provider 对话框
+function openAddProvider() {
+    editingProvider.value = null;
+    providerForm.name = "";
+    providerForm.enabled = true;
+    providerForm.apiKey = "";
+    providerForm.apiBase = "";
+    providerForm.model = "";
+    showProviderDialog.value = true;
+}
+
+// 打开编辑 Provider 对话框
+function openEditProvider(provider) {
+    editingProvider.value = provider;
+    providerForm.name = provider.name;
+    providerForm.enabled = provider.enabled;
+    
+    // 解析 config
+    try {
+        const config = JSON.parse(provider.config || '{}');
+        providerForm.apiKey = config.api_key || "";
+        providerForm.apiBase = config.api_base || "";
+        providerForm.model = config.model || "";
+    } catch {
+        providerForm.apiKey = "";
+        providerForm.apiBase = "";
+        providerForm.model = "";
+    }
+    
+    showProviderDialog.value = true;
+}
+
+// 关闭 Provider 对话框
+function closeProviderDialog() {
+    showProviderDialog.value = false;
+    editingProvider.value = null;
+}
+
+// 保存 Provider
+async function handleSaveProvider() {
+    if (!providerForm.name) return;
+
+    savingProvider.value = true;
+    
+    const config = {
+        api_key: providerForm.apiKey,
+        api_base: providerForm.apiBase,
+        model: providerForm.model
+    };
+    
+    const data = {
+        name: providerForm.name,
+        enabled: providerForm.enabled,
+        config: JSON.stringify(config)
+    };
+
+    try {
+        if (editingProvider.value) {
+            // 更新
+            await api.updateProvider({
+                id: editingProvider.value.id,
+                ...data
+            });
+        } else {
+            // 创建
+            await api.createProvider(data);
+        }
+        
+        await loadProviders();
+        closeProviderDialog();
+    } catch (error) {
+        console.error("保存 Provider 失败:", error);
+        alert("保存 Provider 失败: " + error.message);
+    }
+    
+    savingProvider.value = false;
+}
+
+// 删除 Provider
+async function handleDeleteProvider(provider) {
+    if (!confirm(`确定要删除 Provider "${provider.name}" 吗？`)) {
+        return;
+    }
+
+    try {
+        await api.deleteProvider(provider.id);
+        await loadProviders();
+    } catch (error) {
+        console.error("删除 Provider 失败:", error);
+        alert("删除 Provider 失败: " + error.message);
+    }
 }
 
 // 重置表单
@@ -516,10 +735,16 @@ function handleSave() {
     router.push("/");
 }
 
-// 监听切换到工作区时加载配置文件
+// 监听菜单切换，重新加载对应数据
 watch(activeSection, (newVal) => {
     if (newVal === 'workspace') {
         loadConfigFile();
+    } else if (newVal === 'provider') {
+        loadProviders();
+    } else if (newVal === 'skill') {
+        skillStore.fetchSkills();
+    } else if (newVal === 'connection') {
+        checkHealth();
     }
 });
 

@@ -36,7 +36,7 @@ type ProviderConfig struct {
 	Name    string `gorm:"size:50;uniqueIndex" json:"name"` // openai, anthropic...
 	BaseUrl string `gorm:"size:255" json:"base_url"`        // 基础URL
 	ApiKey  string `gorm:"size:255" json:"api_key"`         // API密钥
-	LLMs    LLMs   `gorm:"type:text" json:"llms"`           // 支持的LLMs
+	LLMs    LLMs   `gorm:"type:text;serializer:json" json:"llms"` // 支持的LLMs
 	Enabled bool   `gorm:"default:false" json:"enabled"`    // 是否启用
 	Config  string `gorm:"type:text" json:"config"`         // JSON配置
 }

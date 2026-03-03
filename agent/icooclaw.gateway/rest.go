@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/docgen"
 	"icooclaw.core/config"
 	"icooclaw.core/consts"
 	"icooclaw.core/storage"
@@ -82,6 +83,8 @@ func (g *RESTGateway) setupRouter() {
 
 	// 注册路由
 	RegisterRoutes(r, g.handlers)
+	// 打印路由
+	docgen.PrintRoutes(r)
 	g.router = r
 }
 
