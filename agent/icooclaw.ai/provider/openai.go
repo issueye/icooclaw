@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"icooclaw.core/consts"
 )
 
 // ============ OpenRouter Provider ============
@@ -126,8 +128,8 @@ func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest, callba
 
 // AnthropicMessage Anthropic 消息格式
 type AnthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    consts.RoleType `json:"role"`
+	Content string          `json:"content"`
 }
 
 // AnthropicRequest Anthropic 请求格式
@@ -143,14 +145,14 @@ type AnthropicRequest struct {
 
 // AnthropicResponse Anthropic 响应格式
 type AnthropicResponse struct {
-	Type         string         `json:"type"`
-	ID           string         `json:"id"`
-	Role         string         `json:"role"`
-	Content      []ContentBlock `json:"content"`
-	Model        string         `json:"model"`
-	StopReason   string         `json:"stop_reason"`
-	StopSequence *string        `json:"stop_sequence"`
-	Usage        AnthropicUsage `json:"usage"`
+	Type         string          `json:"type"`
+	ID           string          `json:"id"`
+	Role         consts.RoleType `json:"role"`
+	Content      []ContentBlock  `json:"content"`
+	Model        string          `json:"model"`
+	StopReason   string          `json:"stop_reason"`
+	StopSequence *string         `json:"stop_sequence"`
+	Usage        AnthropicUsage  `json:"usage"`
 }
 
 // ContentBlock 内容块
@@ -197,7 +199,7 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	for _, msg := range req.Messages {
 		if msg.Role == "system" {
 			// Anthropic 使用特殊的 system 消息
-			messages = append([]AnthropicMessage{{Role: "system", Content: msg.Content}}, messages...)
+			messages = append([]AnthropicMessage{{Role: consts.RoleSystem, Content: msg.Content}}, messages...)
 		} else {
 			messages = append(messages, AnthropicMessage{
 				Role:    msg.Role,

@@ -17,12 +17,12 @@ import (
 
 // ReActConfig ReAct 配置
 type ReActConfig struct {
-	MaxIterations int                   // 最大迭代次数，默认 10
-	Provider      provider.Provider     // LLM 提供者
-	Tools         ToolRegistryInterface // 工具注册表
-	Session       *storage.Session      // 会话
-	Logger        *slog.Logger          // 日志
-	Hooks         hooks.ReActHooks      // 钩子接口
+	MaxIterations int               // 最大迭代次数，默认 10
+	Provider      provider.Provider // LLM 提供者
+	Tools         *tools.Registry   // 工具注册表
+	Session       *storage.Session  // 会话
+	Logger        *slog.Logger      // 日志
+	Hooks         hooks.ReActHooks  // 钩子接口
 }
 
 // NewReActConfig 创建默认配置
@@ -67,12 +67,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		reasoningContent: "",
 		hooks:            hooks,
 		logger:           logger,
-		toolCallsData: make(map[int]*struct {
-			id   string
-			typ  string
-			name string
-			args strings.Builder
-		}),
+		toolCallsData:    make(map[int]*CallData),
 	}
 
 	// 创建流式回调 (在循环外创建，避免重复创建)
@@ -197,14 +192,14 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 			// 添加 assistant 消息（包含 tool_calls）
 			messages = append(messages, provider.Message{
-				Role:      consts.RoleAssistant.ToString(),
+				Role:      consts.RoleAssistant,
 				Content:   content,
 				ToolCalls: []provider.ToolCall{call},
 			})
 
 			// 添加工具结果消息
 			messages = append(messages, provider.Message{
-				Role:       consts.RoleTool.ToString(),
+				Role:       consts.RoleToolResult,
 				Content:    resultContent,
 				ToolCallID: call.ID,
 			})
@@ -221,6 +216,13 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 // ============ 流式回调状态管理 ============
 
+type CallData struct {
+	id   string
+	typ  string
+	name string
+	args strings.Builder
+}
+
 // streamCallbackState 流式回调状态
 type streamCallbackState struct {
 	content          string
@@ -228,12 +230,7 @@ type streamCallbackState struct {
 	hooks            hooks.ReActHooks
 	logger           *slog.Logger
 	// 工具调用累积（按 index 分组）
-	toolCallsData map[int]*struct {
-		id   string
-		typ  string
-		name string
-		args strings.Builder
-	}
+	toolCallsData map[int]*CallData
 }
 
 // createStreamCallback 创建流式回调函数 (在循环外创建)
@@ -285,12 +282,7 @@ func (r *ReActAgent) createStreamCallback(state *streamCallbackState) provider.S
 					tcData.name = tc.Name
 				}
 			} else {
-				tcData := &struct {
-					id   string
-					typ  string
-					name string
-					args strings.Builder
-				}{
+				tcData := &CallData{
 					id:   tc.ID,
 					typ:  tc.Type,
 					name: tc.Name,
@@ -334,7 +326,7 @@ func (r *ReActAgent) buildRequest(ctx context.Context, messages []provider.Messa
 	// 添加系统提示词
 	if systemPrompt != "" {
 		messages = append([]provider.Message{
-			{Role: consts.RoleSystem.ToString(), Content: systemPrompt},
+			{Role: consts.RoleSystem, Content: systemPrompt},
 		}, messages...)
 	}
 	req.Messages = messages

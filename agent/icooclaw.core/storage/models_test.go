@@ -36,9 +36,9 @@ func TestMessage_Structure(t *testing.T) {
 		SessionID:        1,
 		Role:             "user",
 		Content:          "Hello",
-		ToolCalls:        "",
 		ToolCallID:       "",
 		ToolName:         "",
+		ToolArguments:    "",
 		ReasoningContent: "",
 	}
 

@@ -1,22 +1,49 @@
 package storage
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"icooclaw.core/consts"
+)
 
 // Message 消息模型
 type Message struct {
-	Model            `gorm:"embedded"`
-	SessionID        uint   `gorm:"index" json:"session_id"`
-	Role             string `gorm:"size:20;index" json:"role"` // user, assistant, system, tool
-	Content          string `gorm:"type:text" json:"content"`
-	ToolCalls        string `gorm:"type:text" json:"tool_calls"`        // JSON数组
-	ToolCallID       string `gorm:"size:100" json:"tool_call_id"`       // 工具调用ID
-	ToolName         string `gorm:"size:100" json:"tool_name"`          // 工具名称
-	ReasoningContent string `gorm:"type:text" json:"reasoning_content"` // 思考过程
+	Model
+	SessionID        uint            `gorm:"index" json:"session_id"`
+	Role             consts.RoleType `gorm:"size:20;index" json:"role"`          // user, assistant, system, tool_call, tool_result
+	Content          string          `gorm:"type:text" json:"content"`           // 消息内容
+	ToolCallID       string          `gorm:"size:100" json:"tool_call_id"`       // 工具调用ID
+	ToolName         string          `gorm:"size:100" json:"tool_name"`          // 工具名称
+	ToolArguments    string          `gorm:"type:text" json:"tool_arguments"`    // 工具参数
+	ToolResult       string          `gorm:"type:text" json:"tool_result"`       // 工具结果
+	ToolResultError  string          `gorm:"type:text" json:"tool_result_error"` // 工具结果错误
+	Thinking         string          `gorm:"type:text" json:"thinking"`          // 思考过程
+	ReasoningContent string          `gorm:"type:text" json:"reasoning_content"` // 思考过程
 }
 
 // TableName 表名
 func (Message) TableName() string {
 	return tableNamePrefix + "messages"
+}
+
+func NewMessage() *Message {
+	return &Message{}
+}
+
+func NewUserMessage(sessionID uint, content string) *Message {
+	return &Message{
+		SessionID: sessionID,
+		Role:      consts.RoleUser,
+		Content:   content,
+	}
+}
+
+func NewAssistantMessage(sessionID uint, content string, reasoningContent string) *Message {
+	return &Message{
+		SessionID:        sessionID,
+		Role:             consts.RoleAssistant,
+		Content:          content,
+		ReasoningContent: reasoningContent,
+	}
 }
 
 // MessageStorage 消息存储

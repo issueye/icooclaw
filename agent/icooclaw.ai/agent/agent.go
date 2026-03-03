@@ -15,7 +15,6 @@ import (
 	"icooclaw.ai/tools"
 	icooclawbus "icooclaw.core/bus"
 	"icooclaw.core/config"
-	"icooclaw.core/consts"
 	"icooclaw.core/storage"
 )
 
@@ -28,12 +27,12 @@ type SessionMetadata struct {
 type Agent struct {
 	name      string
 	provider  provider.Provider
-	tools     ToolRegistryInterface
-	storage   StorageInterface
+	tools     *tools.Registry
+	storage   *storage.Storage
 	memory    MemoryStoreInterface
 	skills    SkillLoaderInterface
 	config    config.AgentSettings
-	bus       MessageBusInterface
+	bus       *icooclawbus.MessageBus
 	logger    *slog.Logger
 	workspace string
 }
@@ -42,7 +41,7 @@ type Agent struct {
 type AgentOption func(*Agent)
 
 // WithTools 设置工具注册表
-func WithTools(registry ToolRegistryInterface) AgentOption {
+func WithTools(registry *tools.Registry) AgentOption {
 	return func(a *Agent) {
 		a.tools = registry
 	}
@@ -63,7 +62,7 @@ func WithSkillLoader(loader SkillLoaderInterface) AgentOption {
 }
 
 // WithMessageBus 设置消息总线
-func WithMessageBus(bus MessageBusInterface) AgentOption {
+func WithMessageBus(bus *icooclawbus.MessageBus) AgentOption {
 	return func(a *Agent) {
 		a.bus = bus
 	}
@@ -73,7 +72,7 @@ func WithMessageBus(bus MessageBusInterface) AgentOption {
 func NewAgent(
 	name string,
 	provider provider.Provider,
-	storageIntf StorageInterface,
+	storageIntf *storage.Storage,
 	config config.AgentSettings,
 	logger *slog.Logger,
 	workspace string,
@@ -138,15 +137,15 @@ func (a *Agent) SetProvider(p provider.Provider) {
 	a.logger.Info("Provider switched", "name", p.GetName(), "model", p.GetDefaultModel())
 }
 
-func (a *Agent) Tools() ToolRegistryInterface {
-	return a.tools
+func (a *Agent) Tools() []tools.Tool {
+	return a.tools.List()
 }
 
-func (a *Agent) SetTools(registry ToolRegistryInterface) {
+func (a *Agent) SetTools(registry *tools.Registry) {
 	a.tools = registry
 }
 
-func (a *Agent) Storage() StorageInterface {
+func (a *Agent) Storage() *storage.Storage {
 	return a.storage
 }
 
@@ -168,39 +167,39 @@ func (a *Agent) Memory() MemoryStoreInterface {
 
 func (a *Agent) RegisterTool(tool tools.Tool) {
 	a.tools.Register(tool)
-	a.logger.Info("Registered tool", "name", tool.Name())
+	a.logger.Info("注册工具成功", "name", tool.Name())
 }
 
 func (a *Agent) Init(ctx context.Context) error {
 	if err := a.skills.Load(ctx); err != nil {
-		return fmt.Errorf("failed to load skills: %w", err)
+		return fmt.Errorf("加载技能失败: %w", err)
 	}
 
 	for _, skill := range a.skills.GetLoaded() {
-		a.logger.Debug("Loaded skill", "name", skill.Name)
+		a.logger.Debug("加载技能成功", "name", skill.Name)
 	}
 
 	if err := a.memory.Load(ctx); err != nil {
-		a.logger.Warn("Failed to load memory", "error", err)
+		a.logger.Warn("加载记忆失败", "error", err)
 	}
 
-	a.logger.Info("Agent initialized", "name", a.name)
+	a.logger.Info("初始化 Agent 成功", "name", a.name)
 	return nil
 }
 
-func (a *Agent) Run(ctx context.Context, messageBus MessageBusInterface) {
+func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 	a.bus = messageBus
 	if err := a.Init(ctx); err != nil {
-		a.logger.Error("Failed to initialize agent", "error", err)
+		a.logger.Error("初始化 Agent 失败", "error", err)
 		return
 	}
 
-	a.logger.Info("Agent started", "name", a.name)
+	a.logger.Info("启动 Agent", "name", a.name)
 
 	for {
 		select {
 		case <-ctx.Done():
-			a.logger.Info("Agent stopped", "name", a.name)
+			a.logger.Info("停止 Agent 成功", "name", a.name)
 			return
 		default:
 			msg, err := messageBus.ConsumeInbound(ctx)
@@ -208,7 +207,7 @@ func (a *Agent) Run(ctx context.Context, messageBus MessageBusInterface) {
 				if ctx.Err() != nil {
 					return
 				}
-				a.logger.Error("Failed to consume message", "error", err)
+				a.logger.Error("消费消息失败", "error", err)
 				continue
 			}
 
@@ -229,27 +228,29 @@ func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessag
 		"user_id", msg.UserID,
 		"content", msg.Content)
 
-	session, err := a.storage.GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)
+	session, err := a.storage.Session().GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)
 	if err != nil {
-		a.logger.Error("Failed to get or create session", "error", err)
+		a.logger.Error("获取或创建会话失败", "error", err)
 		return
 	}
 
-	_, err = a.storage.AddMessage(session.ID, "user", msg.Content, "", "", "", "")
+	userMsg := storage.NewUserMessage(session.ID, msg.Content)
+	err = a.storage.Message().CreateOrUpdate(userMsg)
 	if err != nil {
-		a.logger.Error("Failed to add user message", "error", err)
+		a.logger.Error("添加用户消息失败", "error", err)
 		return
 	}
 
 	contextBuilder := NewContextBuilder(a, session)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
-		a.logger.Error("Failed to build context", "error", err)
+		a.logger.Error("构建上下文失败", "error", err)
 		return
 	}
 
 	clientID, _ := msg.Metadata["client_id"].(string)
 
+	// 处理 OnLLMChunk 钩子
 	onChunk := func(chunk, thinking string) {
 		if a.bus != nil {
 			if chunk != "" {
@@ -278,23 +279,15 @@ func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessag
 	// 使用解耦的 LoopHooks
 	reactCfg := NewReActConfig()
 	reactCfg.Provider = a.Provider()
-	reactCfg.Tools = a.Tools()
+	reactCfg.Tools = a.tools
 	reactCfg.Session = session
 	reactCfg.Logger = a.logger
-	reactCfg.Hooks = NewLoopHooks(
-		a.storage,
-		a.bus,
-		onChunk,
-		msg.ChatID,
-		clientID,
-		session,
-		a.logger,
-	)
+	reactCfg.Hooks = NewLoopHooks(a.storage, a.bus, onChunk, msg.ChatID, clientID, session, a.logger)
 
 	reactAgent := NewReActAgent(reactCfg)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
-		a.logger.Error("Agent loop failed", "error", err)
+		a.logger.Error("处理消息时出错失败", "error", err)
 		if a.bus != nil {
 			a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
 				Type:      icooclawbus.MessageTypeError,
@@ -320,14 +313,17 @@ func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessag
 
 	toolCallsJSON, err := json.Marshal(toolCalls)
 	if err != nil {
-		a.logger.Warn("Failed to marshal tool calls", "error", err)
-	}
-	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", reasoningContent)
-	if err != nil {
-		a.logger.Error("Failed to save assistant message", "error", err)
+		a.logger.Warn("序列化工具调用失败失败", "error", err)
 	}
 
-	a.logger.Info("Message handled", "response_length", len(response))
+	assistantMsg := storage.NewAssistantMessage(session.ID, response, reasoningContent)
+	assistantMsg.ToolResult = string(toolCallsJSON)
+	err = a.storage.Message().CreateOrUpdate(assistantMsg)
+	if err != nil {
+		a.logger.Error("添加助手消息失败", "error", err)
+	}
+
+	a.logger.Info("处理消息成功", "response_length", len(response))
 }
 
 func (a *Agent) SetSystemPrompt(prompt string) {
@@ -339,12 +335,13 @@ func (a *Agent) GetSystemPrompt() string {
 }
 
 func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, error) {
-	session, err := a.storage.GetOrCreateSession("cli", "cli-session", "cli-user")
+	session, err := a.storage.Session().GetOrCreateSession("cli", "cli-session", "cli-user")
 	if err != nil {
 		return "", fmt.Errorf("failed to get or create session: %w", err)
 	}
 
-	_, err = a.storage.AddMessage(session.ID, "user", content, "", "", "", "")
+	userMsg := storage.NewUserMessage(session.ID, content)
+	err = a.storage.Message().CreateOrUpdate(userMsg)
 	if err != nil {
 		return "", fmt.Errorf("failed to add user message: %w", err)
 	}
@@ -357,7 +354,7 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 
 	reactCfg := NewReActConfig()
 	reactCfg.Provider = a.Provider()
-	reactCfg.Tools = a.Tools()
+	reactCfg.Tools = a.tools
 	reactCfg.Session = session
 	reactCfg.Logger = a.logger
 	reactCfg.Hooks = &hooks.DefaultHooks{}
@@ -372,16 +369,19 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 	if err != nil {
 		a.logger.Warn("Failed to marshal tool calls", "error", err)
 	}
-	_, err = a.storage.AddMessage(session.ID, "assistant", response, string(toolCallsJSON), "", "", reasoningContent)
+
+	assistantMsg := storage.NewAssistantMessage(session.ID, response, reasoningContent)
+	assistantMsg.ToolResult = string(toolCallsJSON)
+	err = a.storage.Message().CreateOrUpdate(assistantMsg)
 	if err != nil {
-		a.logger.Warn("Failed to save assistant message", "error", err)
+		a.logger.Error("添加助手消息失败", "error", err)
 	}
 
 	return response, nil
 }
 
 func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
-	session, err := a.storage.GetSession(sessionID)
+	session, err := a.storage.Session().GetByID(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -400,11 +400,11 @@ func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	return a.storage.UpdateSessionMetadata(sessionID, string(metadataJSON))
+	return a.storage.Session().UpdateSessionMetadata(sessionID, string(metadataJSON))
 }
 
 func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
-	session, err := a.storage.GetSession(sessionID)
+	session, err := a.storage.Session().GetByID(sessionID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
 	}
@@ -505,139 +505,4 @@ func (a *Agent) UpdateMemoryFile(section, content string) error {
 	}
 
 	return os.WriteFile(memoryPath, []byte(result.String()), 0644)
-}
-
-// LoopHooks ReAct 钩子实现（解耦版本）
-type LoopHooks struct {
-	storage  StorageInterface
-	bus      MessageBusInterface
-	onChunk  hooks.OnChunkFunc
-	chatID   string
-	clientID string
-	session  *storage.Session
-	logger   *slog.Logger
-}
-
-// NewLoopHooks 创建解耦的 LoopHooks
-func NewLoopHooks(
-	storage StorageInterface,
-	bus MessageBusInterface,
-	onChunk hooks.OnChunkFunc,
-	chatID, clientID string,
-	session *storage.Session,
-	logger *slog.Logger,
-) *LoopHooks {
-	return &LoopHooks{
-		storage:  storage,
-		bus:      bus,
-		onChunk:  onChunk,
-		chatID:   chatID,
-		clientID: clientID,
-		session:  session,
-		logger:   logger,
-	}
-}
-
-func (h *LoopHooks) OnLLMRequest(ctx context.Context, req *provider.ChatRequest, iteration int) error {
-	return nil
-}
-
-func (h *LoopHooks) OnLLMChunk(ctx context.Context, content, thinking string) error {
-	if h.onChunk != nil {
-		h.onChunk(content, thinking)
-	}
-	return nil
-}
-
-func (h *LoopHooks) OnLLMResponse(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iteration int) error {
-	return nil
-}
-
-func (h *LoopHooks) OnToolCall(ctx context.Context, toolCallID string, toolName string, arguments string) error {
-	if h.storage != nil && h.session != nil {
-		_, err := h.storage.AddMessage(
-			h.session.ID,
-			consts.RoleToolCall.ToString(),
-			"",
-			arguments,
-			toolCallID,
-			toolName,
-			"",
-		)
-		if err != nil {
-			h.logger.Error("Failed to save tool call message", "tool", toolName, "error", err)
-		}
-	}
-
-	if h.bus != nil {
-		h.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
-			Type:       "tool_call",
-			ID:         toolCallID,
-			ToolCallID: toolCallID,
-			ToolName:   toolName,
-			Arguments:  arguments,
-			Status:     "running",
-			ChatID:     h.chatID,
-			Timestamp:  time.Now(),
-			Metadata:   map[string]interface{}{"client_id": h.clientID},
-		})
-	}
-	return nil
-}
-
-func (h *LoopHooks) OnToolResult(ctx context.Context, toolCallID string, toolName string, result tools.ToolResult) error {
-	if h.storage != nil && h.session != nil {
-		resultContent := result.Content
-		if result.Error != nil {
-			resultContent = fmt.Sprintf("Error: %v", result.Error)
-		}
-		_, err := h.storage.AddMessage(
-			h.session.ID,
-			consts.RoleTool.ToString(),
-			resultContent,
-			"",
-			toolCallID,
-			toolName,
-			"",
-		)
-		if err != nil {
-			h.logger.Error("Failed to save tool result message", "tool", toolName, "error", err)
-		}
-	}
-
-	if h.bus != nil {
-		status := "completed"
-		errorMsg := ""
-		if result.Error != nil {
-			status = "error"
-			errorMsg = result.Error.Error()
-		}
-		h.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
-			Type:       "tool_result",
-			ID:         toolCallID,
-			ToolCallID: toolCallID,
-			ToolName:   toolName,
-			Content:    result.Content,
-			Error:      errorMsg,
-			Status:     status,
-			ChatID:     h.chatID,
-			Timestamp:  time.Now(),
-			Metadata:   map[string]interface{}{"client_id": h.clientID},
-		})
-	}
-	return nil
-}
-
-func (h *LoopHooks) OnIterationStart(ctx context.Context, iteration int, messages []provider.Message) error {
-	return nil
-}
-
-func (h *LoopHooks) OnIterationEnd(ctx context.Context, iteration int, hasToolCalls bool) error {
-	return nil
-}
-
-func (h *LoopHooks) OnError(ctx context.Context, err error) error { return nil }
-
-func (h *LoopHooks) OnComplete(ctx context.Context, content, reasoningContent string, toolCalls []provider.ToolCall, iterations int) error {
-	return nil
 }

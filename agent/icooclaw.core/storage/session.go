@@ -2,6 +2,7 @@ package storage
 
 import (
 	"gorm.io/gorm"
+	"icooclaw.core/consts"
 )
 
 // Session 会话模型
@@ -59,6 +60,17 @@ func (s *SessionStorage) GetByID(id uint) (*Session, error) {
 	return &session, err
 }
 
+func (s *SessionStorage) GetOrCreateSession(channel, chatID, userID string) (*Session, error) {
+	session := &Session{
+		Key:     channel + ":" + chatID,
+		Channel: channel,
+		ChatID:  chatID,
+		UserID:  userID,
+	}
+	err := s.CreateOrUpdate(session)
+	return session, err
+}
+
 // GetByName 通过名称获取会话
 func (s *SessionStorage) GetByName(name string) (*Session, error) {
 	var session Session
@@ -103,18 +115,23 @@ func (s *SessionStorage) Page(q *QuerySession) (*ResQuerySession, error) {
 }
 
 // AddMessage 添加消息到会话
-func (s *SessionStorage) AddMessage(sessionID uint, role, content, toolCalls, toolCallID, toolName, reasoningContent string) (*Message, error) {
+func (s *SessionStorage) AddMessage(sessionID uint, role consts.RoleType, content, reasoningContent, toolCallID, toolName, toolArguments, toolResult string) (*Message, error) {
 	msg := Message{
 		SessionID:        sessionID,
 		Role:             role,
 		Content:          content,
-		ToolCalls:        toolCalls,
 		ToolCallID:       toolCallID,
 		ToolName:         toolName,
+		ToolArguments:    toolArguments,
+		ToolResult:       toolResult,
 		ReasoningContent: reasoningContent,
 	}
 	err := s.db.Create(&msg).Error
 	return &msg, err
+}
+
+func (s *SessionStorage) UpdateSessionMetadata(sessionID uint, metadata string) error {
+	return s.db.Model(&Session{}).Where("id = ?", sessionID).Update("metadata", metadata).Error
 }
 
 // GetMessages 获取会话消息

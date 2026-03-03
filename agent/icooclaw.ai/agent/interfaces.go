@@ -6,7 +6,6 @@ import (
 
 	"icooclaw.ai/provider"
 	"icooclaw.ai/skill"
-	"icooclaw.ai/tools"
 	"icooclaw.core/config"
 	"icooclaw.core/storage"
 
@@ -16,35 +15,6 @@ import (
 )
 
 // ============ 核心接口定义 ============
-
-// StorageInterface 存储接口
-// 封装会话和消息的持久化操作
-type StorageInterface interface {
-	GetOrCreateSession(channel, chatID, userID string) (*storage.Session, error)
-	AddMessage(sessionID uint, role, content, toolCalls, toolCallID, toolName, reasoningContent string) (*storage.Message, error)
-	GetSession(sessionID uint) (*storage.Session, error)
-	UpdateSessionMetadata(sessionID uint, metadata string) error
-	// Task operations
-	CreateTask(task *storage.Task) error
-	GetTaskByName(name string) (*storage.Task, error)
-	GetAllTasks() ([]storage.Task, error)
-	DeleteTask(id uint) error
-}
-
-// 确保 *storage.Storage 实现该接口
-// var _ StorageInterface = (*storage.Storage)(nil)
-
-// ToolRegistryInterface 工具注册表接口
-// 封装工具的注册、查询和执行
-type ToolRegistryInterface interface {
-	Register(tool tools.Tool)
-	Get(name string) (tools.Tool, error)
-	ToDefinitions() []tools.ToolDefinition
-	Execute(ctx context.Context, call interface{}) tools.ToolResult
-}
-
-// 确保 *tools.Registry 实现该接口
-var _ ToolRegistryInterface = (*tools.Registry)(nil)
 
 // MemoryStoreInterface 记忆存储接口
 // 封装长期记忆的加载和管理

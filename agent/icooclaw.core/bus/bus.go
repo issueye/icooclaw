@@ -23,32 +23,44 @@ func (m MessageType) ToString() string {
 	return string(m)
 }
 
+type MessageStatus string
+
+const (
+	MessageStatusRunning   MessageStatus = "running"
+	MessageStatusCompleted MessageStatus = "completed"
+	MessageStatusError     MessageStatus = "error"
+)
+
+func (s MessageStatus) ToString() string {
+	return string(s)
+}
+
 // InboundMessage 接收消息
 type InboundMessage struct {
-	ID        string
-	Channel   string
-	ChatID    string
-	UserID    string
-	Content   string
-	Timestamp time.Time
-	Metadata  map[string]interface{}
+	ID        string         `json:"id,omitempty"`        // 消息ID
+	Channel   string         `json:"channel,omitempty"`   // 通道
+	ChatID    string         `json:"chat_id,omitempty"`   // 会话ID
+	UserID    string         `json:"user_id,omitempty"`   // 用户ID
+	Content   string         `json:"content,omitempty"`   // 内容
+	Timestamp time.Time      `json:"timestamp,omitempty"` // 时间戳
+	Metadata  map[string]any `json:"metadata,omitempty"`  // 元数据
 }
 
 // OutboundMessage 发送消息
 type OutboundMessage struct {
-	ID         string                 `json:"id,omitempty"`
-	Type       MessageType            `json:"type"` // "message", "chunk", "chunk_end", "tool_call", "tool_result", "error", "thinking"
-	Channel    string                 `json:"channel,omitempty"`
-	ChatID     string                 `json:"chat_id,omitempty"`
-	Content    string                 `json:"content,omitempty"`
-	Thinking   string                 `json:"thinking,omitempty"`
-	ToolName   string                 `json:"tool_name,omitempty"`
-	ToolCallID string                 `json:"tool_call_id,omitempty"`
-	Arguments  string                 `json:"arguments,omitempty"`
-	Status     string                 `json:"status,omitempty"` // "running", "completed", "error"
-	Error      string                 `json:"error,omitempty"`
-	Timestamp  time.Time              `json:"timestamp"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+	ID         string         `json:"id,omitempty"`           // 消息ID
+	Type       MessageType    `json:"type,omitempty"`         // 消息类型
+	Channel    string         `json:"channel,omitempty"`      // 通道
+	ChatID     string         `json:"chat_id,omitempty"`      // 会话ID
+	Content    string         `json:"content,omitempty"`      // 内容
+	Thinking   string         `json:"thinking,omitempty"`     // 思考内容
+	ToolName   string         `json:"tool_name,omitempty"`    // 工具名称
+	ToolCallID string         `json:"tool_call_id,omitempty"` // 工具调用ID
+	Arguments  string         `json:"arguments,omitempty"`    // 工具调用参数
+	Status     MessageStatus  `json:"status,omitempty"`       // 状态
+	Error      string         `json:"error,omitempty"`        // 错误信息
+	Timestamp  time.Time      `json:"timestamp,omitempty"`    // 时间戳
+	Metadata   map[string]any `json:"metadata,omitempty"`     // 元数据
 }
 
 // MessageBus 异步消息队列

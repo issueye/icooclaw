@@ -3,12 +3,12 @@ package consts
 type RoleType string
 
 const (
-	RoleUser      RoleType = "user"
-	RoleAgent     RoleType = "agent"
-	RoleSystem    RoleType = "system"
-	RoleTool      RoleType = "tool"
-	RoleToolCall  RoleType = "tool_call"
-	RoleAssistant RoleType = "assistant"
+	RoleUser       RoleType = "user"
+	RoleAgent      RoleType = "agent"
+	RoleSystem     RoleType = "system"
+	RoleAssistant  RoleType = "assistant"
+	RoleToolCall   RoleType = "tool_call"
+	RoleToolResult RoleType = "tool_result"
 )
 
 func (r RoleType) ToString() string {

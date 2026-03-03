@@ -10,16 +10,18 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"icooclaw.core/consts"
 )
 
 // Message 消息结构
 type Message struct {
-	Role             string     `json:"role"`
-	Content          string     `json:"content"`
-	ReasoningContent string     `json:"reasoning_content,omitempty"`
-	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID       string     `json:"tool_call_id,omitempty"`
-	Name             string     `json:"name,omitempty"`
+	Role             consts.RoleType `json:"role"`
+	Content          string          `json:"content"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        []ToolCall      `json:"tool_calls,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
+	Name             string          `json:"name,omitempty"`
 }
 
 // ToolCall 工具调用
@@ -246,8 +248,8 @@ func (p *BaseProvider) sendRequest(ctx context.Context, req *http.Request) (*Cha
 
 // APIErrorResponse API 错误响应结构
 type APIErrorResponse struct {
-	Type      string `json:"type"`
-	Error     struct {
+	Type  string `json:"type"`
+	Error struct {
 		Type     string `json:"type"`
 		Message  string `json:"message"`
 		HTTPCode string `json:"http_code"`

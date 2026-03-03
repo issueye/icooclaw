@@ -14,7 +14,6 @@ func TestRoleType_String(t *testing.T) {
 		{RoleUser, "user"},
 		{RoleAgent, "agent"},
 		{RoleSystem, "system"},
-		{RoleTool, "tool"},
 		{RoleToolCall, "tool_call"},
 		{RoleAssistant, "assistant"},
 	}
@@ -31,7 +30,6 @@ func TestRoleType_Constants(t *testing.T) {
 	assert.Equal(t, RoleType("user"), RoleUser)
 	assert.Equal(t, RoleType("agent"), RoleAgent)
 	assert.Equal(t, RoleType("system"), RoleSystem)
-	assert.Equal(t, RoleType("tool"), RoleTool)
 	assert.Equal(t, RoleType("tool_call"), RoleToolCall)
 	assert.Equal(t, RoleType("assistant"), RoleAssistant)
 }
@@ -46,18 +44,18 @@ func TestRoleType_Type(t *testing.T) {
 func TestRoleType_Usage(t *testing.T) {
 	// 模拟实际使用场景
 	roles := map[RoleType]string{
-		RoleUser:      "用户消息",
-		RoleAgent:     "Agent 消息",
-		RoleSystem:    "系统消息",
-		RoleTool:      "工具返回",
-		RoleToolCall:  "工具调用",
-		RoleAssistant: "助手消息",
+		RoleUser:       "用户消息",
+		RoleAgent:      "Agent 消息",
+		RoleSystem:     "系统消息",
+		RoleToolCall:   "工具调用",
+		RoleToolResult: "工具返回",
+		RoleAssistant:  "助手消息",
 	}
 
 	assert.Equal(t, "用户消息", roles[RoleUser])
 	assert.Equal(t, "Agent 消息", roles[RoleAgent])
 	assert.Equal(t, "系统消息", roles[RoleSystem])
-	assert.Equal(t, "工具返回", roles[RoleTool])
+	assert.Equal(t, "工具返回", roles[RoleToolResult])
 	assert.Equal(t, "工具调用", roles[RoleToolCall])
 	assert.Equal(t, "助手消息", roles[RoleAssistant])
 }
@@ -81,8 +79,8 @@ func TestRoleType_SwitchCase(t *testing.T) {
 			return "agent"
 		case RoleSystem:
 			return "system"
-		case RoleTool:
-			return "tool"
+		case RoleToolResult:
+			return "tool_result"
 		case RoleToolCall:
 			return "tool_call"
 		case RoleAssistant:
@@ -95,7 +93,7 @@ func TestRoleType_SwitchCase(t *testing.T) {
 	assert.Equal(t, "user", getRoleName(RoleUser))
 	assert.Equal(t, "agent", getRoleName(RoleAgent))
 	assert.Equal(t, "system", getRoleName(RoleSystem))
-	assert.Equal(t, "tool", getRoleName(RoleTool))
+	assert.Equal(t, "tool_result", getRoleName(RoleToolResult))
 	assert.Equal(t, "tool_call", getRoleName(RoleToolCall))
 	assert.Equal(t, "assistant", getRoleName(RoleAssistant))
 	assert.Equal(t, "unknown", getRoleName(RoleType("custom")))

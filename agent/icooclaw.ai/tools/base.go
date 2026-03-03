@@ -8,12 +8,20 @@ import (
 	"icooclaw.ai/provider"
 )
 
+type ToolIntf interface {
+	Name() string
+	Description() string
+	ToDefinition() ToolDefinition
+	Execute(ctx context.Context, params map[string]any) (string, error)
+	Parameters() map[string]any
+}
+
 // Tool 工具接口
 type Tool interface {
 	Name() string
 	Description() string
-	Parameters() map[string]interface{}
-	Execute(ctx context.Context, params map[string]interface{}) (string, error)
+	Parameters() map[string]any
+	Execute(ctx context.Context, params map[string]any) (string, error)
 	ToDefinition() ToolDefinition
 }
 
@@ -21,16 +29,16 @@ type Tool interface {
 type BaseTool struct {
 	name        string
 	description string
-	parameters  map[string]interface{}
-	executor    func(ctx context.Context, params map[string]interface{}) (string, error)
+	parameters  map[string]any
+	executor    func(ctx context.Context, params map[string]any) (string, error)
 }
 
 // NewBaseTool 创建基础工具
 func NewBaseTool(
 	name string,
 	description string,
-	parameters map[string]interface{},
-	executor func(ctx context.Context, params map[string]interface{}) (string, error),
+	parameters map[string]any,
+	executor func(ctx context.Context, params map[string]any) (string, error),
 ) *BaseTool {
 	return &BaseTool{
 		name:        name,
@@ -51,12 +59,12 @@ func (t *BaseTool) Description() string {
 }
 
 // Parameters 获取参数定义
-func (t *BaseTool) Parameters() map[string]interface{} {
+func (t *BaseTool) Parameters() map[string]any {
 	return t.parameters
 }
 
 // Execute 执行工具
-func (t *BaseTool) Execute(ctx context.Context, params map[string]interface{}) (string, error) {
+func (t *BaseTool) Execute(ctx context.Context, params map[string]any) (string, error) {
 	return t.executor(ctx, params)
 }
 
@@ -80,9 +88,9 @@ type ToolDefinition struct {
 
 // FunctionDefinition 函数定义
 type FunctionDefinition struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters"`
 }
 
 // ToolCall 工具调用
@@ -107,18 +115,18 @@ type ToolResult struct {
 
 // Registry 工具注册表
 type Registry struct {
-	tools map[string]Tool
+	tools map[string]ToolIntf
 }
 
 // NewRegistry 创建注册表
 func NewRegistry() *Registry {
 	return &Registry{
-		tools: make(map[string]Tool),
+		tools: make(map[string]ToolIntf),
 	}
 }
 
 // Register 注册工具
-func (r *Registry) Register(tool Tool) {
+func (r *Registry) Register(tool ToolIntf) {
 	r.tools[tool.Name()] = tool
 }
 
@@ -156,7 +164,7 @@ func (r *Registry) Count() int {
 
 // Execute 执行工具调用
 // call 可以是 tools.ToolCall 或 provider.ToolCall
-func (r *Registry) Execute(ctx context.Context, call interface{}) ToolResult {
+func (r *Registry) Execute(ctx context.Context, call any) ToolResult {
 	// 使用反射或类型断言来处理不同的ToolCall类型
 	var toolCallID, toolName string
 	var arguments json.RawMessage
@@ -188,7 +196,7 @@ func (r *Registry) Execute(ctx context.Context, call interface{}) ToolResult {
 	}
 
 	// 解析参数
-	var params map[string]interface{}
+	var params map[string]any
 	if err := json.Unmarshal(arguments, &params); err != nil {
 		return ToolResult{
 			ToolCallID: toolCallID,
