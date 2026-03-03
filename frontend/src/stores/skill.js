@@ -22,7 +22,7 @@ export const useSkillStore = defineStore('skill', () => {
   );
 
   const userSkills = computed(() =>
-    skills.value.filter(s => s.source === 'user')
+    skills.value.filter(s => s.source === 'workspace' || s.source === 'user')
   );
 
   // ===== 操作 =====
@@ -30,11 +30,37 @@ export const useSkillStore = defineStore('skill', () => {
     loading.value = true;
     error.value = null;
     try {
-      const data = await api.getSkills();
-      skills.value = data.skills || [];
+      const response = await api.getSkills();
+      // API 返回格式: { code, message, data: [...] }
+      skills.value = response.data || [];
     } catch (e) {
       error.value = e.message;
       skills.value = [];
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchEnabledSkills() {
+    loading.value = true;
+    error.value = null;
+    try {
+      const response = await api.getEnabledSkills();
+      skills.value = response.data || [];
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchSkillsPage(params = {}) {
+    loading.value = true;
+    error.value = null;
+    try {
+      const response = await api.getSkillsPage(params);
+      return response.data;
+    } catch (e) {
+      error.value = e.message;
+      throw e;
     } finally {
       loading.value = false;
     }
@@ -44,9 +70,9 @@ export const useSkillStore = defineStore('skill', () => {
     loading.value = true;
     error.value = null;
     try {
-      const newSkill = await api.createSkill(skillData);
-      skills.value.push(newSkill);
-      return newSkill;
+      const response = await api.createSkill(skillData);
+      skills.value.push(response.data);
+      return response.data;
     } catch (e) {
       error.value = e.message;
       throw e;
@@ -55,16 +81,32 @@ export const useSkillStore = defineStore('skill', () => {
     }
   }
 
-  async function updateSkill(id, skillData) {
+  async function updateSkill(skillData) {
     loading.value = true;
     error.value = null;
     try {
-      const updated = await api.updateSkill(id, skillData);
-      const idx = skills.value.findIndex(s => s.id === id);
+      const response = await api.updateSkill(skillData);
+      const idx = skills.value.findIndex(s => s.id === skillData.id);
       if (idx !== -1) {
-        skills.value[idx] = updated;
+        skills.value[idx] = response.data;
       }
-      return updated;
+      return response.data;
+    } catch (e) {
+      error.value = e.message;
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function upsertSkill(skillData) {
+    loading.value = true;
+    error.value = null;
+    try {
+      const response = await api.upsertSkill(skillData);
+      // 刷新列表
+      await fetchSkills();
+      return response.data;
     } catch (e) {
       error.value = e.message;
       throw e;
@@ -90,8 +132,12 @@ export const useSkillStore = defineStore('skill', () => {
   async function toggleSkill(id) {
     const skill = skills.value.find(s => s.id === id);
     if (skill) {
-      return updateSkill(id, { ...skill, enabled: !skill.enabled });
+      return updateSkill({ ...skill, enabled: !skill.enabled });
     }
+  }
+
+  function getSkillByName(name) {
+    return skills.value.find(s => s.name === name);
   }
 
   return {
@@ -106,9 +152,13 @@ export const useSkillStore = defineStore('skill', () => {
     userSkills,
     // 操作
     fetchSkills,
+    fetchEnabledSkills,
+    fetchSkillsPage,
     createSkill,
     updateSkill,
+    upsertSkill,
     deleteSkill,
     toggleSkill,
+    getSkillByName,
   };
 });

@@ -91,6 +91,13 @@
                                             "
                                         ></span>
                                     </button>
+                                    <!-- 编辑按钮 -->
+                                    <button
+                                        @click="openEditDialog(skill)"
+                                        class="p-2 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-accent transition-colors"
+                                    >
+                                        <EditIcon :size="16" />
+                                    </button>
                                     <!-- 删除按钮 -->
                                     <button
                                         @click="handleDelete(skill)"
@@ -152,25 +159,6 @@
                                     </button>
                                 </div>
                             </div>
-
-                            <!-- 用户技能描述 -->
-                            <div
-                                v-if="
-                                    !skill.builtin &&
-                                    skillStore.userSkills.includes(skill)
-                                "
-                                class="mt-3 pt-3 border-t border-border"
-                            >
-                                <label class="text-xs text-text-secondary"
-                                    >描述</label
-                                >
-                                <textarea
-                                    v-model="skill.description"
-                                    @blur="updateSkill(skill)"
-                                    rows="2"
-                                    class="w-full mt-1 px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary outline-none placeholder-text-muted focus:border-accent/60 resize-none"
-                                ></textarea>
-                            </div>
                         </div>
                     </div>
                 </section>
@@ -199,17 +187,19 @@
             </div>
         </main>
 
-        <!-- 添加技能对话框 -->
+        <!-- 添加/编辑技能对话框 -->
         <div
-            v-if="showAddDialog"
+            v-if="showAddDialog || editingSkill"
             class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            @click.self="showAddDialog = false"
+            @click.self="closeDialog"
         >
             <div
                 class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4"
             >
                 <div class="p-4 border-b border-border">
-                    <h2 class="text-lg font-medium">添加技能</h2>
+                    <h2 class="text-lg font-medium">
+                        {{ editingSkill ? "编辑技能" : "添加技能" }}
+                    </h2>
                 </div>
                 <div class="p-4 space-y-4">
                     <div>
@@ -217,10 +207,11 @@
                             >技能名称</label
                         >
                         <input
-                            v-model="newSkill.name"
+                            v-model="formData.name"
                             type="text"
                             placeholder="例如: code_review"
-                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
+                            :disabled="!!editingSkill"
+                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors disabled:opacity-50"
                         />
                     </div>
                     <div>
@@ -228,7 +219,7 @@
                             >描述</label
                         >
                         <input
-                            v-model="newSkill.description"
+                            v-model="formData.description"
                             type="text"
                             placeholder="技能功能描述"
                             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
@@ -239,7 +230,7 @@
                             >技能内容 (Markdown)</label
                         >
                         <textarea
-                            v-model="newSkill.content"
+                            v-model="formData.content"
                             placeholder="## 技能名称&#10;技能描述和指令..."
                             rows="8"
                             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors font-mono text-sm"
@@ -247,7 +238,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <input
-                            v-model="newSkill.always_load"
+                            v-model="formData.always_load"
                             type="checkbox"
                             id="always_load"
                             class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-[#7c6af7]"
@@ -262,17 +253,17 @@
                 </div>
                 <div class="p-4 border-t border-border flex justify-end gap-3">
                     <button
-                        @click="showAddDialog = false"
+                        @click="closeDialog"
                         class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
                     >
                         取消
                     </button>
                     <button
-                        @click="handleAddSkill"
-                        :disabled="!newSkill.name || !newSkill.content"
+                        @click="handleSubmit"
+                        :disabled="!formData.name || !formData.content"
                         class="px-4 py-2 bg-accent hover:bg-[#6b5ce7] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
                     >
-                        添加
+                        {{ editingSkill ? "保存" : "添加" }}
                     </button>
                 </div>
             </div>
@@ -281,12 +272,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import {
     ArrowLeft as ArrowLeftIcon,
     Plus as PlusIcon,
     Trash as TrashIcon,
+    Edit as EditIcon,
     Sparkles as SparklesIcon,
 } from "lucide-vue-next";
 
@@ -297,33 +289,63 @@ const skillStore = useSkillStore();
 
 // 对话框状态
 const showAddDialog = ref(false);
+const editingSkill = ref(null);
 
-// 新技能表单
-const newSkill = ref({
+// 表单数据
+const formData = reactive({
     name: "",
     description: "",
     content: "",
     always_load: false,
     enabled: true,
+    source: "workspace",
 });
 
-// 添加技能
-async function handleAddSkill() {
+// 重置表单
+function resetForm() {
+    formData.name = "";
+    formData.description = "";
+    formData.content = "";
+    formData.always_load = false;
+    formData.enabled = true;
+    formData.source = "workspace";
+}
+
+// 打开编辑对话框
+function openEditDialog(skill) {
+    editingSkill.value = skill;
+    formData.name = skill.name;
+    formData.description = skill.description || "";
+    formData.content = skill.content || "";
+    formData.always_load = skill.always_load || false;
+    formData.enabled = skill.enabled;
+    formData.source = skill.source || "workspace";
+}
+
+// 关闭对话框
+function closeDialog() {
+    showAddDialog.value = false;
+    editingSkill.value = null;
+    resetForm();
+}
+
+// 提交表单
+async function handleSubmit() {
     try {
-        await skillStore.createSkill({
-            ...newSkill.value,
-        });
-        showAddDialog.value = false;
-        // 重置表单
-        newSkill.value = {
-            name: "",
-            description: "",
-            content: "",
-            always_load: false,
-            enabled: true,
-        };
+        if (editingSkill.value) {
+            // 更新
+            await skillStore.updateSkill({
+                id: editingSkill.value.id,
+                ...formData,
+            });
+        } else {
+            // 创建
+            await skillStore.createSkill({ ...formData });
+        }
+        closeDialog();
     } catch (error) {
-        console.error("添加技能失败:", error);
+        console.error("保存技能失败:", error);
+        alert("保存技能失败: " + error.message);
     }
 }
 
@@ -334,6 +356,7 @@ async function handleDelete(skill) {
             await skillStore.deleteSkill(skill.id);
         } catch (error) {
             console.error("删除技能失败:", error);
+            alert("删除技能失败: " + error.message);
         }
     }
 }

@@ -1,13 +1,44 @@
 package storage
 
-import "gorm.io/gorm"
+import (
+	"database/sql/driver"
+	"encoding/json"
+
+	"gorm.io/gorm"
+)
+
+type LLM struct {
+	ID    uint   `gorm:"primaryKey" json:"id"`
+	Name  string `gorm:"size:50" json:"name"`  // openai, anthropic...
+	Model string `gorm:"size:50" json:"model"` // gpt-3.5-turbo, claude-2...
+}
+
+type LLMs []LLM
+
+func (llms LLMs) ToString() string {
+	jsonStr, _ := json.Marshal(llms)
+	return string(jsonStr)
+}
+
+// 实现数据库接口 Scan 方法
+func (llms *LLMs) Scan(value interface{}) error {
+	return json.Unmarshal(value.([]byte), llms)
+}
+
+// 实现数据库接口 Value 方法
+func (llms LLMs) Value() (driver.Value, error) {
+	return llms.ToString(), nil
+}
 
 // ProviderConfig Provider配置模型
 type ProviderConfig struct {
 	Model
 	Name    string `gorm:"size:50;uniqueIndex" json:"name"` // openai, anthropic...
-	Enabled bool   `gorm:"default:false" json:"enabled"`
-	Config  string `gorm:"type:text" json:"config"` // JSON配置
+	BaseUrl string `gorm:"size:255" json:"base_url"`        // 基础URL
+	ApiKey  string `gorm:"size:255" json:"api_key"`         // API密钥
+	LLMs    LLMs   `gorm:"type:text" json:"llms"`           // 支持的LLMs
+	Enabled bool   `gorm:"default:false" json:"enabled"`    // 是否启用
+	Config  string `gorm:"type:text" json:"config"`         // JSON配置
 }
 
 // TableName 表名
