@@ -244,6 +244,17 @@ func (p *BaseProvider) sendRequest(ctx context.Context, req *http.Request) (*Cha
 	return &chatResp, nil
 }
 
+// APIErrorResponse API 错误响应结构
+type APIErrorResponse struct {
+	Type      string `json:"type"`
+	Error     struct {
+		Type     string `json:"type"`
+		Message  string `json:"message"`
+		HTTPCode string `json:"http_code"`
+	} `json:"error"`
+	RequestID string `json:"request_id"`
+}
+
 // sendStreamRequest 发送流式请求并处理 SSE
 func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request, callback StreamCallback) error {
 	resp, err := p.httpClient.Do(req)
@@ -279,7 +290,11 @@ func (p *BaseProvider) sendStreamRequest(ctx context.Context, req *http.Request,
 			break
 		}
 
-		fmt.Println("请求[sendStreamRequest] 数据:", data)
+		// 检测 API 错误响应（如 MiniMax 返回的错误格式）
+		var apiError APIErrorResponse
+		if err := json.Unmarshal([]byte(data), &apiError); err == nil && apiError.Type == "error" {
+			return fmt.Errorf("API error: %s (request_id: %s)", apiError.Error.Message, apiError.RequestID)
+		}
 
 		// 解析 OpenAI 格式的流式块
 		var chunk OpenAIChunk

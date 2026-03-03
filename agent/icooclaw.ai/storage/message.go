@@ -1,21 +1,15 @@
 package storage
 
-import (
-	"time"
-)
-
 // Message 消息模型
 type Message struct {
-	ID               uint      `gorm:"primaryKey" json:"id"`
-	SessionID        uint      `gorm:"index" json:"session_id"`
-	Role             string    `gorm:"size:20;index" json:"role"` // user, assistant, system, tool
-	Content          string    `gorm:"type:text" json:"content"`
-	ToolCalls        string    `gorm:"type:text" json:"tool_calls"`        // JSON数组
-	ToolCallID       string    `gorm:"size:100" json:"tool_call_id"`       // 工具调用ID
-	ToolName         string    `gorm:"size:100" json:"tool_name"`          // 工具名称
-	ReasoningContent string    `gorm:"type:text" json:"reasoning_content"` // 思考过程
-	Timestamp        time.Time `gorm:"index" json:"timestamp"`
-	CreatedAt        time.Time `json:"created_at"`
+	Model            `gorm:"embedded"`
+	SessionID        uint   `gorm:"index" json:"session_id"`
+	Role             string `gorm:"size:20;index" json:"role"` // user, assistant, system, tool
+	Content          string `gorm:"type:text" json:"content"`
+	ToolCalls        string `gorm:"type:text" json:"tool_calls"`        // JSON数组
+	ToolCallID       string `gorm:"size:100" json:"tool_call_id"`       // 工具调用ID
+	ToolName         string `gorm:"size:100" json:"tool_name"`          // 工具名称
+	ReasoningContent string `gorm:"type:text" json:"reasoning_content"` // 思考过程
 }
 
 // TableName 表名

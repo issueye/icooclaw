@@ -241,6 +241,12 @@ func (c *WebSocketChannel) Start(ctx context.Context) error {
 
 	r.Post("/api/v1/chat", c.handleRestChat)
 	r.Post("/api/v1/chat/stream", c.handleRestChatStream)
+	r.Get("/api/v1/sessions", c.handleRestSessions)
+	r.Get("/api/v1/sessions/{id}/messages", c.handleRestSessionMessages)
+	r.Delete("/api/v1/sessions/{id}", c.handleRestDeleteSession)
+	r.Get("/api/v1/providers", c.handleRestProviders)
+	r.Get("/api/v1/skills", c.handleRestSkills)
+	r.Get("/api/v1/skills/{id}", c.handleRestSkillDetail)
 	r.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -464,15 +470,76 @@ func (c *WebSocketChannel) handleRestChatStream(w http.ResponseWriter, r *http.R
 }
 
 func (c *WebSocketChannel) handleRestSessions(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	if c.storage == nil {
+		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		return
+	}
+
+	userID := r.URL.Query().Get("user_id")
+	channel := r.URL.Query().Get("channel")
+
+	sessions, err := c.storage.GetSessions(userID, channel)
+	if err != nil {
+		c.logger.Error("Failed to get sessions", "error", err)
+		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sessions)
 }
 
-func (c *WebSocketChannel) handleRestCreateSession(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+func (c *WebSocketChannel) handleRestSessionMessages(w http.ResponseWriter, r *http.Request) {
+	if c.storage == nil {
+		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		return
+	}
+
+	sessionIDStr := chi.URLParam(r, "id")
+	sessionID, err := strconv.ParseUint(sessionIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	messages, err := c.storage.GetSessionMessages(uint(sessionID), limit)
+	if err != nil {
+		c.logger.Error("Failed to get session messages", "error", err)
+		http.Error(w, "Failed to get session messages", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
 }
 
-func (c *WebSocketChannel) handleRestSessionDetail(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+func (c *WebSocketChannel) handleRestDeleteSession(w http.ResponseWriter, r *http.Request) {
+	if c.storage == nil {
+		http.Error(w, "Storage not configured", http.StatusInternalServerError)
+		return
+	}
+
+	sessionID := chi.URLParam(r, "id")
+	if sessionID == "" {
+		http.Error(w, "Session ID required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.storage.DeleteSession(sessionID); err != nil {
+		c.logger.Error("Failed to delete session", "error", err)
+		http.Error(w, "Failed to delete session", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func (c *WebSocketChannel) handleRestProviders(w http.ResponseWriter, r *http.Request) {

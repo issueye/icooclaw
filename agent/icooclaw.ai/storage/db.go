@@ -185,7 +185,6 @@ func (s *Session) AddMessage(role, content, toolCalls, toolCallID, toolName, rea
 		ToolCallID:       toolCallID,
 		ToolName:         toolName,
 		ReasoningContent: reasoningContent,
-		Timestamp:        time.Now(),
 	}
 	err := DB.Create(&msg).Error
 	return &msg, err

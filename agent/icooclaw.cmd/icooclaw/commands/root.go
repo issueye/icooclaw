@@ -103,7 +103,7 @@ func initComponents() error {
 	channelManager = channel.NewManager(
 		&messageBusAdapter{bus: messageBus},
 		&channelConfigAdapter{cfg: cfg.Channels},
-		db,
+		&storageReaderAdapter{storage: storage.NewStorage(db)},
 		logger,
 	)
 	logger.Info("Channels registered", "count", channelManager.Count())
@@ -207,6 +207,23 @@ func (a *webhookConfigAdapter) Extra() map[string]interface{} {
 // taskStorageAdapter 任务存储适配器
 type taskStorageAdapter struct {
 	storage *storage.Storage
+}
+
+// storageReaderAdapter 存储读取适配器
+type storageReaderAdapter struct {
+	storage *storage.Storage
+}
+
+func (a *storageReaderAdapter) GetSessions(userID, channel string) (interface{}, error) {
+	return a.storage.GetSessions(userID, channel)
+}
+
+func (a *storageReaderAdapter) GetSessionMessages(sessionID uint, limit int) (interface{}, error) {
+	return a.storage.GetSessionMessages(sessionID, limit)
+}
+
+func (a *storageReaderAdapter) DeleteSession(sessionID string) error {
+	return a.storage.DeleteSession(sessionID)
 }
 
 func (a *taskStorageAdapter) GetEnabledTasks() ([]scheduler.TaskInfo, error) {

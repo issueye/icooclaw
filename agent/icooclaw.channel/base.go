@@ -59,16 +59,12 @@ type ConfigReader interface {
 
 // StorageReader 接口 - 存储读取
 type StorageReader interface {
-	// GetChatByID 根据ID获取聊天记录
-	GetChatByID(id uint) (interface{}, error)
-	// CreateChat 创建聊天记录
-	CreateChat(chat interface{}) error
-	// UpdateChat 更新聊天记录
-	UpdateChat(chat interface{}) error
-	// GetUserByID 根据ID获取用户
-	GetUserByID(id uint) (interface{}, error)
-	// CreateUser 创建用户
-	CreateUser(user interface{}) error
+	// GetSessions 获取会话列表
+	GetSessions(userID, channel string) (interface{}, error)
+	// GetSessionMessages 获取会话消息
+	GetSessionMessages(sessionID uint, limit int) (interface{}, error)
+	// DeleteSession 删除会话
+	DeleteSession(sessionID string) error
 }
 
 // Logger 接口 - 日志

@@ -33,7 +33,7 @@ func TestSession_TableName(t *testing.T) {
 // TestMessage tests for Message struct
 func TestMessage_Structure(t *testing.T) {
 	msg := Message{
-		ID:               1,
+		Model:            Model{ID: 1},
 		SessionID:        1,
 		Role:             "user",
 		Content:          "Hello",
@@ -41,7 +41,6 @@ func TestMessage_Structure(t *testing.T) {
 		ToolCallID:       "",
 		ToolName:         "",
 		ReasoningContent: "",
-		Timestamp:        time.Now(),
 	}
 
 	assert.Equal(t, uint(1), msg.ID)
@@ -86,13 +85,11 @@ func TestTask_TableName(t *testing.T) {
 // TestSkill tests for Skill struct
 func TestSkill_Structure(t *testing.T) {
 	skill := Skill{
-		ID:          1,
+		Model:       Model{ID: 1},
 		Name:        "test_skill",
 		Description: "A test skill",
 		Content:     "skill content",
 		Enabled:     true,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	assert.Equal(t, uint(1), skill.ID)
@@ -107,13 +104,16 @@ func TestSkill_TableName(t *testing.T) {
 
 // TestMemory tests for Memory struct
 func TestMemory_Structure(t *testing.T) {
-	memory := Memory{
+	base := Model{
 		ID:        1,
-		Type:      "memory",
-		Key:       "important_key",
-		Content:   "Important information",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+	}
+	memory := Memory{
+		Model:   base,
+		Type:    "memory",
+		Key:     "important_key",
+		Content: "Important information",
 	}
 
 	assert.Equal(t, uint(1), memory.ID)
@@ -150,12 +150,10 @@ func TestChannelConfig_TableName(t *testing.T) {
 // TestProviderConfig tests for ProviderConfig struct
 func TestProviderConfig_Structure(t *testing.T) {
 	config := ProviderConfig{
-		ID:        1,
-		Name:      "openai",
-		Enabled:   true,
-		Config:    `{"api_key":"test"}`,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Model:   Model{ID: 1},
+		Name:    "openai",
+		Enabled: true,
+		Config:  `{"api_key":"test"}`,
 	}
 
 	assert.Equal(t, uint(1), config.ID)
@@ -171,32 +169,32 @@ func TestProviderConfig_TableName(t *testing.T) {
 func TestMemory_GetTags(t *testing.T) {
 	tests := []struct {
 		name     string
-		tags     string
+		tags     StringArray
 		expected []string
 	}{
 		{
 			name:     "Empty tags",
-			tags:     "",
+			tags:     StringArray{},
 			expected: nil,
 		},
 		{
 			name:     "Single tag",
-			tags:     ",important,",
+			tags:     StringArray{"important"},
 			expected: []string{"important"},
 		},
 		{
 			name:     "Multiple tags",
-			tags:     ",work,personal,urgent,",
+			tags:     StringArray{"work", "personal", "urgent"},
 			expected: []string{"work", "personal", "urgent"},
 		},
 		{
 			name:     "No surrounding commas",
-			tags:     "tag1,tag2",
+			tags:     StringArray{"tag1", "tag2"},
 			expected: []string{"tag1", "tag2"},
 		},
 		{
 			name:     "Only commas",
-			tags:     ",,",
+			tags:     StringArray{"", ""},
 			expected: nil,
 		},
 	}
@@ -214,7 +212,7 @@ func TestMemory_GetTags(t *testing.T) {
 func TestMemory_TagsFormatting(t *testing.T) {
 	// 直接测试Tags字段的格式，不需要调用SetTags（需要DB）
 	memory := &Memory{
-		Tags: ",work,personal,urgent,",
+		Tags: StringArray{"work", "personal", "urgent"},
 	}
 
 	tags := memory.GetTags()
@@ -222,7 +220,7 @@ func TestMemory_TagsFormatting(t *testing.T) {
 
 	// 测试只有单个标签
 	memory2 := &Memory{
-		Tags: ",important,",
+		Tags: StringArray{"important"},
 	}
 	tags2 := memory2.GetTags()
 	assert.Equal(t, []string{"important"}, tags2)
@@ -232,7 +230,7 @@ func TestMemory_TagsFormatting(t *testing.T) {
 func TestMemory_GetTags_Roundtrip(t *testing.T) {
 	// 直接设置Tags字段（模拟SetTags的效果）
 	memory := &Memory{
-		Tags: ",work,personal,urgent,",
+		Tags: StringArray{"work", "personal", "urgent"},
 	}
 
 	tags := []string{"work", "personal", "urgent"}

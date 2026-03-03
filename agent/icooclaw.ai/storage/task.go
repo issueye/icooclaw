@@ -44,7 +44,7 @@ type Task struct {
 
 // TableName 表名
 func (Task) TableName() string {
-	return "tasks"
+	return tableNamePrefix + "tasks"
 }
 
 // Create 创建任务
@@ -65,42 +65,62 @@ func (t *Task) Delete() error {
 // GetByID 通过ID获取任务
 func GetTaskByID(id uint) (*Task, error) {
 	var task Task
-	err := DB.First(&task, id).Error
+	err := DB.
+		Table(tableNamePrefix+"tasks").
+		First(&task, id).Error
 	return &task, err
 }
 
 // GetByName 通过名称获取任务
 func GetTaskByName(name string) (*Task, error) {
 	var task Task
-	err := DB.Where("name = ?", name).First(&task).Error
+	err := DB.
+		Table(tableNamePrefix+"tasks").
+		Where("name = ?", name).
+		First(&task).Error
 	return &task, err
 }
 
 // GetEnabledTasks 获取所有启用的任务
 func GetEnabledTasks() ([]Task, error) {
 	var tasks []Task
-	err := DB.Where("enabled = ?", true).Find(&tasks).Error
+	err := DB.
+		Table(tableNamePrefix+"tasks").
+		Where("enabled = ?", true).
+		Find(&tasks).Error
 	return tasks, err
 }
 
 // GetDueTasks 获取到期的任务
 func GetDueTasks() ([]Task, error) {
 	var tasks []Task
-	err := DB.Where("enabled = ? AND (next_run_at IS NULL OR next_run_at <= ?)", true, time.Now()).Find(&tasks).Error
+	err := DB.
+		Table(tableNamePrefix+"tasks").
+		Where("enabled = ? AND (next_run_at IS NULL OR next_run_at <= ?)", true, time.Now()).
+		Find(&tasks).Error
 	return tasks, err
 }
 
 // UpdateNextRun 更新下次执行时间
 func (t *Task) UpdateNextRun(nextRun time.Time) error {
-	return DB.Model(t).Update("next_run_at", nextRun).Error
+	return DB.
+		Table(tableNamePrefix+"tasks").
+		Model(t).
+		Update("next_run_at", nextRun).Error
 }
 
 // UpdateLastRun 更新上次执行时间
 func (t *Task) UpdateLastRun() error {
-	return DB.Model(t).Update("last_run_at", time.Now()).Error
+	return DB.
+		Table(tableNamePrefix+"tasks").
+		Model(t).
+		Update("last_run_at", time.Now()).Error
 }
 
 // ToggleEnabled 切换启用状态
 func (t *Task) ToggleEnabled() error {
-	return DB.Model(t).Update("enabled", gorm.Expr("NOT enabled")).Error
+	return DB.
+		Table(tableNamePrefix+"tasks").
+		Model(t).
+		Update("enabled", gorm.Expr("NOT enabled")).Error
 }

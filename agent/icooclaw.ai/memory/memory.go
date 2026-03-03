@@ -103,7 +103,7 @@ func (m *MemoryStore) Get(key string) (*storage.Memory, error) {
 }
 
 // Add 添加记忆
-func (m *MemoryStore) Add(memType, key, content string) error {
+func (m *MemoryStore) Add(memType storage.MemoryType, key, content string) error {
 	memory := &storage.Memory{
 		Type:    memType,
 		Key:     key,
@@ -472,7 +472,7 @@ func (m *MemoryStore) SaveSessionMemory(sessionID uint, key, content string, tag
 		Key:       fmt.Sprintf("session_%d_%s", sessionID, key),
 		Content:   content,
 		SessionID: sessionIDPtr,
-		Tags:      "," + strings.Join(tags, ",") + ",",
+		Tags:      storage.StringArray(tags),
 	}
 	return m.storage.CreateMemory(memory)
 }
@@ -489,7 +489,7 @@ func (m *MemoryStore) SaveUserMemory(userID, key, content string, tags ...string
 		Key:     fmt.Sprintf("user_%s_%s", userID, key),
 		Content: content,
 		UserID:  userID,
-		Tags:    "," + strings.Join(tags, ",") + ",",
+		Tags:    storage.StringArray(tags),
 	}
 	return m.storage.CreateMemory(memory)
 }
@@ -593,7 +593,7 @@ func (m *MemoryStore) GetDetailedMemoryStats() (*MemoryStats, error) {
 }
 
 // SearchWithFilters 带过滤条件的搜索
-func (m *MemoryStore) SearchWithFilters(query string, memType string, sessionID *uint, userID string, tags []string, limit int) ([]storage.Memory, error) {
+func (m *MemoryStore) SearchWithFilters(query string, memType storage.MemoryType, sessionID *uint, userID string, tags []string, limit int) ([]storage.Memory, error) {
 	// 基础搜索
 	memories, err := m.storage.SearchMemories(query)
 	if err != nil {
@@ -604,7 +604,7 @@ func (m *MemoryStore) SearchWithFilters(query string, memType string, sessionID 
 	var filtered []storage.Memory
 	for _, mem := range memories {
 		// 类型过滤
-		if memType != "" && mem.Type != memType {
+		if memType.String() != "" && mem.Type != memType {
 			continue
 		}
 		// 会话过滤
