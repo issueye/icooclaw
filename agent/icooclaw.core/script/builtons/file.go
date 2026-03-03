@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"icooclaw.script/config"
+	"icooclaw.core/script/config"
 )
 
 // === fs 文件系统对象 ===

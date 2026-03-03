@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"icooclaw.script/config"
+	"icooclaw.core/script/config"
 )
 
 // === http 客户端对象 ===

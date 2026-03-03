@@ -18,8 +18,8 @@ import (
 	"path/filepath"
 
 	"github.com/dop251/goja"
-	"icooclaw.script/builtons"
-	"icooclaw.script/config"
+	"icooclaw.core/script/builtons"
+	"icooclaw.core/script/config"
 )
 
 // Engine 脚本引擎

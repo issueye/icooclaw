@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"icooclaw.script/config"
+	"icooclaw.core/script/config"
 )
 
 func TestEngine_Run(t *testing.T) {

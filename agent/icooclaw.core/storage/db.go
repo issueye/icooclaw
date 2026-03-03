@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	sqlite "github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -110,6 +111,36 @@ func CloseDB() error {
 		return sqlDB.Close()
 	}
 	return nil
+}
+
+// Session 会话模型
+type Session struct {
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	Key              string    `gorm:"uniqueIndex;size:255" json:"key"`    // channel:chat_id
+	Channel          string    `gorm:"size:50;index" json:"channel"`       // telegram, discord, feishu...
+	ChatID           string    `gorm:"size:255;index" json:"chat_id"`      // 用户/群组ID
+	UserID           string    `gorm:"size:255" json:"user_id"`            // 用户唯一标识
+	LastConsolidated int       `gorm:"default:0" json:"last_consolidated"` // 已整合的消息数
+	Metadata         string    `gorm:"type:text" json:"metadata"`          // JSON元数据
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+
+	Messages []Message `gorm:"foreignKey:SessionID" json:"messages"`
+}
+
+// TableName 表名
+func (Session) TableName() string {
+	return "sessions"
+}
+
+// GenerateSessionKey 生成会话 Key
+func GenerateSessionKey(channel, chatID string) string {
+	return fmt.Sprintf("%s:%s", channel, chatID)
+}
+
+// Create 创建会话
+func (s *Session) Create() error {
+	return DB.Create(s).Error
 }
 
 // GetByKey 通过Key获取会话

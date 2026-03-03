@@ -36,12 +36,6 @@ func (m *Manager) registerFromConfig() {
 		return
 	}
 
-	wsCfg := m.config.WebSocketConfig()
-	if wsCfg != nil && wsCfg.Enabled() {
-		wsChannel := NewWebSocketChannel(wsCfg, m.bus, m.db, m.logger)
-		m.Register("websocket", wsChannel)
-	}
-
 	webhookCfg := m.config.WebhookConfig()
 	if webhookCfg != nil && webhookCfg.Enabled() {
 		webhookChannel := NewWebhookChannel(webhookCfg, m.bus, m.logger)

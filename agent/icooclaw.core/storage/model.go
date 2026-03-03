@@ -27,9 +27,3 @@ func (s StringArray) Value() (driver.Value, error) {
 func (s StringArray) String() string {
 	return strings.Join(s, ",")
 }
-
-type Page struct {
-	Size  int `json:"size"`
-	Page  int `json:"page"`
-	Total int `json:"total"`
-}

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"icooclaw.script/config"
-	utils "icooclaw.utils"
+	"icooclaw.core/script/config"
+	"icooclaw.core/utils"
 )
 
 // === shell 命令执行对象 ===
