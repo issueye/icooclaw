@@ -131,13 +131,12 @@ func (g *RESTGateway) Start(ctx context.Context) error {
 	g.mu.Unlock()
 
 	go func() {
-		g.logger.Info("REST 网关启动", "host", host, "port", port)
+		g.logger.Info("REST 网关启动", slog.String("addr", addr))
 		if err := g.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			g.logger.Error("REST 网关启动失败", "error", err)
 		}
 	}()
 
-	g.logger.Info("REST 网关启动成功", "addr", addr)
 	return nil
 }
 
