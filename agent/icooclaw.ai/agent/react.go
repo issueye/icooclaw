@@ -162,15 +162,7 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 			}
 
 			// 执行工具
-			toolCall := tools.ToolCall{
-				ID:   call.ID,
-				Type: call.Type,
-				Function: tools.ToolCallFunction{
-					Name:      toolName,
-					Arguments: arguments,
-				},
-			}
-			result := cfg.Tools.Execute(ctx, toolCall)
+			result := cfg.Tools.Execute(ctx, call)
 			if result.Error != nil {
 				logger.Error("工具执行报错", "tool", toolName, "error", result.Error)
 			}

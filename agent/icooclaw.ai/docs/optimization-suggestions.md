@@ -49,39 +49,20 @@ func (cb *ContextBuilder) buildMessages() ([]provider.Message, error) {
 
 **建议**: 实现该方法或明确标注为 TODO 并在调用处处理空消息情况。
 
-### 1.3 类型定义重复 ⚠️ 中优先级
+### 1.3 类型定义重复 ✅ 已解决
 
 **问题描述**: `ToolCall` 类型在 `tools/base.go` 和 `provider` 包中重复定义。
 
 **位置**:
-- `tools/base.go:58-68`
-- `provider/` 包中
+- ~~`tools/base.go:58-68`~~ (已移除)
+- `provider/base.go:28-35` (统一位置)
 
-```go
-// tools/base.go
-type ToolCall struct {
-    ID       string
-    Type     string
-    Function ToolCallFunction
-}
+**解决方案**: 将 `ToolCall` 和 `ToolCallFunction` 类型统一到 `provider` 包中，`tools` 包现在直接使用 `provider.ToolCall`。
 
-// provider 包中也有类似定义
-```
-
-**建议**:
-```go
-// 方案1: 统一到 provider 包
-// tools 包引用 provider.ToolCall
-
-// 方案2: 创建独立的 types 包
-package types
-
-type ToolCall struct {
-    ID       string
-    Type     string
-    Function ToolCallFunction
-}
-```
+**修改文件**:
+- `tools/base.go` - 移除重复的类型定义
+- `tools/base_test.go` - 更新测试使用 `provider.ToolCall`
+- `agent/react.go` - 简化工具执行调用
 
 ---
 

@@ -93,19 +93,6 @@ type FunctionDefinition struct {
 	Parameters  map[string]any `json:"parameters"`
 }
 
-// ToolCall 工具调用
-type ToolCall struct {
-	ID       string           `json:"id"`
-	Type     string           `json:"type"`
-	Function ToolCallFunction `json:"function"`
-}
-
-// ToolCallFunction 工具调用函数
-type ToolCallFunction struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
-}
-
 // ToolResult 工具结果
 type ToolResult struct {
 	ToolCallID string
@@ -163,17 +150,12 @@ func (r *Registry) Count() int {
 }
 
 // Execute 执行工具调用
-// call 可以是 tools.ToolCall 或 provider.ToolCall
+// call 必须是 provider.ToolCall 类型
 func (r *Registry) Execute(ctx context.Context, call any) ToolResult {
-	// 使用反射或类型断言来处理不同的ToolCall类型
 	var toolCallID, toolName string
 	var arguments json.RawMessage
 
 	switch c := call.(type) {
-	case ToolCall:
-		toolCallID = c.ID
-		toolName = c.Function.Name
-		arguments = json.RawMessage(c.Function.Arguments)
 	case provider.ToolCall:
 		toolCallID = c.ID
 		toolName = c.Function.Name
@@ -182,7 +164,7 @@ func (r *Registry) Execute(ctx context.Context, call any) ToolResult {
 		return ToolResult{
 			ToolCallID: "",
 			Content:    "",
-			Error:      fmt.Errorf("unsupported tool call type: %T", call),
+			Error:      fmt.Errorf("unsupported tool call type: %T, expected provider.ToolCall", call),
 		}
 	}
 

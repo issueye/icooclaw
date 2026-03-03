@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"icooclaw.ai/provider"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,10 +159,10 @@ func TestRegistry_Execute(t *testing.T) {
 	registry.Register(tool)
 
 	// Create a valid ToolCall
-	toolCall := ToolCall{
+	toolCall := provider.ToolCall{
 		ID:   "call_123",
 		Type: "function",
-		Function: ToolCallFunction{
+		Function: provider.ToolCallFunction{
 			Name:      "test_tool",
 			Arguments: `{}`,
 		},
@@ -190,10 +192,10 @@ func TestRegistry_Execute_WithParams(t *testing.T) {
 
 	registry.Register(tool)
 
-	toolCall := ToolCall{
+	toolCall := provider.ToolCall{
 		ID:   "call_123",
 		Type: "function",
-		Function: ToolCallFunction{
+		Function: provider.ToolCallFunction{
 			Name:      "test_tool",
 			Arguments: `{"name":"World"}`,
 		},
@@ -207,10 +209,10 @@ func TestRegistry_Execute_WithParams(t *testing.T) {
 func TestRegistry_Execute_InvalidTool(t *testing.T) {
 	registry := NewRegistry()
 
-	toolCall := ToolCall{
+	toolCall := provider.ToolCall{
 		ID:   "call_123",
 		Type: "function",
-		Function: ToolCallFunction{
+		Function: provider.ToolCallFunction{
 			Name:      "non_existing",
 			Arguments: `{}`,
 		},
@@ -236,10 +238,10 @@ func TestRegistry_Execute_InvalidArgs(t *testing.T) {
 	registry.Register(tool)
 
 	// Invalid JSON in arguments
-	toolCall := ToolCall{
+	toolCall := provider.ToolCall{
 		ID:   "call_123",
 		Type: "function",
-		Function: ToolCallFunction{
+		Function: provider.ToolCallFunction{
 			Name:      "test_tool",
 			Arguments: `invalid json`,
 		},
@@ -268,12 +270,12 @@ func TestToolDefinition_Structure(t *testing.T) {
 	assert.Equal(t, "Test function", def.Function.Description)
 }
 
-// TestToolCall tests for ToolCall struct
+// TestToolCall tests for provider.ToolCall struct
 func TestToolCall_Structure(t *testing.T) {
-	call := ToolCall{
+	call := provider.ToolCall{
 		ID:   "call_123",
 		Type: "function",
-		Function: ToolCallFunction{
+		Function: provider.ToolCallFunction{
 			Name:      "test_func",
 			Arguments: `{"key":"value"}`,
 		},

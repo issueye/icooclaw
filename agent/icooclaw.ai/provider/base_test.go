@@ -3,13 +3,15 @@ package provider
 import (
 	"testing"
 
+	"icooclaw.core/consts"
+
 	"github.com/stretchr/testify/assert"
 )
 
 // TestMessage tests for Message struct
 func TestMessage_Structure(t *testing.T) {
 	msg := Message{
-		Role:             "user",
+		Role:             consts.RoleUser,
 		Content:          "Hello",
 		ReasoningContent: "thinking",
 		ToolCalls:        nil,
@@ -17,7 +19,7 @@ func TestMessage_Structure(t *testing.T) {
 		Name:             "",
 	}
 
-	assert.Equal(t, "user", msg.Role)
+	assert.Equal(t, consts.RoleUser, msg.Role)
 	assert.Equal(t, "Hello", msg.Content)
 	assert.Equal(t, "thinking", msg.ReasoningContent)
 }
@@ -33,7 +35,7 @@ func TestMessage_WithToolCalls(t *testing.T) {
 	}
 
 	msg := Message{
-		Role:      "assistant",
+		Role:      consts.RoleAssistant,
 		Content:   "",
 		ToolCalls: []ToolCall{toolCall},
 	}
@@ -44,13 +46,13 @@ func TestMessage_WithToolCalls(t *testing.T) {
 
 func TestMessage_ToolRole(t *testing.T) {
 	msg := Message{
-		Role:       "tool",
+		Role:       consts.RoleToolResult,
 		Content:    "result content",
 		ToolCallID: "call_123",
 		Name:       "test_func",
 	}
 
-	assert.Equal(t, "tool", msg.Role)
+	assert.Equal(t, consts.RoleToolResult, msg.Role)
 	assert.Equal(t, "call_123", msg.ToolCallID)
 	assert.Equal(t, "test_func", msg.Name)
 }
@@ -106,7 +108,7 @@ func TestUsage_Structure(t *testing.T) {
 func TestChatRequest_Structure(t *testing.T) {
 	req := ChatRequest{
 		Messages: []Message{
-			{Role: "user", Content: "Hello"},
+			{Role: consts.RoleUser, Content: "Hello"},
 		},
 		Tools: []ToolDefinition{
 			{Type: "function", Function: FunctionDefinition{Name: "tool1"}},
@@ -151,12 +153,12 @@ func TestChatResponse_Structure(t *testing.T) {
 func TestChoice_Structure(t *testing.T) {
 	choice := Choice{
 		Index:        0,
-		Message:      Message{Role: "assistant", Content: "Response"},
+		Message:      Message{Role: consts.RoleAssistant, Content: "Response"},
 		FinishReason: "stop",
 	}
 
 	assert.Equal(t, 0, choice.Index)
-	assert.Equal(t, "assistant", choice.Message.Role)
+	assert.Equal(t, consts.RoleAssistant, choice.Message.Role)
 	assert.Equal(t, "Response", choice.Message.Content)
 	assert.Equal(t, "stop", choice.FinishReason)
 }
