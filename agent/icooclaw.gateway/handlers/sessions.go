@@ -3,8 +3,10 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
-	"icooclaw.ai/storage"
+	"github.com/go-chi/chi/v5"
+	"icooclaw.core/storage"
 	"icooclaw.gateway/models"
 )
 
@@ -39,37 +41,40 @@ func (h *SessionHandler) Page(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *SessionHandler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {
+// Save 保存会话
+func (h *SessionHandler) Save(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*storage.Session](r)
 	if err != nil {
-		h.logger.Error("绑定创建会话请求失败", "error", err)
-		http.Error(w, "绑定创建会话请求失败", http.StatusBadRequest)
+		h.logger.Error("绑定保存会话请求失败", "error", err)
+		http.Error(w, "绑定保存会话请求失败", http.StatusBadRequest)
 		return
 	}
 
 	err = h.storage.Session().CreateOrUpdate(req)
 	if err != nil {
-		h.logger.Error("创建会话失败", "error", err)
-		http.Error(w, "创建会话失败", http.StatusInternalServerError)
+		h.logger.Error("保存会话失败", "error", err)
+		http.Error(w, "保存会话失败", http.StatusInternalServerError)
 		return
 	}
 
 	models.WriteData(w, models.BaseResponse[*storage.Session]{
 		Code:    http.StatusOK,
-		Message: "会话创建成功",
+		Message: "会话保存成功",
 		Data:    req,
 	})
 }
 
 func (h *SessionHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	// chi 绑定 {id}
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		h.logger.Error("绑定删除会话请求失败", "error", err)
 		http.Error(w, "绑定删除会话请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Session().Delete(req)
+	err = h.storage.Session().Delete(uint(id))
 	if err != nil {
 		h.logger.Error("删除会话失败", "error", err)
 		http.Error(w, "删除会话失败", http.StatusInternalServerError)
@@ -83,14 +88,16 @@ func (h *SessionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	// chi 绑定 {id}
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		h.logger.Error("绑定获取会话请求失败", "error", err)
 		http.Error(w, "绑定获取会话请求失败", http.StatusBadRequest)
 		return
 	}
 
-	session, err := h.storage.Session().GetByID(req)
+	session, err := h.storage.Session().GetByID(uint(id))
 	if err != nil {
 		h.logger.Error("获取会话失败", "error", err)
 		http.Error(w, "获取会话失败", http.StatusInternalServerError)

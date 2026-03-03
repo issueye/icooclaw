@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"icooclaw.ai/storage"
+	"icooclaw.core/storage"
 )
 
 type Skill struct {
@@ -35,33 +35,33 @@ func NewLoader(storage *storage.Storage, logger *slog.Logger) *Loader {
 func (l *Loader) Load(ctx context.Context) error {
 	l.logger.Info("Loading skills")
 
-	skills, err := l.storage.GetEnabledSkills()
-	if err != nil {
-		l.logger.Warn("Failed to load skills from database", "error", err)
-	}
+	// skills, err := l.storage.GetEnabledSkills()
+	// if err != nil {
+	// 	l.logger.Warn("Failed to load skills from database", "error", err)
+	// }
 
-	l.loadBuiltInSkills()
+	// l.loadBuiltInSkills()
 
-	for _, skill := range skills {
-		l.loaded = append(l.loaded, Skill{
-			Name:        skill.Name,
-			Description: skill.Description,
-			Content:     skill.Content,
-			AlwaysLoad:  skill.AlwaysLoad,
-			Enabled:     skill.Enabled,
-		})
-		if skill.AlwaysLoad {
-			l.alwaysLoad = append(l.alwaysLoad, Skill{
-				Name:        skill.Name,
-				Description: skill.Description,
-				Content:     skill.Content,
-				AlwaysLoad:  skill.AlwaysLoad,
-				Enabled:     skill.Enabled,
-			})
-		}
-	}
+	// for _, skill := range skills {
+	// 	l.loaded = append(l.loaded, Skill{
+	// 		Name:        skill.Name,
+	// 		Description: skill.Description,
+	// 		Content:     skill.Content,
+	// 		AlwaysLoad:  skill.AlwaysLoad,
+	// 		Enabled:     skill.Enabled,
+	// 	})
+	// 	if skill.AlwaysLoad {
+	// 		l.alwaysLoad = append(l.alwaysLoad, Skill{
+	// 			Name:        skill.Name,
+	// 			Description: skill.Description,
+	// 			Content:     skill.Content,
+	// 			AlwaysLoad:  skill.AlwaysLoad,
+	// 			Enabled:     skill.Enabled,
+	// 		})
+	// 	}
+	// }
 
-	l.logger.Info("Skills loaded", "count", len(l.loaded))
+	// l.logger.Info("Skills loaded", "count", len(l.loaded))
 	return nil
 }
 

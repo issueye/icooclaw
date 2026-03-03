@@ -1,0 +1,146 @@
+package gateway
+
+import (
+	"log/slog"
+
+	"github.com/go-chi/chi/v5"
+	"icooclaw.core/storage"
+	"icooclaw.gateway/handlers"
+)
+
+// Handlers 封装所有处理器
+type Handlers struct {
+	Common   *handlers.CommonHandler
+	Session  *handlers.SessionHandler
+	Message  *handlers.MessageHandler
+	MCP      *handlers.MCPHandler
+	Memory   *handlers.MemoryHandler
+	Task     *handlers.TaskHandler
+	Provider *handlers.ProviderHandler
+	Skill    *handlers.SkillHandler
+	Channel  *handlers.ChannelHandler
+}
+
+// NewHandlers 创建所有处理器
+func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
+	return &Handlers{
+		Common:   handlers.NewCommonHandler(logger),
+		Session:  handlers.NewSessionHandler(logger, storage),
+		Message:  handlers.NewMessageHandler(logger, storage),
+		MCP:      handlers.NewMCPHandler(logger, storage),
+		Memory:   handlers.NewMemoryHandler(logger, storage),
+		Task:     handlers.NewTaskHandler(logger, storage),
+		Provider: handlers.NewProviderHandler(logger, storage),
+		Skill:    handlers.NewSkillHandler(logger, storage),
+		Channel:  handlers.NewChannelHandler(logger, storage),
+	}
+}
+
+// RegisterRoutes 注册所有 CRUD 路由
+func RegisterRoutes(r chi.Router, h *Handlers) {
+	// 健康检查
+	r.Get("/api/v1/health", h.Common.HealthCheck)
+
+	// Session 路由
+	r.Route("/api/v1/sessions", func(r chi.Router) {
+		r.Post("/page", h.Session.Page)     // 分页查询
+		r.Post("/save", h.Session.Save)     // 创建
+		r.Post("/delete", h.Session.Delete) // 删除
+		r.Post("/get", h.Session.GetByID)   // 获取单个
+	})
+
+	// Message 路由
+	r.Route("/api/v1/messages", func(r chi.Router) {
+		r.Post("/page", h.Message.Page)
+		r.Post("/create", h.Message.Create)
+		r.Post("/update", h.Message.Update)
+		r.Post("/delete", h.Message.Delete)
+		r.Post("/get", h.Message.GetByID)
+	})
+
+	// MCP 路由
+	r.Route("/api/v1/mcp", func(r chi.Router) {
+		r.Post("/page", h.MCP.Page)
+		r.Post("/create", h.MCP.Create)
+		r.Post("/update", h.MCP.Update)
+		r.Post("/delete", h.MCP.Delete)
+		r.Post("/get", h.MCP.GetByID)
+		r.Get("/all", h.MCP.GetAll)
+	})
+
+	// Memory 路由
+	r.Route("/api/v1/memories", func(r chi.Router) {
+		r.Post("/page", h.Memory.Page)
+		r.Post("/create", h.Memory.Create)
+		r.Post("/update", h.Memory.Update)
+		r.Post("/delete", h.Memory.Delete)
+		r.Post("/get", h.Memory.GetByID)
+		r.Post("/pin", h.Memory.Pin)
+		r.Post("/unpin", h.Memory.Unpin)
+		r.Post("/soft-delete", h.Memory.SoftDelete)
+		r.Post("/restore", h.Memory.Restore)
+		r.Post("/search", h.Memory.Search)
+	})
+
+	// Task 路由
+	r.Route("/api/v1/tasks", func(r chi.Router) {
+		r.Post("/page", h.Task.Page)
+		r.Post("/create", h.Task.Create)
+		r.Post("/update", h.Task.Update)
+		r.Post("/delete", h.Task.Delete)
+		r.Post("/get", h.Task.GetByID)
+		r.Post("/toggle", h.Task.ToggleEnabled)
+		r.Get("/all", h.Task.GetAll)
+		r.Get("/enabled", h.Task.GetEnabled)
+	})
+
+	// Provider 路由
+	r.Route("/api/v1/providers", func(r chi.Router) {
+		r.Post("/page", h.Provider.Page)
+		r.Post("/create", h.Provider.Create)
+		r.Post("/update", h.Provider.Update)
+		r.Post("/delete", h.Provider.Delete)
+		r.Post("/get", h.Provider.GetByID)
+		r.Get("/all", h.Provider.GetAll)
+		r.Get("/enabled", h.Provider.GetEnabled)
+	})
+
+	// Skill 路由
+	r.Route("/api/v1/skills", func(r chi.Router) {
+		r.Post("/page", h.Skill.Page)
+		r.Post("/create", h.Skill.Create)
+		r.Post("/update", h.Skill.Update)
+		r.Post("/delete", h.Skill.Delete)
+		r.Post("/get", h.Skill.GetByID)
+		r.Post("/get-by-name", h.Skill.GetByName)
+		r.Post("/upsert", h.Skill.Upsert)
+		r.Get("/all", h.Skill.GetAll)
+		r.Get("/enabled", h.Skill.GetEnabled)
+	})
+
+	// Channel 路由
+	r.Route("/api/v1/channels", func(r chi.Router) {
+		r.Post("/page", h.Channel.Page)
+		r.Post("/create", h.Channel.Create)
+		r.Post("/update", h.Channel.Update)
+		r.Post("/delete", h.Channel.Delete)
+		r.Post("/get", h.Channel.GetByID)
+		r.Get("/all", h.Channel.GetAll)
+		r.Get("/enabled", h.Channel.GetEnabled)
+	})
+}
+
+// HandleCRUD 通用 CRUD 处理函数，用于 AI Skill 调用
+type CRUDRequest struct {
+	Resource string         `json:"resource"` // sessions, messages, mcp, memories, tasks, providers, skills, channels
+	Action   string         `json:"action"`   // page, create, update, delete, get, get-all, etc.
+	Data     map[string]any `json:"data"`     // 请求数据
+}
+
+// CRUDResponse 通用 CRUD 响应
+type CRUDResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}

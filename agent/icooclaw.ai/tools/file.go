@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	utils "icooclaw.utils"
+	utils "icooclaw.core/utils"
 )
 
 // FileToolConfig 文件工具配置

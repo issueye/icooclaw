@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	script "icooclaw.script"
-	scriptConfig "icooclaw.script/config"
+	script "icooclaw.core/script"
+	scriptConfig "icooclaw.core/script/config"
 )
 
 // JSToolConfig JavaScript 工具配置

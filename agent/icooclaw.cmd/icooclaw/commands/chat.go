@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"icooclaw.ai/agent"
@@ -33,9 +31,9 @@ Chat commands:
   history, /hist           - Show command history
   clear, /c, cls           - Clear screen`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("chat: %w", err)
-		}
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("chat: %w", err)
+		// }
 		return runChat()
 	},
 }
@@ -46,29 +44,29 @@ func init() {
 
 // runChat 运行聊天模式
 func runChat() error {
-	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(context.Background())
 
 	// 处理信号
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		fmt.Println("\nReceived interrupt signal. Exiting...")
-		cancel()
-	}()
+	// sigCh := make(chan os.Signal, 1)
+	// signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	// go func() {
+	// 	<-sigCh
+	// 	fmt.Println("\nReceived interrupt signal. Exiting...")
+	// 	cancel()
+	// }()
 
 	// 启动 Agent
-	go agentInstance.Run(ctx, messageBus)
+	// go agentInstance.Run(ctx, messageBus)
 
 	// 打印可用的 Provider
-	printProviders()
+	// printProviders()
 
 	// 运行 CLI
-	cli := NewCLI(agentInstance, providerReg, logger)
-	cli.Run(ctx)
+	// cli := NewCLI(agentInstance, providerReg, logger)
+	// cli.Run(ctx)
 
 	// 清理
-	cleanup()
+	// cleanup()
 	return nil
 }
 

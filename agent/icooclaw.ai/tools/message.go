@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	channel "icooclaw.channel"
+	channel "icooclaw.core/channel"
 )
 
 // MessageConfig 消息工具配置

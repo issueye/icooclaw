@@ -4,15 +4,15 @@ import (
 	"context"
 	"os"
 
-	"icooclaw.ai/config"
-	"icooclaw.ai/memory"
 	"icooclaw.ai/provider"
 	"icooclaw.ai/skill"
-	"icooclaw.ai/storage"
 	"icooclaw.ai/tools"
+	"icooclaw.core/config"
+	"icooclaw.core/storage"
 
-	icooclawbus "icooclaw.bus"
 	"log/slog"
+
+	icooclawbus "icooclaw.core/bus"
 )
 
 // ============ 核心接口定义 ============
@@ -32,7 +32,7 @@ type StorageInterface interface {
 }
 
 // 确保 *storage.Storage 实现该接口
-var _ StorageInterface = (*storage.Storage)(nil)
+// var _ StorageInterface = (*storage.Storage)(nil)
 
 // ToolRegistryInterface 工具注册表接口
 // 封装工具的注册、查询和执行
@@ -57,7 +57,7 @@ type MemoryStoreInterface interface {
 }
 
 // 确保 *memory.MemoryStore 实现该接口
-var _ MemoryStoreInterface = (*memory.MemoryStore)(nil)
+// var _ MemoryStoreInterface = (*memory.MemoryStore)(nil)
 
 // SkillLoaderInterface 技能加载接口
 // 封装技能的加载和管理

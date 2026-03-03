@@ -26,7 +26,7 @@ func (t TaskType) String() string {
 
 // Task 定时任务模型
 type Task struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
+	Model                 // 嵌入 Model 结构体
 	Name        string    `gorm:"size:100;uniqueIndex" json:"name"`
 	Description string    `gorm:"size:500" json:"description"` // 任务描述
 	Type        TaskType  `gorm:"default:0" json:"type"`       // 任务类型 0 立即执行任务， 1 cron 任务
@@ -38,8 +38,6 @@ type Task struct {
 	Enabled     bool      `gorm:"default:true" json:"enabled"` // 是否启用
 	NextRunAt   time.Time `gorm:"index" json:"next_run_at"`    // 下次执行时间
 	LastRunAt   time.Time `json:"last_run_at"`                 // 上次执行时间
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // TableName 表名
@@ -47,80 +45,124 @@ func (Task) TableName() string {
 	return tableNamePrefix + "tasks"
 }
 
+// TaskStorage 任务存储
+type TaskStorage struct {
+	db *gorm.DB
+}
+
+// NewTaskStorage 创建任务存储
+func NewTaskStorage(db *gorm.DB) *TaskStorage {
+	return &TaskStorage{db: db}
+}
+
+// CreateOrUpdate 创建或更新任务
+func (s *TaskStorage) CreateOrUpdate(task *Task) error {
+	return s.db.Save(task).Error
+}
+
 // Create 创建任务
-func (t *Task) Create() error {
-	return DB.Create(t).Error
+func (s *TaskStorage) Create(task *Task) error {
+	return s.db.Create(task).Error
 }
 
 // Update 更新任务
-func (t *Task) Update() error {
-	return DB.Save(t).Error
-}
-
-// Delete 删除任务
-func (t *Task) Delete() error {
-	return DB.Delete(t).Error
+func (s *TaskStorage) Update(task *Task) error {
+	return s.db.Save(task).Error
 }
 
 // GetByID 通过ID获取任务
-func GetTaskByID(id uint) (*Task, error) {
+func (s *TaskStorage) GetByID(id uint) (*Task, error) {
 	var task Task
-	err := DB.
-		Table(tableNamePrefix+"tasks").
-		First(&task, id).Error
+	err := s.db.First(&task, id).Error
 	return &task, err
 }
 
 // GetByName 通过名称获取任务
-func GetTaskByName(name string) (*Task, error) {
+func (s *TaskStorage) GetByName(name string) (*Task, error) {
 	var task Task
-	err := DB.
-		Table(tableNamePrefix+"tasks").
-		Where("name = ?", name).
-		First(&task).Error
+	err := s.db.Where("name = ?", name).First(&task).Error
 	return &task, err
 }
 
-// GetEnabledTasks 获取所有启用的任务
-func GetEnabledTasks() ([]Task, error) {
+// Delete 删除任务
+func (s *TaskStorage) Delete(id uint) error {
+	return s.db.Delete(&Task{}, id).Error
+}
+
+// GetAll 获取所有任务
+func (s *TaskStorage) GetAll() ([]Task, error) {
 	var tasks []Task
-	err := DB.
-		Table(tableNamePrefix+"tasks").
-		Where("enabled = ?", true).
-		Find(&tasks).Error
+	err := s.db.Find(&tasks).Error
 	return tasks, err
 }
 
-// GetDueTasks 获取到期的任务
-func GetDueTasks() ([]Task, error) {
+// GetEnabled 获取启用的任务
+func (s *TaskStorage) GetEnabled() ([]Task, error) {
 	var tasks []Task
-	err := DB.
-		Table(tableNamePrefix+"tasks").
+	err := s.db.Where("enabled = ?", true).Find(&tasks).Error
+	return tasks, err
+}
+
+// GetDue 获取到期的任务
+func (s *TaskStorage) GetDue() ([]Task, error) {
+	var tasks []Task
+	err := s.db.
 		Where("enabled = ? AND (next_run_at IS NULL OR next_run_at <= ?)", true, time.Now()).
 		Find(&tasks).Error
 	return tasks, err
 }
 
 // UpdateNextRun 更新下次执行时间
-func (t *Task) UpdateNextRun(nextRun time.Time) error {
-	return DB.
-		Table(tableNamePrefix+"tasks").
-		Model(t).
-		Update("next_run_at", nextRun).Error
+func (s *TaskStorage) UpdateNextRun(id uint, nextRun time.Time) error {
+	return s.db.Model(&Task{}).Where("id = ?", id).Update("next_run_at", nextRun).Error
 }
 
 // UpdateLastRun 更新上次执行时间
-func (t *Task) UpdateLastRun() error {
-	return DB.
-		Table(tableNamePrefix+"tasks").
-		Model(t).
-		Update("last_run_at", time.Now()).Error
+func (s *TaskStorage) UpdateLastRun(id uint) error {
+	return s.db.Model(&Task{}).Where("id = ?", id).Update("last_run_at", time.Now()).Error
 }
 
 // ToggleEnabled 切换启用状态
-func (t *Task) ToggleEnabled() error {
-	return DB.
-		Table(tableNamePrefix+"tasks").
-		Model(t).
-		Update("enabled", gorm.Expr("NOT enabled")).Error
+func (s *TaskStorage) ToggleEnabled(id uint) error {
+	return s.db.Model(&Task{}).Where("id = ?", id).Update("enabled", gorm.Expr("NOT enabled")).Error
+}
+
+// Page 分页获取任务
+func (s *TaskStorage) Page(q *QueryTask) (*ResQueryTask, error) {
+	var total int64
+	query := s.db.Model(&Task{})
+	if q.KeyWord != "" {
+		query = query.Where("name LIKE ? OR description LIKE ?", "%"+q.KeyWord+"%", "%"+q.KeyWord+"%")
+	}
+	if q.Enabled != nil {
+		query = query.Where("enabled = ?", *q.Enabled)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	var tasks []Task
+	err := query.Order("created_at DESC").
+		Offset((q.Page.Page - 1) * q.Page.Size).
+		Limit(q.Page.Size).
+		Find(&tasks).Error
+
+	q.Page.Total = int(total)
+	return &ResQueryTask{
+		Page:    q.Page,
+		Records: tasks,
+	}, err
+}
+
+// QueryTask 任务查询参数
+type QueryTask struct {
+	Page    Page   `json:"page"`
+	KeyWord string `json:"key_word"`
+	Enabled *bool  `json:"enabled"`
+}
+
+// ResQueryTask 任务查询结果
+type ResQueryTask struct {
+	Page    Page   `json:"page"`
+	Records []Task `json:"records"`
 }

@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	utils "icooclaw.utils"
+	"icooclaw.core/utils"
 )
 
 // Config 全局配置
 type Config struct {
+	Gateway   GatewayConfig   `mapstructure:"gateway"`
 	Providers ProvidersConfig `mapstructure:"providers"`
 	Channels  ChannelsConfig  `mapstructure:"channels"`
 	Agents    AgentsConfig    `mapstructure:"agents"`
@@ -26,6 +27,13 @@ type Config struct {
 	Log       LogConfig       `mapstructure:"log"`
 	Security  SecurityConfig  `mapstructure:"security"`
 	Scheduler SchedulerConfig `mapstructure:"scheduler"`
+}
+
+type GatewayConfig struct {
+	Port    int    `mapstructure:"port"`
+	Host    string `mapstructure:"host"`
+	Enabled bool   `mapstructure:"enabled"`
+	Key     string `mapstructure:"key"`
 }
 
 // ProvidersConfig Provider配置
@@ -226,6 +234,11 @@ func Load() (*Config, error) {
 	} else {
 		viper.SetDefault("workspace", "./workspace")
 	}
+
+	viper.SetDefault("gateway.port", 8080)
+	viper.SetDefault("gateway.enabled", true)
+	viper.SetDefault("gateway.host", "0.0.0.0")
+	viper.SetDefault("gateway.key", "")
 
 	viper.SetDefault("database.path", "./data/icooclaw.db")
 	viper.SetDefault("log.level", "info")

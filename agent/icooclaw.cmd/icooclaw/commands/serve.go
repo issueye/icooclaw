@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -24,10 +22,11 @@ This command starts channels configured in the configuration file:
 
 At least one channel must be enabled in the configuration.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("serve: %w", err)
-		}
-		return runServe()
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("serve: %w", err)
+		// }
+		// return runServe()
+		return nil
 	},
 }
 
@@ -42,37 +41,37 @@ func init() {
 
 // runServe 运行服务
 func runServe() error {
-	ctx, cancel := getContext()
-	defer cancel()
+	// ctx, cancel := getContext()
+	// defer cancel()
 
-	// 处理信号
-	handleSignals(cancel)
+	// // 处理信号
+	// handleSignals(cancel)
 
-	// 启动 Agent
-	go agentInstance.Run(ctx, messageBus)
+	// // 启动 Agent
+	// go agentInstance.Run(ctx, messageBus)
 
-	// 启动所有启用的通道
-	if err := channelManager.StartAll(); err != nil {
-		return fmt.Errorf("start channels: %w", err)
-	}
+	// // 启动所有启用的通道
+	// if err := channelManager.StartAll(); err != nil {
+	// 	return fmt.Errorf("start channels: %w", err)
+	// }
 
-	// 列出已启动的通道
-	channels := channelManager.List()
-	if len(channels) == 0 {
-		fmt.Println("Warning: No channels enabled. Please enable at least one channel in configuration.")
-	} else {
-		fmt.Println("Started channels:")
-		for _, name := range channels {
-			fmt.Printf("  - %s\n", name)
-		}
-	}
+	// // 列出已启动的通道
+	// channels := channelManager.List()
+	// if len(channels) == 0 {
+	// 	fmt.Println("Warning: No channels enabled. Please enable at least one channel in configuration.")
+	// } else {
+	// 	fmt.Println("Started channels:")
+	// 	for _, name := range channels {
+	// 		fmt.Printf("  - %s\n", name)
+	// 	}
+	// }
 
-	fmt.Println("Server running. Press Ctrl+C to stop.")
+	// fmt.Println("Server running. Press Ctrl+C to stop.")
 
-	// 等待上下文取消
-	<-ctx.Done()
+	// // 等待上下文取消
+	// <-ctx.Done()
 
-	// 清理
-	cleanup()
+	// // 清理
+	// cleanup()
 	return nil
 }

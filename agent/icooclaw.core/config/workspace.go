@@ -6,16 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	utils "icooclaw.utils"
+	utils "icooclaw.core/utils"
 )
 
 // WorkspaceConfig 工作空间配置
 type WorkspaceConfig struct {
-	Path         string
-	ToolsDir     string
-	DataDir      string
-	LogsDir      string
-	MCPServers   map[string]MCPServerConfig
+	Path       string
+	ToolsDir   string
+	DataDir    string
+	LogsDir    string
+	MCPServers map[string]MCPServerConfig
 }
 
 // DefaultWorkspaceDirs 工作空间默认子目录

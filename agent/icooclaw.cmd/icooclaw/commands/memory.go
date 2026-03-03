@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -26,10 +24,11 @@ var memoryGetCmd = &cobra.Command{
 	Long:  "Get the full content of memory/MEMORY.md file",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("memory get: %w", err)
-		}
-		return getMemoryFile()
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("memory get: %w", err)
+		// }
+		// return getMemoryFile()
+		return nil
 	},
 }
 
@@ -43,11 +42,12 @@ Example:
   icooclaw memory set-preference "I prefer Chinese, call me Zhang San"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("memory set-preference: %w", err)
-		}
-		content := args[0]
-		return setMemoryContent("用户偏好", content)
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("memory set-preference: %w", err)
+		// }
+		// content := args[0]
+		// return setMemoryContent("用户偏好", content)
+		return nil
 	},
 }
 
@@ -61,11 +61,12 @@ Example:
   icooclaw memory set-fact "I am a software engineer, mainly using Go"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("memory set-fact: %w", err)
-		}
-		content := args[0]
-		return setMemoryContent("重要事实", content)
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("memory set-fact: %w", err)
+		// }
+		// content := args[0]
+		// return setMemoryContent("重要事实", content)
+		return nil
 	},
 }
 
@@ -79,11 +80,12 @@ Example:
   icooclaw memory set-knowledge "User often asks about Go programming"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("memory set-knowledge: %w", err)
-		}
-		content := args[0]
-		return setMemoryContent("学到的知识", content)
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("memory set-knowledge: %w", err)
+		// }
+		// content := args[0]
+		// return setMemoryContent("学到的知识", content)
+		return nil
 	},
 }
 
@@ -95,25 +97,25 @@ func init() {
 	rootCmd.AddCommand(memoryCmd)
 }
 
-// getMemoryFile 获取记忆文件内容
-func getMemoryFile() error {
-	content, err := agentInstance.GetMemoryFile()
-	if err != nil {
-		return fmt.Errorf("get memory file: %w", err)
-	}
+// // getMemoryFile 获取记忆文件内容
+// func getMemoryFile() error {
+// 	content, err := agentInstance.GetMemoryFile()
+// 	if err != nil {
+// 		return fmt.Errorf("get memory file: %w", err)
+// 	}
 
-	fmt.Println("=== memory/MEMORY.md Content ===")
-	fmt.Println(content)
-	return nil
-}
+// 	fmt.Println("=== memory/MEMORY.md Content ===")
+// 	fmt.Println(content)
+// 	return nil
+// }
 
-// setMemoryContent 设置记忆内容
-func setMemoryContent(section, content string) error {
-	if err := agentInstance.UpdateMemoryFile(section, content); err != nil {
-		return fmt.Errorf("update memory: %w", err)
-	}
+// // setMemoryContent 设置记忆内容
+// func setMemoryContent(section, content string) error {
+// 	if err := agentInstance.UpdateMemoryFile(section, content); err != nil {
+// 		return fmt.Errorf("update memory: %w", err)
+// 	}
 
-	fmt.Printf("%s updated\n", section)
-	fmt.Println("Content:", content)
-	return nil
-}
+// 	fmt.Printf("%s updated\n", section)
+// 	fmt.Println("Content:", content)
+// 	return nil
+// }

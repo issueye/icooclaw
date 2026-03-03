@@ -10,16 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"icooclaw.ai/config"
-	"icooclaw.ai/consts"
 	"icooclaw.ai/hooks"
-	"icooclaw.ai/memory"
 	"icooclaw.ai/provider"
-	"icooclaw.ai/skill"
-	"icooclaw.ai/storage"
 	"icooclaw.ai/tools"
-
-	icooclawbus "icooclaw.bus"
+	icooclawbus "icooclaw.core/bus"
+	"icooclaw.core/config"
+	"icooclaw.core/consts"
+	"icooclaw.core/storage"
 )
 
 // SessionMetadata 会话元数据
@@ -102,23 +99,23 @@ func NewAgent(
 	}
 
 	// 如果没有提供，使用默认实现（需要具体类型）
-	if agent.memory == nil {
-		if storageImpl, ok := storageIntf.(*storage.Storage); ok {
-			agent.memory = memory.NewMemoryStoreWithConfig(storageImpl, logger, memory.MemoryConfig{
-				ConsolidationThreshold: 50,
-				SummaryEnabled:         true,
-			})
-		} else {
-			logger.Warn("Storage is not *storage.Storage, skipping memory initialization")
-		}
-	}
-	if agent.skills == nil {
-		if storageImpl, ok := storageIntf.(*storage.Storage); ok {
-			agent.skills = skill.NewLoader(storageImpl, logger)
-		} else {
-			logger.Warn("Storage is not *storage.Storage, skipping skills initialization")
-		}
-	}
+	// if agent.memory == nil {
+	// 	if storageImpl, ok := storageIntf.(*storage.Storage); ok {
+	// 		agent.memory = memory.NewMemoryStoreWithConfig(storageImpl, logger, memory.MemoryConfig{
+	// 			ConsolidationThreshold: 50,
+	// 			SummaryEnabled:         true,
+	// 		})
+	// 	} else {
+	// 		logger.Warn("Storage is not *storage.Storage, skipping memory initialization")
+	// 	}
+	// }
+	// if agent.skills == nil {
+	// 	if storageImpl, ok := storageIntf.(*storage.Storage); ok {
+	// 		agent.skills = skill.NewLoader(storageImpl, logger)
+	// 	} else {
+	// 		logger.Warn("Storage is not *storage.Storage, skipping skills initialization")
+	// 	}
+	// }
 
 	return agent
 }

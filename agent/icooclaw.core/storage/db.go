@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"time"
 
 	sqlite "github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -88,6 +87,7 @@ func InitDB(dsn string) (*gorm.DB, error) {
 		&Memory{},
 		&ChannelConfig{},
 		&ProviderConfig{},
+		&MCPConfig{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
@@ -113,93 +113,7 @@ func CloseDB() error {
 	return nil
 }
 
-// Session 会话模型
-type Session struct {
-	ID               uint      `gorm:"primaryKey" json:"id"`
-	Key              string    `gorm:"uniqueIndex;size:255" json:"key"`    // channel:chat_id
-	Channel          string    `gorm:"size:50;index" json:"channel"`       // telegram, discord, feishu...
-	ChatID           string    `gorm:"size:255;index" json:"chat_id"`      // 用户/群组ID
-	UserID           string    `gorm:"size:255" json:"user_id"`            // 用户唯一标识
-	LastConsolidated int       `gorm:"default:0" json:"last_consolidated"` // 已整合的消息数
-	Metadata         string    `gorm:"type:text" json:"metadata"`          // JSON元数据
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-
-	Messages []Message `gorm:"foreignKey:SessionID" json:"messages"`
-}
-
-// TableName 表名
-func (Session) TableName() string {
-	return "sessions"
-}
-
 // GenerateSessionKey 生成会话 Key
 func GenerateSessionKey(channel, chatID string) string {
 	return fmt.Sprintf("%s:%s", channel, chatID)
-}
-
-// Create 创建会话
-func (s *Session) Create() error {
-	return DB.Create(s).Error
-}
-
-// GetByKey 通过Key获取会话
-func GetSessionByKey(key string) (*Session, error) {
-	var session Session
-	err := DB.Where("key = ?", key).First(&session).Error
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
-}
-
-// GetOrCreateByChannelChatID 通过通道和聊天ID获取或创建会话
-func GetOrCreateSession(channel, chatID, userID string) (*Session, error) {
-	key := GenerateSessionKey(channel, chatID)
-	session, err := GetSessionByKey(key)
-	if err == nil {
-		return session, nil
-	}
-
-	if err == gorm.ErrRecordNotFound {
-		session = &Session{
-			Key:     key,
-			Channel: channel,
-			ChatID:  chatID,
-			UserID:  userID,
-		}
-		err = session.Create()
-		return session, err
-	}
-
-	return nil, err
-}
-
-// AddMessage 添加消息到会话
-func (s *Session) AddMessage(role, content, toolCalls, toolCallID, toolName, reasoningContent string) (*Message, error) {
-	msg := Message{
-		SessionID:        s.ID,
-		Role:             role,
-		Content:          content,
-		ToolCalls:        toolCalls,
-		ToolCallID:       toolCallID,
-		ToolName:         toolName,
-		ReasoningContent: reasoningContent,
-	}
-	err := DB.Create(&msg).Error
-	return &msg, err
-}
-
-// GetMessages 获取会话消息
-func (s *Session) GetMessages(limit int) ([]Message, error) {
-	var messages []Message
-	err := DB.Where("session_id = ?", s.ID).Order("timestamp ASC").Limit(limit).Find(&messages).Error
-	return messages, err
-}
-
-// UpdateLastConsolidated 更新已整合的消息数
-func (s *Session) UpdateLastConsolidated() error {
-	var count int64
-	DB.Model(&Message{}).Where("session_id = ?", s.ID).Count(&count)
-	return DB.Model(s).Update("last_consolidated", count).Error
 }

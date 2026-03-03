@@ -1,27 +1,23 @@
 package commands
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 	"icooclaw.ai/agent"
-	"icooclaw.ai/config"
 	"icooclaw.ai/provider"
-	"icooclaw.ai/storage"
 	"icooclaw.ai/tools"
-	bus "icooclaw.bus"
-	channel "icooclaw.channel"
-	scheduler "icooclaw.scheduler"
+	bus "icooclaw.core/bus"
+	channel "icooclaw.core/channel"
+	"icooclaw.core/config"
+	scheduler "icooclaw.core/scheduler"
+	"icooclaw.core/storage"
 )
 
 // 全局组件
@@ -47,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Long: `icooclaw is an AI Agent CLI tool.
 
 Examples:
-  icooclaw serve        # Start web server (WebSocket/Webhook)
+  icooclaw gateway        # 启动网关
   icooclaw chat         # Start interactive chat (REPL)
   icooclaw run "hello"  # Run single message
   icooclaw cron list    # List scheduled tasks
@@ -55,7 +51,7 @@ Examples:
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// 跳过不需要初始化的命令
 		switch cmd.Name() {
-		case "help", "version", "completion":
+		case "help", "version", "completion", "gateway":
 			return nil
 		}
 		return initComponents()
@@ -76,11 +72,11 @@ func initComponents() error {
 	slog.SetDefault(logger)
 
 	// Step 3: 初始化工作空间（检查并创建关键文件）
-	wsConfig, err := config.InitWorkspaceWithConfig(cfg)
-	if err != nil {
-		return fmt.Errorf("init workspace: %w", err)
-	}
-	workspace := wsConfig.Path
+	// wsConfig, err := config.InitWorkspaceWithConfig(cfg)
+	// if err != nil {
+	// 	return fmt.Errorf("init workspace: %w", err)
+	// }
+	// workspace := wsConfig.Path
 
 	// Step 4: 初始化数据库
 	if db, err = storage.InitDB(cfg.Database.Path); err != nil {
@@ -100,327 +96,26 @@ func initComponents() error {
 	logger.Info("Providers registered", "count", providerReg.Count())
 
 	// Step 7: 初始化通道管理器
-	channelManager = channel.NewManager(
-		&messageBusAdapter{bus: messageBus},
-		&channelConfigAdapter{cfg: cfg.Channels},
-		&storageReaderAdapter{storage: storage.NewStorage(db)},
-		logger,
-	)
+	// channelManager = channel.NewManager(
+	// 	&messageBusAdapter{bus: messageBus},
+	// 	&channelConfigAdapter{cfg: cfg.Channels},
+	// 	&storageReaderAdapter{storage: storage.NewStorage(db)},
+	// 	logger,
+	// )
 	logger.Info("Channels registered", "count", channelManager.Count())
 
 	// Step 8: 创建默认 Agent
-	if err = initDefaultAgent(workspace); err != nil {
-		return fmt.Errorf("init agent: %w", err)
-	}
+	// if err = initDefaultAgent(workspace); err != nil {
+	// 	return fmt.Errorf("init agent: %w", err)
+	// }
 
 	// Step 9: 初始化工具
 	toolRegistry = tools.InitTools(cfg, logger, channelManager)
 	agentInstance.SetTools(toolRegistry)
 
-	// Step 10: 初始化调度器
-	schedulerInst = scheduler.NewScheduler(
-		&taskStorageAdapter{storage: storage.NewStorage(db)},
-		&schedulerConfigAdapter{cfg: cfg.Scheduler},
-		logger,
-	)
 	logger.Info("All components initialized")
 
 	return nil
-}
-
-// ============ 适配器定义 ============
-
-// messageBusAdapter 消息总线适配器
-type messageBusAdapter struct {
-	bus *bus.MessageBus
-}
-
-func (a *messageBusAdapter) PublishInbound(ctx context.Context, msg channel.InboundMessage) error {
-	return a.bus.PublishInbound(ctx, bus.InboundMessage{
-		ID:        msg.ID,
-		Channel:   msg.Channel,
-		ChatID:    msg.ChatID,
-		UserID:    msg.UserID,
-		Content:   msg.Content,
-		Timestamp: msg.Timestamp,
-		Metadata:  msg.Metadata,
-	})
-}
-
-func (a *messageBusAdapter) Publish(event interface{}) error {
-	if msg, ok := event.(bus.OutboundMessage); ok {
-		return a.bus.PublishOutbound(context.Background(), msg)
-	}
-	return nil
-}
-
-func (a *messageBusAdapter) Subscribe(handler interface{}) error {
-	return nil
-}
-
-// channelConfigAdapter 通道配置适配器
-type channelConfigAdapter struct {
-	cfg config.ChannelsConfig
-}
-
-func (a *channelConfigAdapter) WebSocketConfig() channel.WebSocketConfig {
-	if a.cfg.WebSocket.Enabled {
-		return &webSocketConfigAdapter{cfg: a.cfg.WebSocket}
-	}
-	return nil
-}
-
-func (a *channelConfigAdapter) WebhookConfig() channel.WebhookConfig {
-	if a.cfg.Webhook.Enabled {
-		return &webhookConfigAdapter{cfg: a.cfg.Webhook}
-	}
-	return nil
-}
-
-// webSocketConfigAdapter WebSocket 配置适配器
-type webSocketConfigAdapter struct {
-	cfg config.ChannelSettings
-}
-
-func (a *webSocketConfigAdapter) Enabled() bool { return a.cfg.Enabled }
-func (a *webSocketConfigAdapter) Host() string  { return a.cfg.Host }
-func (a *webSocketConfigAdapter) Port() int     { return a.cfg.Port }
-
-// webhookConfigAdapter Webhook 配置适配器
-type webhookConfigAdapter struct {
-	cfg config.ChannelSettings
-}
-
-func (a *webhookConfigAdapter) Enabled() bool              { return a.cfg.Enabled }
-func (a *webhookConfigAdapter) Host() string               { return a.cfg.Host }
-func (a *webhookConfigAdapter) Port() int                  { return a.cfg.Port }
-func (a *webhookConfigAdapter) Path() string               { return "" }
-func (a *webhookConfigAdapter) Secret() string             { return a.cfg.Token }
-func (a *webhookConfigAdapter) Extra() map[string]interface{} {
-	result := make(map[string]interface{})
-	for k, v := range a.cfg.Extra {
-		result[k] = v
-	}
-	return result
-}
-
-// taskStorageAdapter 任务存储适配器
-type taskStorageAdapter struct {
-	storage *storage.Storage
-}
-
-// storageReaderAdapter 存储读取适配器
-type storageReaderAdapter struct {
-	storage *storage.Storage
-}
-
-func (a *storageReaderAdapter) GetSessions(userID, channel string) (interface{}, error) {
-	return a.storage.GetSessions(userID, channel)
-}
-
-func (a *storageReaderAdapter) GetSessionMessages(sessionID uint, limit int) (interface{}, error) {
-	return a.storage.GetSessionMessages(sessionID, limit)
-}
-
-func (a *storageReaderAdapter) DeleteSession(sessionID string) error {
-	return a.storage.DeleteSession(sessionID)
-}
-
-func (a *taskStorageAdapter) GetEnabledTasks() ([]scheduler.TaskInfo, error) {
-	tasks, err := a.storage.GetEnabledTasks()
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]scheduler.TaskInfo, len(tasks))
-	for i, t := range tasks {
-		result[i] = scheduler.TaskInfo{
-			ID:          t.ID,
-			Name:        t.Name,
-			Description: t.Description,
-			Type:        scheduler.TaskTypeCron,
-			CronExpr:    t.CronExpr,
-			Interval:    t.Interval,
-			Message:     t.Message,
-			Channel:     t.Channel,
-			ChatID:      t.ChatID,
-			Enabled:     t.Enabled,
-			NextRunAt:   t.NextRunAt,
-			LastRunAt:   t.LastRunAt,
-		}
-	}
-	return result, nil
-}
-
-func (a *taskStorageAdapter) GetTaskByName(name string) (*scheduler.TaskInfo, error) {
-	task, err := a.storage.GetTaskByName(name)
-	if err != nil {
-		return nil, err
-	}
-
-	return &scheduler.TaskInfo{
-		ID:          task.ID,
-		Name:        task.Name,
-		Description: task.Description,
-		Type:        scheduler.TaskTypeCron,
-		CronExpr:    task.CronExpr,
-		Interval:    task.Interval,
-		Message:     task.Message,
-		Channel:     task.Channel,
-		ChatID:      task.ChatID,
-		Enabled:     task.Enabled,
-		NextRunAt:   task.NextRunAt,
-		LastRunAt:   task.LastRunAt,
-	}, nil
-}
-
-func (a *taskStorageAdapter) UpdateTask(task *scheduler.TaskInfo) error {
-	return a.storage.UpdateTask(&storage.Task{
-		ID:          task.ID,
-		Name:        task.Name,
-		Description: task.Description,
-		CronExpr:    task.CronExpr,
-		Interval:    task.Interval,
-		Message:     task.Message,
-		Channel:     task.Channel,
-		ChatID:      task.ChatID,
-		Enabled:     task.Enabled,
-		NextRunAt:   task.NextRunAt,
-		LastRunAt:   task.LastRunAt,
-	})
-}
-
-// schedulerConfigAdapter 调度器配置适配器
-type schedulerConfigAdapter struct {
-	cfg config.SchedulerConfig
-}
-
-func (a *schedulerConfigAdapter) GetTaskTimeout() time.Duration {
-	return 30 * time.Minute
-}
-
-func (a *schedulerConfigAdapter) GetQueueSize() int {
-	return 100
-}
-
-func (a *schedulerConfigAdapter) GetCheckInterval() time.Duration {
-	return time.Duration(a.cfg.HeartbeatInterval) * time.Minute
-}
-
-func (a *schedulerConfigAdapter) IsEnabled() bool {
-	return a.cfg.Enabled
-}
-
-func (a *schedulerConfigAdapter) GetHeartbeatInterval() time.Duration {
-	return time.Duration(a.cfg.HeartbeatInterval) * time.Minute
-}
-
-func (a *schedulerConfigAdapter) IsHeartbeatEnabled() bool {
-	return a.cfg.Enabled
-}
-
-func (a *schedulerConfigAdapter) GetWorkspace() string {
-	return ""
-}
-
-// ============ 初始化函数 ============
-
-// initDefaultAgent 初始化默认 Agent
-func initDefaultAgent(workspace string) error {
-	agentConfig := cfg.Agents.Defaults
-	defaultProviderName := cfg.Agents.DefaultProvider
-
-	if defaultProviderName == "" {
-		providers := providerReg.List()
-		if len(providers) == 0 {
-			return errors.New("no providers available")
-		}
-		defaultProviderName = providers[0]
-	}
-
-	defaultProvider, err := providerReg.Get(defaultProviderName)
-	if err != nil {
-		return fmt.Errorf("get default provider '%s': %w", defaultProviderName, err)
-	}
-
-	agentInstance = agent.NewAgent(
-		agentConfig.Name,
-		defaultProvider,
-		storage.NewStorage(db),
-		agentConfig,
-		logger,
-		workspace,
-	)
-	logger.Info("Agent initialized", "name", agentConfig.Name, "provider", defaultProviderName)
-
-	return nil
-}
-
-// getContext 创建一个可取消的上下文
-func getContext() (context.Context, context.CancelFunc) {
-	return context.WithCancel(context.Background())
-}
-
-// handleSignals 设置信号处理
-func handleSignals(cancel context.CancelFunc) {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-sigCh
-		if logger != nil {
-			logger.Info("Received signal, shutting down", "signal", sig.String())
-		}
-		cancel()
-	}()
-}
-
-// cleanup 执行清理操作
-func cleanup() {
-	if logger == nil {
-		return
-	}
-	logger.Info("Cleaning up...")
-
-	// 停止通道
-	if channelManager != nil {
-		if wsCh, err := channelManager.Get("websocket"); err == nil {
-			wsCh.Stop()
-		}
-	}
-
-	// 停止调度器
-	if schedulerInst != nil && schedulerInst.IsRunning() {
-		schedulerInst.Stop()
-	}
-
-	logger.Info("Cleanup completed")
-}
-
-// checkInitialized 检查组件是否已初始化
-func checkInitialized() error {
-	if agentInstance == nil {
-		return ErrNotInitialized
-	}
-	return nil
-}
-
-// printProviders 打印可用的提供商
-func printProviders() {
-	if providerReg == nil {
-		fmt.Println("Providers not initialized")
-		return
-	}
-
-	providers := providerReg.List()
-	fmt.Println("Available providers:")
-	for _, name := range providers {
-		p, err := providerReg.Get(name)
-		if err != nil {
-			continue
-		}
-		fmt.Printf("  - %s: %s\n", name, p.GetDefaultModel())
-	}
 }
 
 func Execute() error {

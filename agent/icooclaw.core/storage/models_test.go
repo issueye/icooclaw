@@ -9,14 +9,13 @@ import (
 
 // TestSession tests for Session struct
 func TestSession_Structure(t *testing.T) {
+
 	session := Session{
-		ID:        1,
-		Key:       "telegram:chat_123",
-		Channel:   "telegram",
-		ChatID:    "chat_123",
-		UserID:    "user_456",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Model:   Model{ID: 1},
+		Key:     "telegram:chat_123",
+		Channel: "telegram",
+		ChatID:  "chat_123",
+		UserID:  "user_456",
 	}
 
 	assert.Equal(t, uint(1), session.ID)
@@ -57,7 +56,7 @@ func TestMessage_TableName(t *testing.T) {
 // TestTask tests for Task struct
 func TestTask_Structure(t *testing.T) {
 	task := Task{
-		ID:          1,
+		Model:       Model{ID: 1},
 		Name:        "test_task",
 		Description: "A test task",
 		CronExpr:    "*/5 * * * *",
@@ -68,8 +67,6 @@ func TestTask_Structure(t *testing.T) {
 		Enabled:     true,
 		NextRunAt:   time.Now(),
 		LastRunAt:   time.Now(),
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	assert.Equal(t, uint(1), task.ID)
@@ -129,12 +126,10 @@ func TestMemory_TableName(t *testing.T) {
 // TestChannelConfig tests for ChannelConfig struct
 func TestChannelConfig_Structure(t *testing.T) {
 	config := ChannelConfig{
-		ID:        1,
-		Name:      "telegram",
-		Enabled:   true,
-		Config:    `{"token":"test"}`,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Model:   Model{ID: 1},
+		Name:    "telegram",
+		Enabled: true,
+		Config:  `{"token":"test"}`,
 	}
 
 	assert.Equal(t, uint(1), config.ID)

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"icooclaw.ai/config"
+	"icooclaw.core/config"
 )
 
 // ToolRegistry 工具注册表管理器

@@ -3,53 +3,68 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"icooclaw.core/config"
+	"icooclaw.core/consts"
+	"icooclaw.core/storage"
 )
 
 // RESTGateway REST API 网关实现
 type RESTGateway struct {
-	config  Config
-	storage StorageReader
-	agent   AgentReader
-	skills  SkillReader
-	logger  Logger
-	server  *http.Server
-	router  *chi.Mux
-	running bool
-	mu      sync.RWMutex
+	workspace   string
+	config      *config.Config
+	logger      Logger
+	dataStorage *storage.Storage
+	server      *http.Server
+	router      *chi.Mux
+	running     bool
+	mu          sync.RWMutex
+
+	handlers *Handlers
 }
 
 // NewRESTGateway 创建 REST 网关
-func NewRESTGateway(cfg Config, storage StorageReader, agent AgentReader, skills SkillReader, logger Logger) *RESTGateway {
+func NewRESTGateway() (*RESTGateway, error) {
+	// Step 1: 加载配置
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("加载配置失败: %w", err)
+	}
+
+	// Step 2: 初始化日志
+	logger := config.InitLogger(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output)
+	slog.SetDefault(logger)
+
+	// Step 3: 初始化工作空间（检查并创建关键文件）
+	wsConfig, err := config.InitWorkspaceWithConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("初始化工作空间失败: %w", err)
+	}
+
+	// Step 4: 初始化数据库
+	db, err := storage.InitDB(cfg.Database.Path)
+	if err != nil {
+		return nil, fmt.Errorf("初始化数据库失败: %w", err)
+	}
+	logger.Info("数据库初始化成功", "path", cfg.Database.Path)
+
+	dataStorage := storage.NewStorage(db)
 	g := &RESTGateway{
-		config:  cfg,
-		storage: storage,
-		agent:   agent,
-		skills:  skills,
-		logger:  logger,
+		mu:          sync.RWMutex{},
+		workspace:   wsConfig.Path,
+		config:      cfg,
+		logger:      logger,
+		dataStorage: dataStorage,
 	}
 
 	g.setupRouter()
-	return g
-}
-
-// SetAgent 设置 Agent 引用
-func (g *RESTGateway) SetAgent(agent AgentReader) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.agent = agent
-}
-
-// SetSkills 设置技能读取器
-func (g *RESTGateway) SetSkills(skills SkillReader) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.skills = skills
+	return g, nil
 }
 
 // setupRouter 设置路由
@@ -64,21 +79,8 @@ func (g *RESTGateway) setupRouter() {
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(g.corsMiddleware)
 
-	// 健康检查
-	r.Get("/api/v1/health", g.handleHealth)
-
-	// 会话相关
-	r.Get("/api/v1/sessions", g.handleGetSessions)
-	r.Get("/api/v1/sessions/{id}/messages", g.handleGetSessionMessages)
-	r.Delete("/api/v1/sessions/{id}", g.handleDeleteSession)
-
-	// Provider 信息
-	r.Get("/api/v1/providers", g.handleGetProviders)
-
-	// 技能相关
-	r.Get("/api/v1/skills", g.handleGetSkills)
-	r.Get("/api/v1/skills/{id}", g.handleGetSkill)
-
+	// 注册路由
+	RegisterRoutes(r, g.handlers)
 	g.router = r
 }
 
@@ -100,18 +102,18 @@ func (g *RESTGateway) corsMiddleware(next http.Handler) http.Handler {
 
 // Start 启动网关
 func (g *RESTGateway) Start(ctx context.Context) error {
-	if g.config == nil || !g.config.Enabled() {
-		g.logger.Info("REST Gateway is disabled")
+	if g.config == nil || !g.config.Gateway.Enabled {
+		g.logger.Info("REST 网关已禁用")
 		return nil
 	}
 
-	host := g.config.Host()
+	host := g.config.Gateway.Host
 	if host == "" {
-		host = "0.0.0.0"
+		host = consts.DEF_GATEWAY_HOST
 	}
-	port := g.config.Port()
+	port := g.config.Gateway.Port
 	if port == 0 {
-		port = 8080
+		port = consts.DEF_GATEWAY_PORT
 	}
 
 	addr := fmt.Sprintf("%s:%d", host, port)
@@ -128,13 +130,13 @@ func (g *RESTGateway) Start(ctx context.Context) error {
 	g.mu.Unlock()
 
 	go func() {
-		g.logger.Info("REST Gateway starting", "host", host, "port", port)
+		g.logger.Info("REST 网关启动", "host", host, "port", port)
 		if err := g.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			g.logger.Error("REST Gateway error", "error", err)
+			g.logger.Error("REST 网关启动失败", "error", err)
 		}
 	}()
 
-	g.logger.Info("REST Gateway started", "addr", addr)
+	g.logger.Info("REST 网关启动成功", "addr", addr)
 	return nil
 }
 
@@ -148,7 +150,7 @@ func (g *RESTGateway) Stop() error {
 	defer cancel()
 
 	if err := g.server.Shutdown(ctx); err != nil {
-		g.logger.Error("REST Gateway shutdown error", "error", err)
+		g.logger.Error("REST 网关关闭失败", "error", err)
 		return err
 	}
 
@@ -156,7 +158,7 @@ func (g *RESTGateway) Stop() error {
 	g.running = false
 	g.mu.Unlock()
 
-	g.logger.Info("REST Gateway stopped")
+	g.logger.Info("REST 网关关闭成功")
 	return nil
 }
 
@@ -175,4 +177,5 @@ func (g *RESTGateway) Router() http.Handler {
 // Mount 挂载到外部路由器
 func (g *RESTGateway) Mount(r chi.Router, pattern string) {
 	r.Mount(pattern, g.router)
+	g.logger.Info("REST 网关挂载到路由", "pattern", pattern)
 }

@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -28,11 +26,12 @@ Example:
   icooclaw role set "You are a friendly assistant who likes to answer questions in Chinese"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("role set: %w", err)
-		}
-		rolePrompt := args[0]
-		return setRolePrompt(rolePrompt)
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("role set: %w", err)
+		// }
+		// rolePrompt := args[0]
+		// return setRolePrompt(rolePrompt)
+		return nil
 	},
 }
 
@@ -43,10 +42,11 @@ var roleGetCmd = &cobra.Command{
 	Long:  "Get the currently set role prompt",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("role get: %w", err)
-		}
-		return getRolePrompt()
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("role get: %w", err)
+		// }
+		// return getRolePrompt()
+		return nil
 	},
 }
 
@@ -57,10 +57,11 @@ var roleClearCmd = &cobra.Command{
 	Long:  "Clear the currently set role prompt",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := checkInitialized(); err != nil {
-			return fmt.Errorf("role clear: %w", err)
-		}
-		return clearRolePrompt()
+		// if err := checkInitialized(); err != nil {
+		// 	return fmt.Errorf("role clear: %w", err)
+		// }
+		// return clearRolePrompt()
+		return nil
 	},
 }
 
@@ -71,58 +72,58 @@ func init() {
 	rootCmd.AddCommand(roleCmd)
 }
 
-// setRolePrompt 设置角色提示词
-func setRolePrompt(prompt string) error {
-	// 为 CLI 创建虚拟会话
-	session, err := agentInstance.Storage().GetOrCreateSession("cli", "cli-session", "cli-user")
-	if err != nil {
-		return fmt.Errorf("get session: %w", err)
-	}
+// // setRolePrompt 设置角色提示词
+// func setRolePrompt(prompt string) error {
+// 	// 为 CLI 创建虚拟会话
+// 	session, err := agentInstance.Storage().GetOrCreateSession("cli", "cli-session", "cli-user")
+// 	if err != nil {
+// 		return fmt.Errorf("get session: %w", err)
+// 	}
 
-	if err := agentInstance.SetSessionRolePrompt(session.ID, prompt); err != nil {
-		return fmt.Errorf("set role prompt: %w", err)
-	}
+// 	if err := agentInstance.SetSessionRolePrompt(session.ID, prompt); err != nil {
+// 		return fmt.Errorf("set role prompt: %w", err)
+// 	}
 
-	fmt.Println("Role prompt set:")
-	fmt.Println(prompt)
-	return nil
-}
+// 	fmt.Println("Role prompt set:")
+// 	fmt.Println(prompt)
+// 	return nil
+// }
 
-// getRolePrompt 获取角色提示词
-func getRolePrompt() error {
-	// 为 CLI 创建虚拟会话
-	session, err := agentInstance.Storage().GetOrCreateSession("cli", "cli-session", "cli-user")
-	if err != nil {
-		return fmt.Errorf("get session: %w", err)
-	}
+// // getRolePrompt 获取角色提示词
+// func getRolePrompt() error {
+// 	// 为 CLI 创建虚拟会话
+// 	session, err := agentInstance.Storage().GetOrCreateSession("cli", "cli-session", "cli-user")
+// 	if err != nil {
+// 		return fmt.Errorf("get session: %w", err)
+// 	}
 
-	rolePrompt, err := agentInstance.GetSessionRolePrompt(session.ID)
-	if err != nil {
-		return fmt.Errorf("get role prompt: %w", err)
-	}
+// 	rolePrompt, err := agentInstance.GetSessionRolePrompt(session.ID)
+// 	if err != nil {
+// 		return fmt.Errorf("get role prompt: %w", err)
+// 	}
 
-	if rolePrompt == "" {
-		fmt.Println("No role prompt set")
-		return nil
-	}
+// 	if rolePrompt == "" {
+// 		fmt.Println("No role prompt set")
+// 		return nil
+// 	}
 
-	fmt.Println("Current role prompt:")
-	fmt.Println(rolePrompt)
-	return nil
-}
+// 	fmt.Println("Current role prompt:")
+// 	fmt.Println(rolePrompt)
+// 	return nil
+// }
 
-// clearRolePrompt 清除角色提示词
-func clearRolePrompt() error {
-	// 为 CLI 创建虚拟会话
-	session, err := agentInstance.Storage().GetOrCreateSession("cli", "cli-session", "cli-user")
-	if err != nil {
-		return fmt.Errorf("get session: %w", err)
-	}
+// // clearRolePrompt 清除角色提示词
+// func clearRolePrompt() error {
+// 	// 为 CLI 创建虚拟会话
+// 	session, err := agentInstance.Storage().GetOrCreateSession("cli", "cli-session", "cli-user")
+// 	if err != nil {
+// 		return fmt.Errorf("get session: %w", err)
+// 	}
 
-	if err := agentInstance.SetSessionRolePrompt(session.ID, ""); err != nil {
-		return fmt.Errorf("clear role prompt: %w", err)
-	}
+// 	if err := agentInstance.SetSessionRolePrompt(session.ID, ""); err != nil {
+// 		return fmt.Errorf("clear role prompt: %w", err)
+// 	}
 
-	fmt.Println("Role prompt cleared")
-	return nil
-}
+// 	fmt.Println("Role prompt cleared")
+// 	return nil
+// }

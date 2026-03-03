@@ -6,23 +6,23 @@ import (
 	"log/slog"
 	"strings"
 
-	"icooclaw.ai/consts"
 	"icooclaw.ai/hooks"
 	"icooclaw.ai/provider"
-	"icooclaw.ai/storage"
 	"icooclaw.ai/tools"
+	"icooclaw.core/consts"
+	"icooclaw.core/storage"
 )
 
 // ============ ReAct Agent ============
 
 // ReActConfig ReAct 配置
 type ReActConfig struct {
-	MaxIterations int                 // 最大迭代次数，默认 10
-	Provider      provider.Provider   // LLM 提供者
+	MaxIterations int                   // 最大迭代次数，默认 10
+	Provider      provider.Provider     // LLM 提供者
 	Tools         ToolRegistryInterface // 工具注册表
-	Session       *storage.Session    // 会话
-	Logger        *slog.Logger        // 日志
-	Hooks         hooks.ReActHooks    // 钩子接口
+	Session       *storage.Session      // 会话
+	Logger        *slog.Logger          // 日志
+	Hooks         hooks.ReActHooks      // 钩子接口
 }
 
 // NewReActConfig 创建默认配置

@@ -10,13 +10,8 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	gorm.io/gorm v1.31.1
-	icooclaw.bus v0.0.0
-	icooclaw.utils v0.0.0
 )
 
-replace icooclaw.bus => ../icooclaw.bus
-
-replace icooclaw.utils => ../icooclaw.utils
 
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect

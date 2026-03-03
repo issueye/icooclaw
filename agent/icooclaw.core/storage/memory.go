@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -52,84 +51,78 @@ func (m *Memory) BeforeUpdate(tx *gorm.DB) error {
 	return nil
 }
 
+// GetTags 获取标签
+func (m *Memory) GetTags() []string {
+	return m.Tags
+}
+
+// MemoryStorage 记忆存储
+type MemoryStorage struct {
+	db *gorm.DB
+}
+
+// NewMemoryStorage 创建记忆存储
+func NewMemoryStorage(db *gorm.DB) *MemoryStorage {
+	return &MemoryStorage{db: db}
+}
+
 // Create 创建记忆
-func (m *Memory) Create() error {
-	return DB.Create(m).Error
+func (s *MemoryStorage) Create(memory *Memory) error {
+	return s.db.Create(memory).Error
 }
 
 // Update 更新记忆
-func (m *Memory) Update() error {
-	return DB.Save(m).Error
-}
-
-// Delete 删除记忆
-func (m *Memory) Delete() error {
-	return DB.Delete(m).Error
+func (s *MemoryStorage) Update(memory *Memory) error {
+	return s.db.Save(memory).Error
 }
 
 // GetByID 通过ID获取记忆
-func GetMemoryByID(id uint) (*Memory, error) {
+func (s *MemoryStorage) GetByID(id uint) (*Memory, error) {
 	var memory Memory
-	err := DB.First(&memory, id).Error
+	err := s.db.First(&memory, id).Error
 	return &memory, err
 }
 
 // GetByKey 通过Key获取记忆
-func GetMemoryByKey(key string) (*Memory, error) {
+func (s *MemoryStorage) GetByKey(key string) (*Memory, error) {
 	var memory Memory
-	err := DB.Where("key = ?", key).First(&memory).Error
+	err := s.db.Where("key = ?", key).First(&memory).Error
 	return &memory, err
 }
 
-// GetByType 通过类型获取记忆
-func GetMemoriesByType(memType string) ([]Memory, error) {
-	var memories []Memory
-	err := DB.Where("type = ?", memType).Order("updated_at DESC").Find(&memories).Error
-	return memories, err
+// Delete 删除记忆
+func (s *MemoryStorage) Delete(id uint) error {
+	return s.db.Delete(&Memory{}, id).Error
 }
 
 // GetAll 获取所有记忆
-func GetAllMemories() ([]Memory, error) {
+func (s *MemoryStorage) GetAll() ([]Memory, error) {
 	var memories []Memory
-	err := DB.Order("updated_at DESC").Find(&memories).Error
+	err := s.db.Order("updated_at DESC").Find(&memories).Error
 	return memories, err
 }
 
-// Upsert 创建或更新记忆
-func (m *Memory) Upsert() error {
-	var existing Memory
-	err := DB.Where("key = ? AND type = ?", m.Key, m.Type).First(&existing).Error
-	if err == gorm.ErrRecordNotFound {
-		return m.Create()
-	}
-	m.ID = existing.ID
-	return m.Update()
+// GetByType 通过类型获取记忆
+func (s *MemoryStorage) GetByType(memType MemoryType) ([]Memory, error) {
+	var memories []Memory
+	err := s.db.Where("type = ? AND is_deleted = ?", memType, false).Order("updated_at DESC").Find(&memories).Error
+	return memories, err
 }
 
-// SearchMemories 搜索记忆
-func SearchMemories(query string) ([]Memory, error) {
+// Search 搜索记忆
+func (s *MemoryStorage) Search(query string) ([]Memory, error) {
 	var memories []Memory
-	err := DB.
+	err := s.db.
 		Where("is_deleted = ? AND (content LIKE ? OR tags LIKE ?)", false, "%"+query+"%", "%"+query+"%").
 		Order("importance DESC, updated_at DESC").
 		Find(&memories).Error
 	return memories, err
 }
 
-// GetByTypeAndSession 按类型和会话获取记忆
-func GetMemoriesByTypeAndSession(memType string, sessionID uint) ([]Memory, error) {
-	var memories []Memory
-	err := DB.
-		Where("type = ? AND session_id = ? AND is_deleted = ?", memType, sessionID, false).
-		Order("is_pinned DESC, importance DESC, updated_at DESC").
-		Find(&memories).Error
-	return memories, err
-}
-
 // GetByUserID 按用户ID获取记忆
-func GetMemoriesByUserID(userID string) ([]Memory, error) {
+func (s *MemoryStorage) GetByUserID(userID string) ([]Memory, error) {
 	var memories []Memory
-	err := DB.
+	err := s.db.
 		Where("user_id = ? AND is_deleted = ?", userID, false).
 		Order("is_pinned DESC, importance DESC, updated_at DESC").
 		Find(&memories).Error
@@ -137,126 +130,89 @@ func GetMemoriesByUserID(userID string) ([]Memory, error) {
 }
 
 // GetBySessionID 按会话ID获取记忆
-func GetMemoriesBySessionID(sessionID uint) ([]Memory, error) {
+func (s *MemoryStorage) GetBySessionID(sessionID uint) ([]Memory, error) {
 	var memories []Memory
-	err := DB.
+	err := s.db.
 		Where("session_id = ? AND is_deleted = ?", sessionID, false).
 		Order("is_pinned DESC, importance DESC, updated_at DESC").
 		Find(&memories).Error
 	return memories, err
 }
 
-// GetPinnedMemories 获取置顶记忆
-func GetPinnedMemories() ([]Memory, error) {
+// GetPinned 获取置顶记忆
+func (s *MemoryStorage) GetPinned() ([]Memory, error) {
 	var memories []Memory
-	err := DB.
+	err := s.db.
 		Where("is_pinned = ? AND is_deleted = ?", true, false).
 		Order("updated_at DESC").
 		Find(&memories).Error
 	return memories, err
 }
 
-// GetExpiredMemories 获取过期记忆
-func GetExpiredMemories() ([]Memory, error) {
-	var memories []Memory
-	err := DB.
-		Where("expires_at IS NOT NULL AND expires_at < ? AND is_deleted = ?", time.Now(), false).
-		Find(&memories).Error
-	return memories, err
-}
-
 // SoftDelete 软删除记忆
-func (m *Memory) SoftDelete() error {
-	m.IsDeleted = true
-	return m.Update()
+func (s *MemoryStorage) SoftDelete(id uint) error {
+	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_deleted", true).Error
 }
 
 // Restore 恢复记忆
-func (m *Memory) Restore() error {
-	m.IsDeleted = false
-	return m.Update()
+func (s *MemoryStorage) Restore(id uint) error {
+	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_deleted", false).Error
 }
 
 // Pin 置顶记忆
-func (m *Memory) Pin() error {
-	m.IsPinned = true
-	return m.Update()
+func (s *MemoryStorage) Pin(id uint) error {
+	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_pinned", true).Error
 }
 
 // Unpin 取消置顶
-func (m *Memory) Unpin() error {
-	m.IsPinned = false
-	return m.Update()
+func (s *MemoryStorage) Unpin(id uint) error {
+	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_pinned", false).Error
 }
 
-// SetTags 设置标签
-func (m *Memory) SetTags(tags []string) error {
-	m.Tags = append(m.Tags, tags...)
-	return m.Update()
-}
-
-// GetTags 获取标签列表
-func (m *Memory) GetTags() []string {
-	if len(m.Tags) == 0 {
-		return nil
+// Page 分页获取记忆
+func (s *MemoryStorage) Page(q *QueryMemory) (*ResQueryMemory, error) {
+	var total int64
+	query := s.db.Model(&Memory{}).Where("is_deleted = ?", false)
+	if q.Type != "" {
+		query = query.Where("type = ?", q.Type)
 	}
-	// 去掉首尾逗号后分割
-	tagsStr := strings.Trim(m.Tags.String(), ",")
-	if tagsStr == "" {
-		return nil
+	if q.KeyWord != "" {
+		query = query.Where("content LIKE ? OR tags LIKE ?", "%"+q.KeyWord+"%", "%"+q.KeyWord+"%")
 	}
-	return strings.Split(tagsStr, ",")
-}
-
-// BatchCreate 批量创建记忆
-func BatchCreateMemories(memories []*Memory) error {
-	if len(memories) == 0 {
-		return nil
+	if q.UserID != "" {
+		query = query.Where("user_id = ?", q.UserID)
 	}
-	return DB.Create(memories).Error
-}
-
-// BatchDelete 批量删除记忆
-func BatchDeleteMemories(ids []uint) error {
-	if len(ids) == 0 {
-		return nil
+	if q.SessionID != nil {
+		query = query.Where("session_id = ?", q.SessionID)
 	}
-	return DB.
-		Model(&Memory{}).
-		Where("id IN ?", ids).
-		Update("is_deleted", true).Error
-}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, err
+	}
 
-// CountByType 按类型统计记忆数量
-func CountMemoriesByType(memType string) (int64, error) {
-	var count int64
-	err := DB.
-		Model(&Memory{}).
-		Where("type = ? AND is_deleted = ?", memType, false).
-		Count(&count).Error
-	return count, err
-}
-
-// GetMemoriesByTags 按标签获取记忆
-func GetMemoriesByTags(tag string) ([]Memory, error) {
 	var memories []Memory
-	err := DB.
-		Where("tags LIKE ? AND is_deleted = ?", "%,"+tag+",%", false).
-		Order("importance DESC, updated_at DESC").
+	err := query.Order("is_pinned DESC, importance DESC, updated_at DESC").
+		Offset((q.Page.Page - 1) * q.Page.Size).
+		Limit(q.Page.Size).
 		Find(&memories).Error
-	return memories, err
+
+	q.Page.Total = int(total)
+	return &ResQueryMemory{
+		Page:    q.Page,
+		Records: memories,
+	}, err
 }
 
-// ClearSessionMemories 清除会话记忆
-func ClearSessionMemories(sessionID uint) error {
-	return DB.
-		Where("session_id = ? AND type = ?", sessionID, "session").
-		Delete(&Memory{}).Error
+// QueryMemory 记忆查询参数
+type QueryMemory struct {
+	Page      Page       `json:"page"`
+	Type      MemoryType `json:"type"`
+	KeyWord   string     `json:"key_word"`
+	UserID    string     `json:"user_id"`
+	SessionID *uint      `json:"session_id"`
 }
 
-// ClearUserMemories 清除用户记忆
-func ClearUserMemories(userID string) error {
-	return DB.
-		Where("user_id = ? AND type = ?", userID, "user").
-		Delete(&Memory{}).Error
+// ResQueryMemory 记忆查询结果
+type ResQueryMemory struct {
+	Page    Page     `json:"page"`
+	Records []Memory `json:"records"`
 }

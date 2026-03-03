@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"icooclaw.ai/provider"
-	"icooclaw.ai/storage"
+	"icooclaw.core/storage"
 )
 
 // ContextBuilder 上下文构建器
@@ -433,36 +433,37 @@ func (cb *ContextBuilder) GetMemoryFilePath() string {
 // buildMessages 构建消息列表
 func (cb *ContextBuilder) buildMessages() ([]provider.Message, error) {
 	// 获取会话消息
-	messages, err := cb.session.GetMessages(cb.agent.Config().MemoryWindow)
-	if err != nil {
-		return nil, err
-	}
+	// messages, err := cb.session.GetMessages(cb.agent.Config().MemoryWindow)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	// 转换为provider.Message
-	result := make([]provider.Message, len(messages))
-	for i, msg := range messages {
-		result[i] = provider.Message{
-			Role:             msg.Role,
-			Content:          msg.Content,
-			ReasoningContent: msg.ReasoningContent,
-		}
+	// // 转换为provider.Message
+	// result := make([]provider.Message, len(messages))
+	// for i, msg := range messages {
+	// 	result[i] = provider.Message{
+	// 		Role:             msg.Role,
+	// 		Content:          msg.Content,
+	// 		ReasoningContent: msg.ReasoningContent,
+	// 	}
 
-		// 处理tool_calls
-		if msg.ToolCalls != "" {
-			var calls []provider.ToolCall
-			if err := json.Unmarshal([]byte(msg.ToolCalls), &calls); err == nil {
-				result[i].ToolCalls = calls
-			}
-		}
+	// 	// 处理tool_calls
+	// 	if msg.ToolCalls != "" {
+	// 		var calls []provider.ToolCall
+	// 		if err := json.Unmarshal([]byte(msg.ToolCalls), &calls); err == nil {
+	// 			result[i].ToolCalls = calls
+	// 		}
+	// 	}
 
-		// 处理tool角色
-		if msg.Role == "tool" {
-			result[i].ToolCallID = msg.ToolCallID
-			result[i].Name = msg.ToolName
-		}
-	}
+	// 	// 处理tool角色
+	// 	if msg.Role == "tool" {
+	// 		result[i].ToolCallID = msg.ToolCallID
+	// 		result[i].Name = msg.ToolName
+	// 	}
+	// }
 
-	return result, nil
+	// return result, nil
+	return nil, nil
 }
 
 // AddContext 添加额外上下文
