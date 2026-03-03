@@ -61,6 +61,7 @@ func NewRESTGateway() (*RESTGateway, error) {
 		config:      cfg,
 		logger:      logger,
 		dataStorage: dataStorage,
+		handlers:    NewHandlers(logger, dataStorage),
 	}
 
 	g.setupRouter()

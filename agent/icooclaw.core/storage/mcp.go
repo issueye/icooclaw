@@ -22,7 +22,7 @@ type MCPConfig struct {
 	Name        string   `gorm:"size:100;uniqueIndex" json:"name"` // MCP 名称
 	Description string   `gorm:"size:255" json:"description"`      // MCP 描述
 	Type        MCPType  `gorm:"size:100" json:"type"`             // MCP 类型
-	Args        []string `gorm:"size:255" json:"args"`             // MCP 参数
+	Args        []string `gorm:"type:text;serializer:json" json:"args"` // MCP 参数
 }
 
 func (table *MCPConfig) IsStdio() bool {
