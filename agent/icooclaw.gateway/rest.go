@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/docgen"
+	"icooclaw.ai/agent"
 	"icooclaw.core/config"
 	"icooclaw.core/consts"
 	"icooclaw.core/storage"
@@ -26,6 +27,7 @@ type RESTGateway struct {
 	router      *chi.Mux
 	running     bool
 	mu          sync.RWMutex
+	Agents      map[uint]*agent.Agent
 
 	handlers *Handlers
 }
@@ -63,6 +65,7 @@ func NewRESTGateway() (*RESTGateway, error) {
 		logger:      logger,
 		dataStorage: dataStorage,
 		handlers:    NewHandlers(logger, dataStorage),
+		Agents:      make(map[uint]*agent.Agent),
 	}
 
 	g.setupRouter()
