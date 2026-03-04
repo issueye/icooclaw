@@ -11,25 +11,36 @@ import (
 	"strings"
 	"time"
 
+	"icooclaw.ai/memory"
 	"icooclaw.ai/provider"
-	"icooclaw.core/storage"
+	"icooclaw.ai/skill"
 )
 
 // ContextBuilder 上下文构建器
 type ContextBuilder struct {
-	agent   AgentContext
-	session *storage.Session
-	logger  *slog.Logger
-	fs      FileSystemInterface
+	sessionID    uint
+	workspace    string
+	skillLoader  skill.Loader
+	memoryLoader memory.Loader
+	logger       *slog.Logger
+	fs           *OsFileSystem
 }
 
 // NewContextBuilder 创建上下文构建器
-func NewContextBuilder(agent AgentContext, session *storage.Session) *ContextBuilder {
+func NewContextBuilder(
+	sessionID uint,
+	workspace string,
+	logger *slog.Logger,
+	skillLoader skill.Loader,
+	memoryLoader memory.Loader,
+) *ContextBuilder {
 	return &ContextBuilder{
-		agent:   agent,
-		session: session,
-		logger:  agent.Logger(),
-		fs:      OsFileSystem{},
+		workspace:    workspace,
+		logger:       logger,
+		skillLoader:  skillLoader,
+		memoryLoader: memoryLoader,
+		sessionID:    sessionID,
+		fs:           &OsFileSystem{},
 	}
 }
 
@@ -37,7 +48,7 @@ func NewContextBuilder(agent AgentContext, session *storage.Session) *ContextBui
 type ContextBuilderOption func(*ContextBuilder)
 
 // WithFileSystem 设置文件系统实现
-func WithFileSystem(fs FileSystemInterface) ContextBuilderOption {
+func WithFileSystem(fs *OsFileSystem) ContextBuilderOption {
 	return func(cb *ContextBuilder) {
 		cb.fs = fs
 	}
@@ -82,24 +93,10 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 		parts = append(parts, userContent)
 	}
 
-	// 添加用户设定的角色提示词（优先级最高）
-	rolePrompt, err := cb.agent.GetSessionRolePrompt(cb.session.ID)
-	if err == nil && rolePrompt != "" {
-		parts = append(parts, "", "## 角色设定")
-		parts = append(parts, rolePrompt)
-	}
-
-	// 添加默认系统提示词
-	defaultPrompt := cb.agent.GetSystemPrompt()
-	if defaultPrompt != "" {
-		parts = append(parts, "", "## 系统指令")
-		parts = append(parts, defaultPrompt)
-	}
-
 	// 添加环境信息
 	parts = append(parts, "", "## 环境信息")
 	parts = append(parts, fmt.Sprintf("- 操作系统: %s", runtime.GOOS))
-	parts = append(parts, fmt.Sprintf("- 工作目录: %s", cb.agent.Workspace()))
+	parts = append(parts, fmt.Sprintf("- 工作目录: %s", cb.workspace))
 
 	// 读取 workspace 下的记忆文件
 	memoryContent := cb.readMemoryFile()
@@ -109,16 +106,23 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 	}
 
 	// 添加技能提示词
-	skills := cb.agent.Skills().GetLoaded()
+	ctx := context.Background()
+	// 加载技能
+	skills, err := cb.skillLoader.Load(ctx)
+	if err != nil {
+		return ""
+	}
+
+	// 将技能添加到系统提示词中
 	for _, sk := range skills {
 		parts = append(parts, "", fmt.Sprintf("## Skill: %s", sk.Name))
-		parts = append(parts, sk.Content)
+		parts = append(parts, sk.Description)
 	}
 
 	// 添加记忆
-	memories, err := cb.agent.Memory().GetAll()
+	memories, err := cb.memoryLoader.Load(cb.sessionID, 0)
 	if err == nil && len(memories) > 0 {
-		parts = append(parts, "", "## Long-term Memory")
+		parts = append(parts, "", "## 长期记忆")
 		for _, mem := range memories {
 			parts = append(parts, mem.Content)
 		}
@@ -130,7 +134,7 @@ func (cb *ContextBuilder) buildSystemPrompt() string {
 // readTemplateFile 读取模板文件内容
 // 优先读取 workspace 目录下的文件，如果不存在则回退到 templates 目录
 func (cb *ContextBuilder) readTemplateFile(filename string) string {
-	workspace := cb.agent.Workspace()
+	workspace := cb.workspace
 	if workspace == "" {
 		return ""
 	}
@@ -140,7 +144,7 @@ func (cb *ContextBuilder) readTemplateFile(filename string) string {
 	if _, err := cb.fs.Stat(workspacePath); err == nil {
 		content, err := cb.fs.ReadFile(workspacePath)
 		if err == nil {
-			cb.logger.Debug("Read template from workspace", "file", filename, "path", workspacePath)
+			cb.logger.Debug("读取模板文件成功", "file", filename, "path", workspacePath)
 			return string(content)
 		}
 	}
@@ -166,7 +170,7 @@ func (cb *ContextBuilder) readTemplateFile(filename string) string {
 
 // readMemoryFile 读取 workspace/memory/MEMORY.md 文件
 func (cb *ContextBuilder) readMemoryFile() string {
-	workspace := cb.agent.Workspace()
+	workspace := cb.workspace
 	if workspace == "" {
 		return ""
 	}
@@ -238,7 +242,7 @@ func (cb *ContextBuilder) hasUserPreference(content string) bool {
 
 // CheckUserPreferenceSet 检查用户是否已设置偏好
 func (cb *ContextBuilder) CheckUserPreferenceSet() bool {
-	workspace := cb.agent.Workspace()
+	workspace := cb.workspace
 	if workspace == "" {
 		return false
 	}
@@ -254,7 +258,7 @@ func (cb *ContextBuilder) CheckUserPreferenceSet() bool {
 
 // UpdateMemoryFile 更新 memory/MEMORY.md 文件
 func (cb *ContextBuilder) UpdateMemoryFile(section, content string) error {
-	workspace := cb.agent.Workspace()
+	workspace := cb.workspace
 	if workspace == "" {
 		return fmt.Errorf("workspace not set")
 	}
@@ -407,7 +411,7 @@ func updateLastUpdated(content string) string {
 
 // GetMemoryFile 读取 memory/MEMORY.md 文件内容
 func (cb *ContextBuilder) GetMemoryFile() (string, error) {
-	workspace := cb.agent.Workspace()
+	workspace := cb.workspace
 	if workspace == "" {
 		return "", fmt.Errorf("workspace not set")
 	}
@@ -423,7 +427,7 @@ func (cb *ContextBuilder) GetMemoryFile() (string, error) {
 
 // GetMemoryFilePath 获取 memory/MEMORY.md 文件路径
 func (cb *ContextBuilder) GetMemoryFilePath() string {
-	workspace := cb.agent.Workspace()
+	workspace := cb.workspace
 	if workspace == "" {
 		return ""
 	}
@@ -432,6 +436,7 @@ func (cb *ContextBuilder) GetMemoryFilePath() string {
 
 // buildMessages 构建消息列表
 func (cb *ContextBuilder) buildMessages() ([]provider.Message, error) {
+
 	// 获取会话消息
 	// messages, err := cb.session.GetMessages(cb.agent.Config().MemoryWindow)
 	// if err != nil {

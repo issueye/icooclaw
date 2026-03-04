@@ -15,6 +15,10 @@ func (r RoleType) ToString() string {
 	return string(r)
 }
 
+func ToRole(role string) RoleType {
+	return RoleType(role)
+}
+
 // DEF_GATEWAY_PORT 默认网关端口
 const DEF_GATEWAY_PORT = 16777
 

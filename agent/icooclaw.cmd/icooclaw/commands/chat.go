@@ -196,12 +196,12 @@ func (c *CLI) handleSlashCommand(ctx context.Context, input string) error {
 func (c *CLI) sendMessage(ctx context.Context, input string) error {
 	c.logger.Info("Sending message to agent", "content", truncateMessage(input, 50))
 
-	resp, err := c.agent.ProcessMessage(ctx, input)
+	_, response, err := c.agent.ProcessMessage(ctx, input)
 	if err != nil {
 		return fmt.Errorf("agent error: %w", err)
 	}
 
-	fmt.Printf("\n%s\n", resp)
+	fmt.Printf("\n%s\n", response)
 	return nil
 }
 

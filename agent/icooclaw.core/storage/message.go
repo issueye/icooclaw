@@ -75,8 +75,17 @@ func (s *MessageStorage) GetByID(id uint) (*Message, error) {
 
 // GetBySessionID 通过会话ID获取消息
 func (s *MessageStorage) GetBySessionID(sessionID uint, limit, offset int) ([]Message, error) {
-	var messages []Message
-	err := s.db.Where("session_id = ?", sessionID).Order("created_at DESC").Limit(limit).Offset(offset).Find(&messages).Error
+	query := s.db.Where("session_id = ?", sessionID).Order("created_at DESC")
+
+	var (
+		messages []Message
+		err      error
+	)
+	if limit <= 0 {
+		err = query.Find(&messages).Error
+	} else {
+		err = query.Limit(limit).Offset(offset).Find(&messages).Error
+	}
 	return messages, err
 }
 

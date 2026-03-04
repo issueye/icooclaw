@@ -162,26 +162,26 @@ func (s *SubAgent) execute() {
 	message := s.buildExecutionPrompt()
 
 	// 执行处理
-	response, err := s.agent.ProcessMessage(subCtx, message)
+	_, response, err := s.agent.ProcessMessage(subCtx, message)
 
 	s.mu.Lock()
 	s.lastRun = time.Now()
 	s.execCount++
 	if err != nil {
 		s.lastResult = fmt.Sprintf("error: %v", err)
-		s.logger.Error("SubAgent execution failed", "name", s.name, "error", err)
+		s.logger.Error("子代理执行失败", "name", s.name, "error", err)
 	} else {
 		s.lastResult = response
-		s.logger.Debug("SubAgent executed", "name", s.name, "response_length", len(response))
+		s.logger.Debug("子代理执行成功", "name", s.name, "response_length", len(response))
 	}
 	s.mu.Unlock()
 
 	// 保存到记忆（如果启用）
-	if err == nil && s.agent.Memory() != nil {
-		key := fmt.Sprintf("subagent_%s_%d", s.name, s.execCount)
-		summary := fmt.Sprintf("Ran at %s: %s", s.lastRun.Format(time.RFC3339), truncate(response, 200))
-		_ = s.agent.Memory().RememberHistory(key, summary)
-	}
+	// if err == nil && s.agent.Memory() != nil {
+	// 	key := fmt.Sprintf("subagent_%s_%d", s.name, s.execCount)
+	// 	summary := fmt.Sprintf("Ran at %s: %s", s.lastRun.Format(time.RFC3339), truncate(response, 200))
+	// 	_ = s.agent.Memory().Save(sessionID, summary)
+	// }
 }
 
 // buildExecutionPrompt 构建执行提示

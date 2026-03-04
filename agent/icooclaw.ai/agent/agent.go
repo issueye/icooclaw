@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"icooclaw.ai/hooks"
+	"icooclaw.ai/memory"
 	"icooclaw.ai/provider"
+	"icooclaw.ai/skill"
 	"icooclaw.ai/tools"
+	"icooclaw.core/bus"
 	icooclawbus "icooclaw.core/bus"
 	"icooclaw.core/config"
 	"icooclaw.core/storage"
@@ -25,55 +28,27 @@ type SessionMetadata struct {
 
 // Agent Agent 核心结构体
 type Agent struct {
-	name      string
-	provider  provider.Provider
-	tools     *tools.Registry
-	storage   *storage.Storage
-	memory    MemoryStoreInterface
-	skills    SkillLoaderInterface
-	config    config.AgentSettings
-	bus       *icooclawbus.MessageBus
-	logger    *slog.Logger
-	workspace string
-}
-
-// AgentOption Agent 选项函数
-type AgentOption func(*Agent)
-
-// WithTools 设置工具注册表
-func WithTools(registry *tools.Registry) AgentOption {
-	return func(a *Agent) {
-		a.tools = registry
-	}
-}
-
-// WithMemoryStore 设置记忆存储
-func WithMemoryStore(store MemoryStoreInterface) AgentOption {
-	return func(a *Agent) {
-		a.memory = store
-	}
-}
-
-// WithSkillLoader 设置技能加载器
-func WithSkillLoader(loader SkillLoaderInterface) AgentOption {
-	return func(a *Agent) {
-		a.skills = loader
-	}
-}
-
-// WithMessageBus 设置消息总线
-func WithMessageBus(bus *icooclawbus.MessageBus) AgentOption {
-	return func(a *Agent) {
-		a.bus = bus
-	}
+	name           string                  // Agent 名称
+	workspace      string                  // 工作空间
+	sessionID      uint                    // 会话 ID
+	config         *config.AgentSettings   // Agent 配置
+	bus            *icooclawbus.MessageBus // 消息总线
+	logger         *slog.Logger            // 日志记录器
+	provider       provider.Provider       // 模型提供器
+	tools          *tools.Registry         // 工具注册表
+	storage        *storage.Storage        // 存储接口
+	memory         memory.Loader           // 记忆加载器
+	skills         skill.Loader            // 技能加载器
+	contextBuilder *ContextBuilder         // 上下文构建器
 }
 
 // NewAgent 创建 Agent 实例（使用函数式选项模式）
 func NewAgent(
+	id uint,
 	name string,
 	provider provider.Provider,
-	storageIntf *storage.Storage,
-	config config.AgentSettings,
+	storage *storage.Storage,
+	config *config.AgentSettings,
 	logger *slog.Logger,
 	workspace string,
 	opts ...AgentOption,
@@ -83,10 +58,11 @@ func NewAgent(
 	}
 
 	agent := &Agent{
+		sessionID: id,
 		name:      name,
 		provider:  provider,
 		tools:     tools.NewRegistry(), // 默认实现
-		storage:   storageIntf,
+		storage:   storage,
 		config:    config,
 		logger:    logger,
 		workspace: workspace,
@@ -97,24 +73,15 @@ func NewAgent(
 		opt(agent)
 	}
 
-	// 如果没有提供，使用默认实现（需要具体类型）
-	// if agent.memory == nil {
-	// 	if storageImpl, ok := storageIntf.(*storage.Storage); ok {
-	// 		agent.memory = memory.NewMemoryStoreWithConfig(storageImpl, logger, memory.MemoryConfig{
-	// 			ConsolidationThreshold: 50,
-	// 			SummaryEnabled:         true,
-	// 		})
-	// 	} else {
-	// 		logger.Warn("Storage is not *storage.Storage, skipping memory initialization")
-	// 	}
-	// }
-	// if agent.skills == nil {
-	// 	if storageImpl, ok := storageIntf.(*storage.Storage); ok {
-	// 		agent.skills = skill.NewLoader(storageImpl, logger)
-	// 	} else {
-	// 		logger.Warn("Storage is not *storage.Storage, skipping skills initialization")
-	// 	}
-	// }
+	// 初始化记忆加载器
+	if agent.memory == nil {
+		agent.memory = memory.NewStorage(storage, logger)
+	}
+
+	// 初始化技能加载器
+	if agent.skills == nil {
+		agent.skills = skill.NewLoader(storage, logger)
+	}
 
 	return agent
 }
@@ -127,6 +94,7 @@ func (a *Agent) Name() string {
 	return a.name
 }
 
+// Provider 获取 Provider
 func (a *Agent) Provider() provider.Provider {
 	return a.provider
 }
@@ -134,7 +102,7 @@ func (a *Agent) Provider() provider.Provider {
 // SetProvider 设置 Provider（用于运行时切换模型）
 func (a *Agent) SetProvider(p provider.Provider) {
 	a.provider = p
-	a.logger.Info("Provider switched", "name", p.GetName(), "model", p.GetDefaultModel())
+	a.logger.Info("切换供应商成功", "name", p.GetName(), "model", p.GetDefaultModel())
 }
 
 func (a *Agent) Tools() []tools.Tool {
@@ -149,7 +117,7 @@ func (a *Agent) Storage() *storage.Storage {
 	return a.storage
 }
 
-func (a *Agent) Config() config.AgentSettings {
+func (a *Agent) Config() *config.AgentSettings {
 	return a.config
 }
 
@@ -157,11 +125,11 @@ func (a *Agent) Logger() *slog.Logger {
 	return a.logger
 }
 
-func (a *Agent) Skills() SkillLoaderInterface {
+func (a *Agent) Skills() skill.Loader {
 	return a.skills
 }
 
-func (a *Agent) Memory() MemoryStoreInterface {
+func (a *Agent) Memory() memory.Loader {
 	return a.memory
 }
 
@@ -170,30 +138,9 @@ func (a *Agent) RegisterTool(tool tools.Tool) {
 	a.logger.Info("注册工具成功", "name", tool.Name())
 }
 
-func (a *Agent) Init(ctx context.Context) error {
-	if err := a.skills.Load(ctx); err != nil {
-		return fmt.Errorf("加载技能失败: %w", err)
-	}
-
-	for _, skill := range a.skills.GetLoaded() {
-		a.logger.Debug("加载技能成功", "name", skill.Name)
-	}
-
-	if err := a.memory.Load(ctx); err != nil {
-		a.logger.Warn("加载记忆失败", "error", err)
-	}
-
-	a.logger.Info("初始化 Agent 成功", "name", a.name)
-	return nil
-}
-
+// Run 运行 Agent
 func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 	a.bus = messageBus
-	if err := a.Init(ctx); err != nil {
-		a.logger.Error("初始化 Agent 失败", "error", err)
-		return
-	}
-
 	a.logger.Info("启动 Agent", "name", a.name)
 
 	for {
@@ -213,27 +160,33 @@ func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 
 			// 为每个消息处理创建独立的上下文，避免 goroutine 泄漏
 			msgCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-			go func(ctx context.Context, msg icooclawbus.InboundMessage) {
+			go func(ctx context.Context, msg bus.InboundMessage) {
 				defer cancel()
-				a.handleMessage(ctx, msg)
+				a.handleMessage(ctx, a.sessionID, msg)
 			}(msgCtx, msg)
 		}
 	}
 }
 
-func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessage) {
-	a.logger.Info("Handling message",
+func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.InboundMessage) {
+	a.logger.Info("开始处理消息",
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID,
 		"user_id", msg.UserID,
 		"content", msg.Content)
 
-	session, err := a.storage.Session().GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)
-	if err != nil {
-		a.logger.Error("获取或创建会话失败", "error", err)
-		return
+	// 获取会话
+	session, err := a.storage.Session().GetByID(sessionID)
+	if err != nil || (session != nil && session.ID == 0) {
+		// 如果会话不存在，创建一个新的会话
+		session, err = a.storage.Session().GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)
+		if err != nil {
+			a.logger.Error("获取或创建会话失败", "error", err)
+			return
+		}
 	}
 
+	// 创建用户消息
 	userMsg := storage.NewUserMessage(session.ID, msg.Content)
 	err = a.storage.Message().CreateOrUpdate(userMsg)
 	if err != nil {
@@ -241,36 +194,38 @@ func (a *Agent) handleMessage(ctx context.Context, msg icooclawbus.InboundMessag
 		return
 	}
 
-	contextBuilder := NewContextBuilder(a, session)
+	// 构建上下文
+	contextBuilder := NewContextBuilder(session.ID, a.workspace, a.logger, a.skills, a.memory)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
 		a.logger.Error("构建上下文失败", "error", err)
 		return
 	}
 
+	// 获取客户端 ID
 	clientID, _ := msg.Metadata["client_id"].(string)
 
 	// 处理 OnLLMChunk 钩子
 	onChunk := func(chunk, thinking string) {
 		if a.bus != nil {
 			if chunk != "" {
-				a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
-					Type:      icooclawbus.MessageTypeChunk,
+				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+					Type:      bus.MessageTypeChunk,
 					Channel:   msg.Channel,
 					ChatID:    msg.ChatID,
 					Content:   chunk,
 					Timestamp: time.Now(),
-					Metadata:  map[string]interface{}{"client_id": clientID},
+					Metadata:  map[string]any{"client_id": clientID},
 				})
 			}
 			if thinking != "" {
-				a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
-					Type:      icooclawbus.MessageTypeThinking,
+				a.bus.PublishOutbound(ctx, bus.OutboundMessage{
+					Type:      bus.MessageTypeThinking,
 					Channel:   msg.Channel,
 					ChatID:    msg.ChatID,
 					Thinking:  thinking,
 					Timestamp: time.Now(),
-					Metadata:  map[string]interface{}{"client_id": clientID},
+					Metadata:  map[string]any{"client_id": clientID},
 				})
 			}
 		}
@@ -334,24 +289,27 @@ func (a *Agent) GetSystemPrompt() string {
 	return a.config.SystemPrompt
 }
 
-func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, error) {
+func (a *Agent) ProcessMessage(ctx context.Context, content string) (uint, string, error) {
 	session, err := a.storage.Session().GetOrCreateSession("cli", "cli-session", "cli-user")
 	if err != nil {
-		return "", fmt.Errorf("failed to get or create session: %w", err)
+		return 0, "", fmt.Errorf("创建会话失败: %w", err)
 	}
 
+	// 创建用户消息
 	userMsg := storage.NewUserMessage(session.ID, content)
 	err = a.storage.Message().CreateOrUpdate(userMsg)
 	if err != nil {
-		return "", fmt.Errorf("failed to add user message: %w", err)
+		return 0, "", fmt.Errorf("添加用户消息失败: %w", err)
 	}
 
-	contextBuilder := NewContextBuilder(a, session)
+	// 构建上下文
+	contextBuilder := NewContextBuilder(session.ID, a.workspace, a.logger, a.skills, a.memory)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to build context: %w", err)
+		return 0, "", fmt.Errorf("构建上下文失败: %w", err)
 	}
 
+	// 运行 ReactActAgent
 	reactCfg := NewReActConfig()
 	reactCfg.Provider = a.Provider()
 	reactCfg.Tools = a.tools
@@ -359,25 +317,28 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, err
 	reactCfg.Logger = a.logger
 	reactCfg.Hooks = &hooks.DefaultHooks{}
 
+	// 运行 ReactActAgent
 	reactAgent := NewReActAgent(reactCfg)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
-		return "", fmt.Errorf("agent loop failed: %w", err)
+		return 0, "", fmt.Errorf("处理消息时出错: %w", err)
 	}
 
+	// 序列化工具调用
 	toolCallsJSON, err := json.Marshal(toolCalls)
 	if err != nil {
-		a.logger.Warn("Failed to marshal tool calls", "error", err)
+		a.logger.Warn("序列化工具调用失败", slog.Any("error", err))
 	}
 
+	// 创建助手消息
 	assistantMsg := storage.NewAssistantMessage(session.ID, response, reasoningContent)
 	assistantMsg.ToolResult = string(toolCallsJSON)
 	err = a.storage.Message().CreateOrUpdate(assistantMsg)
 	if err != nil {
-		a.logger.Error("添加助手消息失败", "error", err)
+		return 0, "", fmt.Errorf("添加助手消息失败: %w", err)
 	}
 
-	return response, nil
+	return session.ID, response, nil
 }
 
 func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {

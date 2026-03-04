@@ -5,13 +5,7 @@ import (
 	"os"
 
 	"icooclaw.ai/provider"
-	"icooclaw.ai/skill"
-	"icooclaw.core/config"
 	"icooclaw.core/storage"
-
-	"log/slog"
-
-	icooclawbus "icooclaw.core/bus"
 )
 
 // ============ 核心接口定义 ============
@@ -26,43 +20,7 @@ type MemoryStoreInterface interface {
 	RememberHistory(key, content string) error
 }
 
-// 确保 *memory.MemoryStore 实现该接口
-// var _ MemoryStoreInterface = (*memory.MemoryStore)(nil)
-
-// SkillLoaderInterface 技能加载接口
-// 封装技能的加载和管理
-type SkillLoaderInterface interface {
-	Load(ctx context.Context) error
-	GetLoaded() []skill.Skill
-	GetByName(name string) *skill.Skill
-}
-
-// 确保 *skill.Loader 实现该接口
-var _ SkillLoaderInterface = (*skill.Loader)(nil)
-
-// MessageBusInterface 消息总线接口
-// 封装消息的输入和输出
-type MessageBusInterface interface {
-	ConsumeInbound(ctx context.Context) (icooclawbus.InboundMessage, error)
-	PublishOutbound(ctx context.Context, msg icooclawbus.OutboundMessage) error
-}
-
-// 确保 *icooclawbus.MessageBus 实现该接口
-var _ MessageBusInterface = (*icooclawbus.MessageBus)(nil)
-
 // ============ Agent 上下文接口 ============
-
-// AgentContext Agent 上下文接口
-// 为 ContextBuilder 提供最小化的 Agent 能力抽象
-type AgentContext interface {
-	Logger() *slog.Logger
-	Workspace() string
-	Skills() SkillLoaderInterface
-	Memory() MemoryStoreInterface
-	Config() config.AgentSettings
-	GetSessionRolePrompt(sessionID uint) (string, error)
-	GetSystemPrompt() string
-}
 
 // ContextBuilderInterface 上下文构建器接口
 type ContextBuilderInterface interface {

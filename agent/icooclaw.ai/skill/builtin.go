@@ -1,16 +1,13 @@
 package skill
 
-func GetBuiltInSkills() []Skill {
-	return []Skill{
+func GetBuiltInSkills() []*Skill {
+	return []*Skill{
 		newIdentitySkill(),
-		newFileSkill(),
-		newShellSkill(),
-		newWebSkill(),
 	}
 }
 
-func newIdentitySkill() Skill {
-	return Skill{
+func newIdentitySkill() *Skill {
+	return &Skill{
 		Name:        "identity",
 		Description: "身份设定技能",
 		Content: `## 身份设定技能
@@ -39,45 +36,6 @@ func newIdentitySkill() Skill {
 - 记住用户的称呼并在后续对话中使用
 - 更新文件时保持原有内容不变，只修改对应部分`,
 		AlwaysLoad: true,
-		Enabled:    true,
-	}
-}
-
-func newFileSkill() Skill {
-	return Skill{
-		Name:        "file",
-		Description: "文件操作技能",
-		Content: `## 文件操作技能
-你可以帮助用户读取、写入和管理文件。
-- 读取文件：使用file_read工具
-- 写入文件：使用file_write工具
-- 列出目录：使用file_list工具`,
-		AlwaysLoad: true,
-		Enabled:    true,
-	}
-}
-
-func newShellSkill() Skill {
-	return Skill{
-		Name:        "shell",
-		Description: "Shell命令执行技能",
-		Content: `## Shell命令执行技能
-你可以帮助用户执行Shell命令。
-- 执行命令：使用shell_exec工具`,
-		AlwaysLoad: true,
-		Enabled:    true,
-	}
-}
-
-func newWebSkill() Skill {
-	return Skill{
-		Name:        "web",
-		Description: "网页搜索和抓取技能",
-		Content: `## 网页搜索和抓取技能
-你可以帮助用户搜索互联网和抓取网页内容。
-- 搜索网页：使用web_search工具
-- 抓取网页：使用web_fetch工具`,
-		AlwaysLoad: false,
 		Enabled:    true,
 	}
 }

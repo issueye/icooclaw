@@ -8,64 +8,71 @@ import (
 	"icooclaw.core/storage"
 )
 
+// Skill 技能
 type Skill struct {
-	Name        string
-	Description string
-	Content     string
-	AlwaysLoad  bool
-	Enabled     bool
+	Name        string   // 技能名称
+	Description string   // 技能描述
+	Content     string   // 技能内容
+	References  []string // 引用的技能
+	Scripts     []string // 脚本
+	AlwaysLoad  bool     // 是否始终加载该技能
+	Enabled     bool     // 是否启用该技能
 }
 
-type Loader struct {
-	storage    *storage.Storage
-	logger     *slog.Logger
-	loaded     []Skill
-	alwaysLoad []Skill
+// SkillLoader 技能加载器
+type SkillLoader struct {
+	storage    *storage.Storage // 存储
+	logger     *slog.Logger     // 日志记录器
+	loaded     []*Skill         // 已加载的技能
+	alwaysLoad []*Skill         // 总是加载的技能
 }
 
-func NewLoader(storage *storage.Storage, logger *slog.Logger) *Loader {
-	return &Loader{
-		storage:    storage,
-		logger:     logger,
-		loaded:     make([]Skill, 0),
-		alwaysLoad: make([]Skill, 0),
+// NewSkillLoader 创建技能加载器
+func NewLoader(storage *storage.Storage, logger *slog.Logger) *SkillLoader {
+	return &SkillLoader{
+		storage:    storage,           // 存储
+		logger:     logger,            // 日志记录器
+		loaded:     make([]*Skill, 0), // 已加载的技能
+		alwaysLoad: make([]*Skill, 0), // 总是加载的技能
 	}
 }
 
-func (l *Loader) Load(ctx context.Context) error {
-	l.logger.Info("Loading skills")
+// Load 加载技能
+func (l *SkillLoader) Load(ctx context.Context) ([]*Skill, error) {
+	l.logger.Info("加载技能中...")
 
-	// skills, err := l.storage.GetEnabledSkills()
-	// if err != nil {
-	// 	l.logger.Warn("Failed to load skills from database", "error", err)
-	// }
+	// 从存储中获取所有技能
+	sks, err := l.storage.Skill().GetAll()
+	if err != nil {
+		return nil, err
+	}
 
-	// l.loadBuiltInSkills()
+	skills := make([]*Skill, 0)
+	for _, sk := range sks {
+		// 过滤未启用的技能
+		if sk.Enabled {
+			skill := &Skill{
+				Name:        sk.Name,
+				Description: sk.Description,
+				Content:     sk.Content,
+				AlwaysLoad:  sk.AlwaysLoad,
+				Enabled:     sk.Enabled,
+				References:  []string{},
+				Scripts:     []string{},
+			}
 
-	// for _, skill := range skills {
-	// 	l.loaded = append(l.loaded, Skill{
-	// 		Name:        skill.Name,
-	// 		Description: skill.Description,
-	// 		Content:     skill.Content,
-	// 		AlwaysLoad:  skill.AlwaysLoad,
-	// 		Enabled:     skill.Enabled,
-	// 	})
-	// 	if skill.AlwaysLoad {
-	// 		l.alwaysLoad = append(l.alwaysLoad, Skill{
-	// 			Name:        skill.Name,
-	// 			Description: skill.Description,
-	// 			Content:     skill.Content,
-	// 			AlwaysLoad:  skill.AlwaysLoad,
-	// 			Enabled:     skill.Enabled,
-	// 		})
-	// 	}
-	// }
+			skills = append(skills, skill)
+		}
+	}
 
-	// l.logger.Info("Skills loaded", "count", len(l.loaded))
-	return nil
+	// 加载内置技能
+	builtInSkills := l.loadBuiltInSkills()
+	skills = append(skills, builtInSkills...)
+
+	return skills, nil
 }
 
-func (l *Loader) loadBuiltInSkills() {
+func (l *SkillLoader) loadBuiltInSkills() []*Skill {
 	builtInSkills := GetBuiltInSkills()
 
 	for _, skill := range builtInSkills {
@@ -74,27 +81,26 @@ func (l *Loader) loadBuiltInSkills() {
 			l.alwaysLoad = append(l.alwaysLoad, skill)
 		}
 	}
+
+	return builtInSkills
 }
 
-func (l *Loader) GetLoaded() []Skill {
-	return l.loaded
-}
-
-func (l *Loader) GetAlwaysLoad() []Skill {
+func (l *SkillLoader) GetAlwaysLoad() []*Skill {
 	return l.alwaysLoad
 }
 
-func (l *Loader) GetByName(name string) *Skill {
+func (l *SkillLoader) GetByName(name string) *Skill {
 	for _, skill := range l.loaded {
 		if strings.EqualFold(skill.Name, name) {
-			return &skill
+			return skill
 		}
 	}
 	return nil
 }
 
-func (l *Loader) Reload(ctx context.Context) error {
-	l.loaded = make([]Skill, 0)
-	l.alwaysLoad = make([]Skill, 0)
-	return l.Load(ctx)
+func (l *SkillLoader) Reload(ctx context.Context) ([]*Skill, error) {
+	l.loaded = make([]*Skill, 0)
+	l.alwaysLoad = make([]*Skill, 0)
+	skills, err := l.Load(ctx)
+	return skills, err
 }
