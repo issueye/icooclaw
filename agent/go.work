@@ -3,6 +3,6 @@ go 1.24.11
 use (
 	./icooclaw.ai
 	./icooclaw.cmd
-	./icooclaw.gateway
 	./icooclaw.core
+	./icooclaw.gateway
 )

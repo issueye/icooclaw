@@ -12,9 +12,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/docgen"
 	"icooclaw.ai/agent"
+	"icooclaw.core/bus"
 	"icooclaw.core/config"
 	"icooclaw.core/consts"
 	"icooclaw.core/storage"
+	"icooclaw.core/ws"
 )
 
 // RESTGateway REST API 网关实现
@@ -29,7 +31,8 @@ type RESTGateway struct {
 	mu          sync.RWMutex
 	Agents      map[uint]*agent.Agent
 
-	handlers *Handlers
+	handlers  *Handlers
+	wsManager *ws.Manager
 }
 
 // NewRESTGateway 创建 REST 网关
@@ -58,13 +61,18 @@ func NewRESTGateway() (*RESTGateway, error) {
 	logger.Info("数据库初始化成功", "path", cfg.Database.Path)
 
 	dataStorage := storage.NewStorage(db)
+
+	// 初始化 WebSocket 管理器
+	wsManager := ws.NewManager(dataStorage, logger)
+
 	g := &RESTGateway{
 		mu:          sync.RWMutex{},
 		workspace:   wsConfig.Path,
 		config:      cfg,
 		logger:      logger,
 		dataStorage: dataStorage,
-		handlers:    NewHandlers(logger, dataStorage),
+		wsManager:   wsManager,
+		handlers:    NewHandlers(logger, dataStorage, wsManager),
 		Agents:      make(map[uint]*agent.Agent),
 	}
 
@@ -148,6 +156,11 @@ func (g *RESTGateway) Start(ctx context.Context) error {
 
 // Stop 停止网关
 func (g *RESTGateway) Stop() error {
+	// 关闭 WebSocket 管理器
+	if g.wsManager != nil {
+		g.wsManager.Close()
+	}
+
 	if g.server == nil {
 		return nil
 	}
@@ -184,4 +197,14 @@ func (g *RESTGateway) Router() http.Handler {
 func (g *RESTGateway) Mount(r chi.Router, pattern string) {
 	r.Mount(pattern, g.router)
 	g.logger.Info("REST 网关挂载到路由", "pattern", pattern)
+}
+
+// WSManager 获取 WebSocket 管理器
+func (g *RESTGateway) WSManager() *ws.Manager {
+	return g.wsManager
+}
+
+// Bus 获取消息总线
+func (g *RESTGateway) Bus() *bus.MessageBus {
+	return g.wsManager.Bus()
 }

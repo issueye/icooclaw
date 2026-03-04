@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"icooclaw.core/storage"
+	"icooclaw.core/ws"
 	"icooclaw.gateway/handlers"
 )
 
@@ -20,10 +21,11 @@ type Handlers struct {
 	Skill    *handlers.SkillHandler
 	Channel  *handlers.ChannelHandler
 	Config   *handlers.ConfigHandler
+	Chat     *handlers.ChatHandler
 }
 
 // NewHandlers 创建所有处理器
-func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
+func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Manager) *Handlers {
 	return &Handlers{
 		Common:   handlers.NewCommonHandler(logger),
 		Session:  handlers.NewSessionHandler(logger, storage),
@@ -35,6 +37,7 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 		Skill:    handlers.NewSkillHandler(logger, storage),
 		Channel:  handlers.NewChannelHandler(logger, storage),
 		Config:   handlers.NewConfigHandler(logger),
+		Chat:     handlers.NewChatHandler(logger, wsManager),
 	}
 }
 
@@ -46,7 +49,8 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 	// Session 路由
 	r.Route("/api/v1/sessions", func(r chi.Router) {
 		r.Post("/page", h.Session.Page)     // 分页查询
-		r.Post("/save", h.Session.Save)     // 创建
+		r.Post("/save", h.Session.Save)     // 保存
+		r.Post("/create", h.Session.Create) // 创建新会话
 		r.Post("/delete", h.Session.Delete) // 删除
 		r.Post("/get", h.Session.GetByID)   // 获取单个
 	})
@@ -145,6 +149,9 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Get("/", h.Config.GetWorkspace)    // 获取工作区
 		r.Post("/set", h.Config.SetWorkspace) // 设置工作区
 	})
+
+	// WebSocket 聊天路由
+	r.Get("/ws/chat", h.Chat.HandleWebSocket) // WebSocket 连接
 }
 
 // HandleCRUD 通用 CRUD 处理函数，用于 AI Skill 调用
