@@ -46,6 +46,7 @@ type Manager struct {
 	storage     *storage.Storage
 	bus         *bus.MessageBus
 	handler     MessageHandler
+	queue       *ConversationQueue
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
@@ -63,6 +64,7 @@ func NewManager(storage *storage.Storage, logger *slog.Logger, opts ...ManagerOp
 		logger:      logger,
 		storage:     storage,
 		bus:         bus.NewMessageBus(1000),
+		queue:       NewConversationQueue(DefaultMaxConcurrent, logger),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -71,6 +73,9 @@ func NewManager(storage *storage.Storage, logger *slog.Logger, opts ...ManagerOp
 	for _, opt := range opts {
 		opt(m)
 	}
+
+	// 设置队列通知器
+	m.queue.SetNotifier(m)
 
 	go m.run()
 	go m.runOutboundHandler()
@@ -92,9 +97,60 @@ func WithBus(b *bus.MessageBus) ManagerOption {
 	}
 }
 
+// WithMaxConcurrent 设置最大并发数
+func WithMaxConcurrent(max int) ManagerOption {
+	return func(m *Manager) {
+		m.queue = NewConversationQueue(max, m.logger)
+	}
+}
+
 // SetHandler 设置消息处理器
 func (m *Manager) SetHandler(handler MessageHandler) {
 	m.handler = handler
+}
+
+// NotifyQueueStatus 实现 QueueNotifier 接口
+func (m *Manager) NotifyQueueStatus(sessionID uint, status *QueueStatus) {
+	m.mu.RLock()
+	for _, conn := range m.connections {
+		if conn.SessionID() == sessionID {
+			conn.SendMessage(&Message{
+				Type:      MessageTypeQueueStatus,
+				SessionID: sessionID,
+				Data: &QueueStatusData{
+					ActiveCount:   status.ActiveCount,
+					WaitingCount:  status.WaitingCount,
+					MaxConcurrent: status.MaxConcurrent,
+				},
+				Timestamp: time.Now(),
+			})
+			break
+		}
+	}
+	m.mu.RUnlock()
+}
+
+// NotifyQueuePosition 实现 QueueNotifier 接口
+func (m *Manager) NotifyQueuePosition(sessionID uint, position int) {
+	m.mu.RLock()
+	for _, conn := range m.connections {
+		if conn.SessionID() == sessionID {
+			status := m.queue.GetStatus()
+			conn.SendMessage(&Message{
+				Type:      MessageTypeQueueStatus,
+				SessionID: sessionID,
+				Data: &QueueStatusData{
+					ActiveCount:   status.ActiveCount,
+					WaitingCount:  status.WaitingCount,
+					MaxConcurrent: status.MaxConcurrent,
+					Position:      position,
+				},
+				Timestamp: time.Now(),
+			})
+			break
+		}
+	}
+	m.mu.RUnlock()
 }
 
 // run 运行管理器
@@ -112,6 +168,10 @@ func (m *Manager) run() {
 		case conn := <-m.unregister:
 			m.mu.Lock()
 			if _, ok := m.connections[conn.ID()]; ok {
+				// 取消该连接的队列任务
+				if conn.SessionID() > 0 {
+					m.queue.Cancel(conn.SessionID())
+				}
 				delete(m.connections, conn.ID())
 				conn.Close()
 			}
@@ -251,6 +311,8 @@ func (m *Manager) handleClientMessage(conn *Connection, msg *Message) {
 		m.handleChat(conn, msg)
 	case MessageTypePing:
 		m.handlePing(conn, msg)
+	case MessageTypeQueueStatus:
+		m.handleQueueStatus(conn, msg)
 	default:
 		conn.SendMessage(NewErrorMessage(conn.SessionID(), 400, fmt.Sprintf("未知的消息类型: %s", msg.Type)))
 	}
@@ -331,38 +393,73 @@ func (m *Manager) handleChat(conn *Connection, msg *Message) {
 		return
 	}
 
-	// 如果设置了消息处理器，使用处理器处理消息
-	if m.handler != nil {
-		err = m.handler.HandleMessage(m.ctx, sessionID, req.Content, conn.ID())
-		if err != nil {
-			conn.SendMessage(NewErrorMessage(sessionID, 500, fmt.Sprintf("处理消息失败: %v", err)))
-			return
-		}
-	} else {
-		// 获取会话
-		session, err := m.storage.Session().GetByID(sessionID)
-		if err != nil {
-			conn.SendMessage(NewErrorMessage(sessionID, 500, "获取会话失败"))
-			return
-		}
-
-		// 发布入站消息到消息总线
-		err = m.bus.PublishInbound(m.ctx, bus.InboundMessage{
-			Channel: session.Channel,
-			ChatID:  session.ChatID,
-			UserID:  session.UserID,
-			Content: req.Content,
-			Metadata: map[string]any{
-				"client_id": conn.ID(),
-			},
-		})
-		if err != nil {
-			conn.SendMessage(NewErrorMessage(sessionID, 500, "发送消息失败"))
-			return
-		}
+	// 检查是否已在队列中
+	if m.queue.IsQueued(sessionID) {
+		position := m.queue.GetPosition(sessionID)
+		conn.SendMessage(NewErrorMessage(sessionID, 429, fmt.Sprintf("请求正在处理中，队列位置: %d", position)))
+		return
 	}
 
-	m.logger.Debug("聊天消息已发送", "session_id", sessionID, "content_length", len(req.Content))
+	// 设置队列处理器
+	m.queue.SetHandler(QueueHandlerFunc(func(ctx context.Context, item *QueueItem) error {
+		return m.processChatMessage(ctx, item.SessionID, item.Content, item.ConnectionID)
+	}))
+
+	// 加入队列
+	item, accepted := m.queue.Enqueue(m.ctx, sessionID, conn.ID(), req.Content)
+	if !accepted {
+		conn.SendMessage(NewErrorMessage(sessionID, 500, "无法加入处理队列"))
+		return
+	}
+
+	// 如果正在等待，发送队列状态
+	if m.queue.IsWaiting(sessionID) {
+		position := m.queue.GetPosition(sessionID)
+		status := m.queue.GetStatus()
+		conn.SendMessage(&Message{
+			Type:      MessageTypeQueueStatus,
+			SessionID: sessionID,
+			Data: &QueueStatusData{
+				ActiveCount:   status.ActiveCount,
+				WaitingCount:  status.WaitingCount,
+				MaxConcurrent: status.MaxConcurrent,
+				Position:      position,
+			},
+			Timestamp: time.Now(),
+		})
+	}
+
+	m.logger.Debug("聊天消息已加入队列", "session_id", sessionID, "content_length", len(req.Content), "item_accepted", accepted && item != nil)
+}
+
+// processChatMessage 处理聊天消息
+func (m *Manager) processChatMessage(ctx context.Context, sessionID uint, content string, clientID string) error {
+	// 如果设置了消息处理器，使用处理器处理消息
+	if m.handler != nil {
+		return m.handler.HandleMessage(ctx, sessionID, content, clientID)
+	}
+
+	// 获取会话
+	session, err := m.storage.Session().GetByID(sessionID)
+	if err != nil {
+		return fmt.Errorf("获取会话失败: %w", err)
+	}
+
+	// 发布入站消息到消息总线
+	err = m.bus.PublishInbound(ctx, bus.InboundMessage{
+		Channel: session.Channel,
+		ChatID:  session.ChatID,
+		UserID:  session.UserID,
+		Content: content,
+		Metadata: map[string]any{
+			"client_id": clientID,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("发送消息失败: %w", err)
+	}
+
+	return nil
 }
 
 // handlePing 处理心跳
@@ -373,9 +470,32 @@ func (m *Manager) handlePing(conn *Connection, msg *Message) {
 	})
 }
 
+// handleQueueStatus 处理队列状态查询
+func (m *Manager) handleQueueStatus(conn *Connection, msg *Message) {
+	sessionID := conn.SessionID()
+	status := m.queue.GetStatus()
+	position := -1
+	if sessionID > 0 {
+		position = m.queue.GetPosition(sessionID)
+	}
+
+	conn.SendMessage(&Message{
+		Type:      MessageTypeQueueStatus,
+		SessionID: sessionID,
+		Data: &QueueStatusData{
+			ActiveCount:   status.ActiveCount,
+			WaitingCount:  status.WaitingCount,
+			MaxConcurrent: status.MaxConcurrent,
+			Position:      position,
+		},
+		Timestamp: time.Now(),
+	})
+}
+
 // Close 关闭管理器
 func (m *Manager) Close() {
 	m.cancel()
+	m.queue.Close()
 	m.mu.Lock()
 	for _, conn := range m.connections {
 		conn.Close()
@@ -429,4 +549,19 @@ func (m *Manager) Bus() *bus.MessageBus {
 // Storage 获取存储
 func (m *Manager) Storage() *storage.Storage {
 	return m.storage
+}
+
+// Queue 获取对话队列
+func (m *Manager) Queue() *ConversationQueue {
+	return m.queue
+}
+
+// SetMaxConcurrent 设置最大并发数
+func (m *Manager) SetMaxConcurrent(max int) {
+	m.queue.SetMaxConcurrent(max)
+}
+
+// GetQueueStatus 获取队列状态
+func (m *Manager) GetQueueStatus() *QueueStatus {
+	return m.queue.GetStatus()
 }

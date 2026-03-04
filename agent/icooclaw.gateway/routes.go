@@ -152,6 +152,12 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 
 	// WebSocket 聊天路由
 	r.Get("/ws/chat", h.Chat.HandleWebSocket) // WebSocket 连接
+
+	// 队列管理路由
+	r.Route("/api/v1/queue", func(r chi.Router) {
+		r.Get("/status", h.Chat.GetQueueStatus)       // 获取队列状态
+		r.Post("/max-concurrent", h.Chat.SetMaxConcurrent) // 设置最大并发数
+	})
 }
 
 // HandleCRUD 通用 CRUD 处理函数，用于 AI Skill 调用

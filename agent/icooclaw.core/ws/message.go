@@ -22,6 +22,7 @@ const (
 	MessageTypeEnd            MessageType = "end"             // 响应结束
 	MessageTypeError          MessageType = "error"           // 错误
 	MessageTypePong           MessageType = "pong"           // 心跳响应
+	MessageTypeQueueStatus    MessageType = "queue_status"    // 队列状态
 )
 
 // Message WebSocket 消息结构
@@ -95,6 +96,14 @@ type EndData struct {
 type ErrorData struct {
 	SessionID uint   `json:"session_id"`
 	Message   string `json:"message"`
+}
+
+// QueueStatusData 队列状态数据
+type QueueStatusData struct {
+	ActiveCount   int         `json:"active_count"`
+	WaitingCount  int         `json:"waiting_count"`
+	MaxConcurrent int         `json:"max_concurrent"`
+	Position      int         `json:"position,omitempty"` // 当前会话在队列中的位置，0表示正在处理
 }
 
 // NewMessage 创建新消息
