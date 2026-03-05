@@ -88,18 +88,20 @@ export const useChatStore = defineStore("chat", () => {
 
   async function createSession(title = "新对话") {
     try {
-      const data = await api.createSession({
+      const response = await api.createSession({
         user_id: userId.value,
         metadata: JSON.stringify({ title }),
       });
+      // 后端返回格式: { code, message, data: { session_id, chat_id, user_id, key } }
+      const data = response.data || response;
       const session = {
-        id: String(data.id),
+        id: String(data.session_id),
         chatId: data.chat_id,
         userId: data.user_id,
         title,
         messages: [],
-        createdAt: new Date(data.created_at).getTime(),
-        updatedAt: new Date(data.updated_at).getTime(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         raw: data,
       };
       sessions.value.unshift(session);

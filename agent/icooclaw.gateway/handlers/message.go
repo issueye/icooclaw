@@ -107,14 +107,14 @@ func (h *MessageHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MessageHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除消息请求失败", "error", err)
 		http.Error(w, "绑定删除消息请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Message().Delete(req)
+	err = h.storage.Message().Delete(id)
 	if err != nil {
 		h.logger.Error("删除消息失败", "error", err)
 		http.Error(w, "删除消息失败", http.StatusInternalServerError)
@@ -128,14 +128,14 @@ func (h *MessageHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MessageHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取消息请求失败", "error", err)
 		http.Error(w, "绑定获取消息请求失败", http.StatusBadRequest)
 		return
 	}
 
-	message, err := h.storage.Message().GetByID(req)
+	message, err := h.storage.Message().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取消息失败", "error", err)
 		http.Error(w, "获取消息失败", http.StatusInternalServerError)

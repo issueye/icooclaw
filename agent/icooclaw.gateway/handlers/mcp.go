@@ -107,14 +107,14 @@ func (h *MCPHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MCPHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除MCP配置请求失败", "error", err)
 		http.Error(w, "绑定删除MCP配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.MCPConfig().Delete(req)
+	err = h.storage.MCPConfig().Delete(id)
 	if err != nil {
 		h.logger.Error("删除MCP配置失败", "error", err)
 		http.Error(w, "删除MCP配置失败", http.StatusInternalServerError)
@@ -128,14 +128,14 @@ func (h *MCPHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MCPHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取MCP配置请求失败", "error", err)
 		http.Error(w, "绑定获取MCP配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	config, err := h.storage.MCPConfig().GetByID(req)
+	config, err := h.storage.MCPConfig().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取MCP配置失败", "error", err)
 		http.Error(w, "获取MCP配置失败", http.StatusInternalServerError)

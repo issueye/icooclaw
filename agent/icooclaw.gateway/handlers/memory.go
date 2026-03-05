@@ -84,14 +84,14 @@ func (h *MemoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MemoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除记忆请求失败", "error", err)
 		http.Error(w, "绑定删除记忆请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Memory().Delete(req)
+	err = h.storage.Memory().Delete(id)
 	if err != nil {
 		h.logger.Error("删除记忆失败", "error", err)
 		http.Error(w, "删除记忆失败", http.StatusInternalServerError)
@@ -105,14 +105,14 @@ func (h *MemoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MemoryHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取记忆请求失败", "error", err)
 		http.Error(w, "绑定获取记忆请求失败", http.StatusBadRequest)
 		return
 	}
 
-	memory, err := h.storage.Memory().GetByID(req)
+	memory, err := h.storage.Memory().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取记忆失败", "error", err)
 		http.Error(w, "获取记忆失败", http.StatusInternalServerError)
@@ -127,14 +127,14 @@ func (h *MemoryHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MemoryHandler) Pin(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定置顶记忆请求失败", "error", err)
 		http.Error(w, "绑定置顶记忆请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Memory().Pin(req)
+	err = h.storage.Memory().Pin(id)
 	if err != nil {
 		h.logger.Error("置顶记忆失败", "error", err)
 		http.Error(w, "置顶记忆失败", http.StatusInternalServerError)
@@ -148,14 +148,14 @@ func (h *MemoryHandler) Pin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MemoryHandler) Unpin(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定取消置顶记忆请求失败", "error", err)
 		http.Error(w, "绑定取消置顶记忆请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Memory().Unpin(req)
+	err = h.storage.Memory().Unpin(id)
 	if err != nil {
 		h.logger.Error("取消置顶记忆失败", "error", err)
 		http.Error(w, "取消置顶记忆失败", http.StatusInternalServerError)
@@ -169,14 +169,14 @@ func (h *MemoryHandler) Unpin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MemoryHandler) SoftDelete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定软删除记忆请求失败", "error", err)
 		http.Error(w, "绑定软删除记忆请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Memory().SoftDelete(req)
+	err = h.storage.Memory().SoftDelete(id)
 	if err != nil {
 		h.logger.Error("软删除记忆失败", "error", err)
 		http.Error(w, "软删除记忆失败", http.StatusInternalServerError)
@@ -190,14 +190,14 @@ func (h *MemoryHandler) SoftDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MemoryHandler) Restore(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定恢复记忆请求失败", "error", err)
 		http.Error(w, "绑定恢复记忆请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Memory().Restore(req)
+	err = h.storage.Memory().Restore(id)
 	if err != nil {
 		h.logger.Error("恢复记忆失败", "error", err)
 		http.Error(w, "恢复记忆失败", http.StatusInternalServerError)

@@ -84,14 +84,14 @@ func (h *ChannelHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ChannelHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除通道配置请求失败", "error", err)
 		http.Error(w, "绑定删除通道配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.ChannelConfig().Delete(req)
+	err = h.storage.ChannelConfig().Delete(id)
 	if err != nil {
 		h.logger.Error("删除通道配置失败", "error", err)
 		http.Error(w, "删除通道配置失败", http.StatusInternalServerError)
@@ -105,14 +105,14 @@ func (h *ChannelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ChannelHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取通道配置请求失败", "error", err)
 		http.Error(w, "绑定获取通道配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	config, err := h.storage.ChannelConfig().GetByID(req)
+	config, err := h.storage.ChannelConfig().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取通道配置失败", "error", err)
 		http.Error(w, "获取通道配置失败", http.StatusInternalServerError)

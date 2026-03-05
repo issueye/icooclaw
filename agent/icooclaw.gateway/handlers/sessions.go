@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
+	"time"
 
-	"github.com/go-chi/chi/v5"
 	"icooclaw.core/storage"
 	"icooclaw.gateway/models"
 )
@@ -21,9 +21,10 @@ func NewSessionHandler(logger *slog.Logger, storage *storage.Storage) *SessionHa
 
 // CreateSessionRequest 创建会话请求
 type CreateSessionRequest struct {
-	Channel string `json:"channel,omitempty"` // 渠道 (默认为 "websocket")
-	UserID  string `json:"user_id,omitempty"` // 用户ID
-	ChatID  string `json:"chat_id,omitempty"` // 聊天ID (可选，不提供则自动生成)
+	Channel  string `json:"channel,omitempty"`  // 渠道 (默认为 "websocket")
+	UserID   string `json:"user_id,omitempty"`  // 用户ID
+	ChatID   string `json:"chat_id,omitempty"`  // 聊天ID (可选，不提供则自动生成)
+	Metadata string `json:"metadata,omitempty"` // 元数据 (JSON格式)
 }
 
 // CreateSessionResponse 创建会话响应
@@ -49,9 +50,17 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Channel = "websocket"
 	}
 
-	// 如果没有提供 ChatID，使用自动生成的方式
+	// 如果没有提供 ChatID，生成唯一的 ChatID
 	if req.ChatID == "" {
-		session, err := h.storage.Session().GetOrCreateSession(req.Channel, "ws-auto", req.UserID)
+		chatID := fmt.Sprintf("chat-%d", time.Now().UnixNano())
+		session := &storage.Session{
+			Key:      req.Channel + ":" + chatID,
+			Channel:  req.Channel,
+			ChatID:   chatID,
+			UserID:   req.UserID,
+			Metadata: req.Metadata,
+		}
+		err = h.storage.Session().CreateOrUpdate(session)
 		if err != nil {
 			h.logger.Error("创建会话失败", "error", err)
 			http.Error(w, "创建会话失败", http.StatusInternalServerError)
@@ -74,10 +83,11 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// 使用提供的 ChatID 创建会话
 	session := &storage.Session{
-		Key:     req.Channel + ":" + req.ChatID,
-		Channel: req.Channel,
-		ChatID:  req.ChatID,
-		UserID:  req.UserID,
+		Key:      req.Channel + ":" + req.ChatID,
+		Channel:  req.Channel,
+		ChatID:   req.ChatID,
+		UserID:   req.UserID,
+		Metadata: req.Metadata,
 	}
 
 	err = h.storage.Session().CreateOrUpdate(session)
@@ -146,16 +156,22 @@ func (h *SessionHandler) Save(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	// chi 绑定 {id}
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	// 从请求体获取 ID
+	req, err := models.Bind[map[string]any](r)
 	if err != nil {
 		h.logger.Error("绑定删除会话请求失败", "error", err)
 		http.Error(w, "绑定删除会话请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Session().Delete(uint(id))
+	idFloat, ok := req["id"].(float64)
+	if !ok {
+		http.Error(w, "缺少或无效的 id 参数", http.StatusBadRequest)
+		return
+	}
+	id := uint(idFloat)
+
+	err = h.storage.Session().Delete(id)
 	if err != nil {
 		h.logger.Error("删除会话失败", "error", err)
 		http.Error(w, "删除会话失败", http.StatusInternalServerError)
@@ -169,16 +185,22 @@ func (h *SessionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	// chi 绑定 {id}
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	// 从请求体获取 ID
+	req, err := models.Bind[map[string]any](r)
 	if err != nil {
 		h.logger.Error("绑定获取会话请求失败", "error", err)
 		http.Error(w, "绑定获取会话请求失败", http.StatusBadRequest)
 		return
 	}
 
-	session, err := h.storage.Session().GetByID(uint(id))
+	idFloat, ok := req["id"].(float64)
+	if !ok {
+		http.Error(w, "缺少或无效的 id 参数", http.StatusBadRequest)
+		return
+	}
+	id := uint(idFloat)
+
+	session, err := h.storage.Session().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取会话失败", "error", err)
 		http.Error(w, "获取会话失败", http.StatusInternalServerError)

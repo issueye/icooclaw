@@ -107,14 +107,14 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除任务请求失败", "error", err)
 		http.Error(w, "绑定删除任务请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Task().Delete(req)
+	err = h.storage.Task().Delete(id)
 	if err != nil {
 		h.logger.Error("删除任务失败", "error", err)
 		http.Error(w, "删除任务失败", http.StatusInternalServerError)
@@ -128,14 +128,14 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取任务请求失败", "error", err)
 		http.Error(w, "绑定获取任务请求失败", http.StatusBadRequest)
 		return
 	}
 
-	task, err := h.storage.Task().GetByID(req)
+	task, err := h.storage.Task().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取任务失败", "error", err)
 		http.Error(w, "获取任务失败", http.StatusInternalServerError)
@@ -150,14 +150,14 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) ToggleEnabled(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定切换任务状态请求失败", "error", err)
 		http.Error(w, "绑定切换任务状态请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Task().ToggleEnabled(req)
+	err = h.storage.Task().ToggleEnabled(id)
 	if err != nil {
 		h.logger.Error("切换任务状态失败", "error", err)
 		http.Error(w, "切换任务状态失败", http.StatusInternalServerError)

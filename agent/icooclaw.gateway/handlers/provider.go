@@ -107,14 +107,14 @@ func (h *ProviderHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除Provider配置请求失败", "error", err)
 		http.Error(w, "绑定删除Provider配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.ProviderConfig().Delete(req)
+	err = h.storage.ProviderConfig().Delete(id)
 	if err != nil {
 		h.logger.Error("删除Provider配置失败", "error", err)
 		http.Error(w, "删除Provider配置失败", http.StatusInternalServerError)
@@ -128,14 +128,14 @@ func (h *ProviderHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取Provider配置请求失败", "error", err)
 		http.Error(w, "绑定获取Provider配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	config, err := h.storage.ProviderConfig().GetByID(req)
+	config, err := h.storage.ProviderConfig().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取Provider配置失败", "error", err)
 		http.Error(w, "获取Provider配置失败", http.StatusInternalServerError)

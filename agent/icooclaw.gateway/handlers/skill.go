@@ -107,14 +107,14 @@ func (h *SkillHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SkillHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定删除技能请求失败", "error", err)
 		http.Error(w, "绑定删除技能请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.Skill().Delete(req)
+	err = h.storage.Skill().Delete(id)
 	if err != nil {
 		h.logger.Error("删除技能失败", "error", err)
 		http.Error(w, "删除技能失败", http.StatusInternalServerError)
@@ -128,14 +128,14 @@ func (h *SkillHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SkillHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[uint](r)
+	id, err := models.BindID(r)
 	if err != nil {
 		h.logger.Error("绑定获取技能请求失败", "error", err)
 		http.Error(w, "绑定获取技能请求失败", http.StatusBadRequest)
 		return
 	}
 
-	skill, err := h.storage.Skill().GetByID(req)
+	skill, err := h.storage.Skill().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取技能失败", "error", err)
 		http.Error(w, "获取技能失败", http.StatusInternalServerError)

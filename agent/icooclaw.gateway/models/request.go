@@ -44,3 +44,17 @@ func Bind[T any](r *http.Request) (T, error) {
 	}
 	return req, nil
 }
+
+// IDRequest 通用 ID 请求
+type IDRequest struct {
+	ID uint `json:"id"`
+}
+
+// BindID 从请求体绑定 ID
+func BindID(r *http.Request) (uint, error) {
+	var req IDRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return 0, err
+	}
+	return req.ID, nil
+}
