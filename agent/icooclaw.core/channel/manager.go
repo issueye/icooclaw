@@ -41,6 +41,13 @@ func (m *Manager) registerFromConfig() {
 		webhookChannel := NewWebhookChannel(webhookCfg, m.bus, m.logger)
 		m.Register("webhook", webhookChannel)
 	}
+
+	// 注册飞书通道
+	feishuCfg := m.config.FeishuConfig()
+	if feishuCfg != nil && feishuCfg.Enabled() {
+		feishuChannel := NewFeishuChannel(feishuCfg, m.bus, m.logger)
+		m.Register("feishu", feishuChannel)
+	}
 }
 
 // Register 注册通道

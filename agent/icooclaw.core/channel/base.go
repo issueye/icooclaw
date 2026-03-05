@@ -87,6 +87,8 @@ type RequestReader interface {
 type ChannelConfig interface {
 	WebSocketConfig() WebSocketConfig
 	WebhookConfig() WebhookConfig
+	// FeishuConfig 飞书通道配置
+	FeishuConfig() FeishuConfig
 }
 
 // WebSocketConfig WebSocket 配置
@@ -104,6 +106,25 @@ type WebhookConfig interface {
 	Path() string
 	Secret() string
 	Extra() map[string]interface{}
+}
+
+// FeishuConfig 飞书通道配置
+type FeishuConfig interface {
+	Enabled() bool
+	// Host 监听地址，默认 0.0.0.0
+	Host() string
+	// Port 监听端口，默认 8082
+	Port() int
+	// Path Webhook 接收路径，默认 /feishu/webhook
+	Path() string
+	// VerificationToken 飞书事件订阅验证 Token
+	VerificationToken() string
+	// EncryptKey 飞书消息体加密密钥（可选）
+	EncryptKey() string
+	// AppID 飞书应用 AppID（用于发送消息）
+	AppID() string
+	// AppSecret 飞书应用 AppSecret
+	AppSecret() string
 }
 
 // BaseChannel 基础通道实现
