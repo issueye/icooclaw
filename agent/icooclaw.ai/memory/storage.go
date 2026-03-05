@@ -163,12 +163,13 @@ func (s *Storage) SummarizeMessages(messages []*Message) (string, error) {
 	return strings.Join(summaryParts, "\n"), nil
 }
 
-// truncate 截断字符串
+// truncate 截断字符串，使用 rune 保证中文字符不乱码
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	r := []rune(s)
+	if len(r) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return string(r[:maxLen]) + "..."
 }
 
 // Search 搜索记忆

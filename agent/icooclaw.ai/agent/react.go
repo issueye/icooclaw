@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"icooclaw.ai/hooks"
 	"icooclaw.ai/provider"
@@ -77,6 +78,8 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		// 重置状态
 		streamState.content = ""
 		streamState.reasoningContent = ""
+		streamState.isThinking = false
+		streamState.isKimiThinking = false
 		// 清空 map 而非重新创建，减少内存分配
 		for key := range streamState.toolCallsData {
 			delete(streamState.toolCallsData, key)
@@ -150,51 +153,64 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 		}
 
 		// 执行工具调用
-		for _, call := range toolCalls {
-			toolName := call.Function.Name
-			arguments := call.Function.Arguments
-
-			logger.Info("执行工具", "tool", toolName, "call_id", call.ID)
-
-			// 触发工具调用前钩子
-			if err := hooks.OnToolCall(ctx, call.ID, toolName, arguments); err != nil {
-				logger.Warn("工具调用前钩子报错", "error", err)
-			}
-
-			// 执行工具
-			result := cfg.Tools.Execute(ctx, call)
-			if result.Error != nil {
-				logger.Error("工具执行报错", "tool", toolName, "error", result.Error)
-			}
-
-			logger.Debug(fmt.Sprintf("工具调用[%s]\n参数[%s]\n结果[%s]", toolName, arguments, result.Content))
-
-			// 触发工具结果钩子
-			if err := hooks.OnToolResult(ctx, call.ID, toolName, result); err != nil {
-				logger.Warn("工具结果钩子报错", "error", err)
-			}
-
-			// 添加工具结果到消息
-			var resultContent string
-			if result.Error != nil {
-				resultContent = fmt.Sprintf("Error: %v", result.Error)
-			} else {
-				resultContent = result.Content
-			}
-
-			// 添加 assistant 消息（包含 tool_calls）
+		if len(toolCalls) > 0 {
+			// 添加 assistant 消息（包含所有 tool_calls 且无空 content，符合 OpenAI 标准形式）
 			messages = append(messages, provider.Message{
 				Role:      consts.RoleAssistant,
 				Content:   content,
-				ToolCalls: []provider.ToolCall{call},
+				ToolCalls: toolCalls,
 			})
 
-			// 添加工具结果消息
-			messages = append(messages, provider.Message{
-				Role:       consts.RoleToolResult,
-				Content:    resultContent,
-				ToolCallID: call.ID,
-			})
+			// 并发执行所有的工具
+			var wg sync.WaitGroup
+			results := make([]provider.Message, len(toolCalls))
+
+			for i, call := range toolCalls {
+				wg.Add(1)
+				go func(index int, c provider.ToolCall) {
+					defer wg.Done()
+					toolName := c.Function.Name
+					arguments := c.Function.Arguments
+
+					logger.Info("执行工具", "tool", toolName, "call_id", c.ID)
+
+					// 触发工具调用前钩子
+					if err := hooks.OnToolCall(ctx, c.ID, toolName, arguments); err != nil {
+						logger.Warn("工具调用前钩子报错", "error", err)
+					}
+
+					// 执行工具
+					result := cfg.Tools.Execute(ctx, c)
+					if result.Error != nil {
+						logger.Error("工具执行报错", "tool", toolName, "error", result.Error)
+					}
+
+					logger.Debug(fmt.Sprintf("工具调用[%s]\n参数[%s]\n结果[%s]", toolName, arguments, result.Content))
+
+					// 触发工具结果钩子
+					if err := hooks.OnToolResult(ctx, c.ID, toolName, result); err != nil {
+						logger.Warn("工具结果钩子报错", "error", err)
+					}
+
+					// 添加工具结果到消息
+					var resultContent string
+					if result.Error != nil {
+						resultContent = fmt.Sprintf("Error: %v", result.Error)
+					} else {
+						resultContent = result.Content
+					}
+
+					results[index] = provider.Message{
+						Role:       consts.RoleToolResult,
+						Content:    resultContent,
+						ToolCallID: c.ID,
+					}
+				}(i, call)
+			}
+			wg.Wait()
+
+			// 按顺序把结果追加到 messages
+			messages = append(messages, results...)
 		}
 
 		// 触发迭代结束钩子
@@ -223,6 +239,10 @@ type streamCallbackState struct {
 	logger           *slog.Logger
 	// 工具调用累积（按 index 分组）
 	toolCallsData map[int]*CallData
+
+	// 思考状态追踪
+	isThinking     bool
+	isKimiThinking bool
 }
 
 // createStreamCallback 创建流式回调函数 (在循环外创建)
@@ -238,20 +258,74 @@ func (r *ReActAgent) createStreamCallback(state *streamCallbackState) provider.S
 		}
 
 		if chunk.Content != "" {
-			// 使用统一的解析器提取思考内容（如 DeepSeek 的 <think> 标签）
-			cleanContent, thinking := provider.ExtractThinkingContent(chunk.Content, "")
+			cleanContent := chunk.Content
+			var thinking string
+
+			// 处理 DeepSeek 的 <think> 标签流式拦截
+			if state.isThinking {
+				if endIdx := strings.Index(cleanContent, "</think>"); endIdx != -1 {
+					state.isThinking = false
+					thinking += cleanContent[:endIdx]
+					cleanContent = cleanContent[endIdx+len("</think>"):]
+				} else {
+					thinking += cleanContent
+					cleanContent = ""
+				}
+			} else if startIdx := strings.Index(cleanContent, "<think>"); startIdx != -1 {
+				state.isThinking = true
+				searchStr := cleanContent[startIdx+len("<think>"):]
+				if endIdx := strings.Index(searchStr, "</think>"); endIdx != -1 {
+					state.isThinking = false
+					thinking += searchStr[:endIdx]
+					cleanContent = cleanContent[:startIdx] + searchStr[endIdx+len("</think>"):]
+				} else {
+					thinking += searchStr
+					cleanContent = cleanContent[:startIdx]
+				}
+			}
+
+			// 处理 Kimi 的 reasoning 标签流式拦截
+			kimiStart := "<|start_header_id|>reasoning<|end_header_id|>"
+			kimiEnd := "<|start_header_id|>assistant<|end_header_id|>"
+			if state.isKimiThinking {
+				if endIdx := strings.Index(cleanContent, kimiEnd); endIdx != -1 {
+					state.isKimiThinking = false
+					thinking += cleanContent[:endIdx]
+					cleanContent = cleanContent[endIdx+len(kimiEnd):]
+				} else {
+					thinking += cleanContent
+					cleanContent = ""
+				}
+			} else if startIdx := strings.Index(cleanContent, kimiStart); startIdx != -1 {
+				state.isKimiThinking = true
+				searchStr := cleanContent[startIdx+len(kimiStart):]
+				if endIdx := strings.Index(searchStr, kimiEnd); endIdx != -1 {
+					state.isKimiThinking = false
+					thinking += searchStr[:endIdx]
+					cleanContent = cleanContent[:startIdx] + searchStr[endIdx+len(kimiEnd):]
+				} else {
+					thinking += searchStr
+					cleanContent = cleanContent[:startIdx]
+				}
+			}
 
 			// 累积思考内容
 			if thinking != "" {
 				state.reasoningContent += thinking
+				// 触发思考内容更新钩子
+				if err := state.hooks.OnLLMChunk(context.Background(), "", state.reasoningContent); err != nil {
+					state.logger.Warn("思考内容更新钩子报错", "error", err)
+				}
 			}
 
-			// 触发流式输出钩子（发送累积的思考内容）
-			if err := state.hooks.OnLLMChunk(context.Background(), cleanContent, state.reasoningContent); err != nil {
-				state.logger.Warn("流式输出钩子报错", "error", err)
+			// 累积正式内容
+			if cleanContent != "" {
+				state.content += cleanContent
+				// 触发流式输出钩子
+				if err := state.hooks.OnLLMChunk(context.Background(), cleanContent, state.reasoningContent); err != nil {
+					state.logger.Warn("流式输出钩子报错", "error", err)
+				}
 			}
-
-			state.content += cleanContent
 		}
 
 		// 处理工具调用 - StreamToolCall 需要按 index 分组累积
