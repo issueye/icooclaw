@@ -560,8 +560,20 @@
           <!-- 飞书专属配置 -->
           <template v-if="channelForm.type === 'feishu'">
             <div class="border-t border-border pt-4">
-              <div class="text-sm font-medium mb-3 text-accent">飞书配置</div>
+              <!-- 配置步骤说明 -->
+              <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                <div class="text-sm font-medium text-blue-400 mb-2">📋 配置步骤</div>
+                <ol class="text-xs text-text-secondary space-y-1 list-decimal list-inside">
+                  <li>前往 <a href="https://open.feishu.cn/app" target="_blank" class="text-accent hover:underline">飞书开放平台</a> 创建企业自建应用</li>
+                  <li>在「凭证与基础信息」获取 App ID 和 App Secret</li>
+                  <li>在「事件订阅」配置请求网址，并获取 Verification Token</li>
+                  <li>在「权限管理」开通所需权限（im:message, im:message:send_as_bot）</li>
+                </ol>
+              </div>
+
+              <div class="text-sm font-medium mb-3 text-accent">基础配置</div>
               <div class="space-y-3">
+                <!-- Webhook 配置 -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs text-text-secondary mb-1"
@@ -573,6 +585,7 @@
                       placeholder="8082"
                       class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                     />
+                    <p class="text-xs text-text-muted mt-1">本地 Webhook 监听端口</p>
                   </div>
                   <div>
                     <label class="block text-xs text-text-secondary mb-1"
@@ -584,60 +597,155 @@
                       placeholder="/feishu/webhook"
                       class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                     />
+                    <p class="text-xs text-text-muted mt-1">事件订阅接收路径</p>
                   </div>
                 </div>
+
+                <!-- Webhook URL 显示与复制 -->
                 <div>
-                  <label class="block text-xs text-text-secondary mb-1"
-                    >App ID</label
-                  >
+                  <label class="block text-xs text-text-secondary mb-1">Webhook 回调地址</label>
+                  <div class="flex items-center gap-2">
+                    <code class="flex-1 bg-bg-tertiary px-3 py-2 rounded-lg text-sm text-text-primary break-all">
+                      {{ getWebhookUrl() }}
+                    </code>
+                    <button
+                      type="button"
+                      @click="copyWebhookUrl"
+                      class="px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm hover:bg-bg-hover transition-colors flex items-center gap-1"
+                      :title="webhookUrlCopied ? '已复制' : '复制'"
+                    >
+                      <component :is="webhookUrlCopied ? CheckIcon : CopyIcon" :size="14" />
+                    </button>
+                  </div>
+                  <p class="text-xs text-text-muted mt-1">将此地址配置到飞书事件订阅</p>
+                </div>
+
+                <!-- App ID -->
+                <div>
+                  <label class="block text-xs text-text-secondary mb-1">
+                    App ID <span class="text-red-400">*</span>
+                  </label>
                   <input
                     v-model="channelForm.config.app_id"
                     type="text"
-                    placeholder="cli_xxxxxxxx"
+                    placeholder="cli_xxxxxxxxxxxx"
                     class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                   />
+                  <p class="text-xs text-text-muted mt-1">飞书应用凭证，格式：cli_ 开头</p>
                 </div>
+
+                <!-- App Secret -->
                 <div>
-                  <label class="block text-xs text-text-secondary mb-1"
-                    >App Secret</label
-                  >
+                  <label class="block text-xs text-text-secondary mb-1">
+                    App Secret <span class="text-red-400">*</span>
+                  </label>
                   <input
                     v-model="channelForm.config.app_secret"
                     type="password"
-                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxx"
+                    placeholder="应用密钥"
                     class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                   />
+                  <p class="text-xs text-text-muted mt-1">在「凭证与基础信息」页面获取</p>
                 </div>
+
+                <!-- Verification Token -->
                 <div>
-                  <label class="block text-xs text-text-secondary mb-1"
-                    >Verification Token</label
-                  >
+                  <label class="block text-xs text-text-secondary mb-1">
+                    Verification Token <span class="text-red-400">*</span>
+                  </label>
                   <input
                     v-model="channelForm.config.verification_token"
                     type="text"
                     placeholder="事件订阅验证 Token"
                     class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                   />
+                  <p class="text-xs text-text-muted mt-1">在「事件订阅」页面获取，用于验证请求来源</p>
                 </div>
+
+                <!-- Encrypt Key -->
                 <div>
-                  <label class="block text-xs text-text-secondary mb-1"
-                    >Encrypt Key
-                    <span class="text-text-muted">（可选）</span></label
-                  >
+                  <label class="block text-xs text-text-secondary mb-1">
+                    Encrypt Key <span class="text-text-muted">（可选）</span>
+                  </label>
                   <input
                     v-model="channelForm.config.encrypt_key"
                     type="password"
-                    placeholder="消息加密密钥，不加密可留空"
+                    placeholder="消息加密密钥"
                     class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                   />
+                  <p class="text-xs text-text-muted mt-1">开启消息加密后需要配置，不加密可留空</p>
                 </div>
-                <p class="text-xs text-text-muted">
-                  Webhook 回调地址：<code class="bg-bg-tertiary px-1 rounded"
-                    >http://&lt;your-host&gt;:{{
-                      channelForm.config.port || 8082
-                    }}{{ channelForm.config.path || "/feishu/webhook" }}</code
-                  >
-                </p>
+              </div>
+
+              <!-- 功能配置 -->
+              <div class="border-t border-border pt-4 mt-4">
+                <div class="text-sm font-medium mb-3 text-accent">功能配置</div>
+                <div class="space-y-3">
+                  <!-- 欢迎消息 -->
+                  <div>
+                    <label class="block text-xs text-text-secondary mb-1">
+                      欢迎消息 <span class="text-text-muted">（可选）</span>
+                    </label>
+                    <textarea
+                      v-model="channelForm.config.welcome_message"
+                      rows="2"
+                      placeholder="机器人被添加到群聊时发送的欢迎消息"
+                      class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors resize-none"
+                    ></textarea>
+                  </div>
+
+                  <!-- 功能开关 -->
+                  <div class="space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                      <input
+                        v-model="channelForm.config.enable_group_events"
+                        type="checkbox"
+                        class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
+                      />
+                      <div>
+                        <span class="text-sm">处理群聊事件</span>
+                        <p class="text-xs text-text-muted">成员加入/退出、群解散等事件</p>
+                      </div>
+                    </label>
+
+                    <label class="flex items-center gap-3 cursor-pointer">
+                      <input
+                        v-model="channelForm.config.enable_card_message"
+                        type="checkbox"
+                        class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
+                      />
+                      <div>
+                        <span class="text-sm">启用卡片消息</span>
+                        <p class="text-xs text-text-muted">支持发送交互式卡片消息</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 权限说明 -->
+              <div class="border-t border-border pt-4 mt-4">
+                <div class="text-sm font-medium mb-3 text-accent">所需权限</div>
+                <div class="bg-bg-tertiary rounded-lg p-3">
+                  <div class="text-xs text-text-secondary space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                      <code>im:message</code> - 接收消息
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                      <code>im:message:send_as_bot</code> - 以应用身份发消息
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                      <code>contact:user.base:readonly</code> - 获取用户信息（可选）
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                      <code>im:chat:readonly</code> - 获取群聊信息（可选）
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </template>
@@ -932,6 +1040,8 @@ import {
   Webhook as WebhookIcon,
   Send as TelegramIcon,
   Radio as FeishuIcon,
+  Copy as CopyIcon,
+  Check as CheckIcon,
 } from "lucide-vue-next";
 
 import { useChatStore } from "@/stores/chat";
@@ -1011,8 +1121,36 @@ const channelForm = reactive({
     encrypt_key: "",
     bot_token: "",
     webhook_url: "",
+    // 飞书扩展配置
+    welcome_message: "",
+    enable_group_events: true,
+    enable_card_message: true,
   },
 });
+
+// Webhook URL 复制状态
+const webhookUrlCopied = ref(false);
+
+// 获取 Webhook URL
+function getWebhookUrl() {
+  const port = channelForm.config.port || 8082;
+  const path = channelForm.config.path || "/feishu/webhook";
+  return `http://<your-host>:${port}${path}`;
+}
+
+// 复制 Webhook URL
+async function copyWebhookUrl() {
+  const url = getWebhookUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    webhookUrlCopied.value = true;
+    setTimeout(() => {
+      webhookUrlCopied.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error("复制失败:", err);
+  }
+}
 
 // 是否有修改
 const hasChanges = computed(() => {
@@ -1138,6 +1276,8 @@ function validateChannelConfig() {
   if (type === "feishu") {
     if (!config.app_id) {
       channelErrors.value.push("App ID 不能为空");
+    } else if (!config.app_id.startsWith("cli_")) {
+      channelErrors.value.push("App ID 格式不正确，应以 cli_ 开头");
     }
     if (!config.app_secret) {
       channelErrors.value.push("App Secret 不能为空");
@@ -1203,6 +1343,9 @@ function resetChannelForm() {
   channelForm.config.encrypt_key = "";
   channelForm.config.bot_token = "";
   channelForm.config.webhook_url = "";
+  channelForm.config.welcome_message = "";
+  channelForm.config.enable_group_events = true;
+  channelForm.config.enable_card_message = true;
   channelErrors.value = [];
 }
 
@@ -1231,6 +1374,9 @@ function openEditChannel(ch) {
     channelForm.config.encrypt_key = cfg.encrypt_key || "";
     channelForm.config.bot_token = cfg.bot_token || "";
     channelForm.config.webhook_url = cfg.webhook_url || "";
+    channelForm.config.welcome_message = cfg.welcome_message || "";
+    channelForm.config.enable_group_events = cfg.enable_group_events !== false;
+    channelForm.config.enable_card_message = cfg.enable_card_message !== false;
   } catch {
     resetChannelForm();
     channelForm.name = ch.name;
