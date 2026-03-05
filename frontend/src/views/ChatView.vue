@@ -147,30 +147,96 @@ async function checkApiStatus() {
 
 // ===== 消息处理 =====
 onMessage((msg) => {
-    if (msg.type === "chunk") {
-        chatStore.appendToLastAI(msg.content || "");
-        scrollToBottom();
-    } else if (msg.type === "thinking") {
-        chatStore.updateThinking(msg.thinking || "");
-    } else if (msg.type === "tool_call") {
-        chatStore.addToolCall(msg);
-        scrollToBottom();
-    } else if (msg.type === "tool_result") {
-        chatStore.updateToolResult(msg);
-        scrollToBottom();
-    } else if (msg.type === "chunk_end" || msg.type === "message") {
-        if (msg.type === "message") {
-            chatStore.finishLastAI(msg.content || "");
-        } else {
+    // 处理后端返回的消息
+    switch (msg.type) {
+        case "session_created":
+            // 会话创建成功，保存 session_id
+            if (msg.data && msg.data.session_id) {
+                chatStore.setWsSessionId(
+                    chatStore.currentSessionId,
+                    msg.data.session_id
+                );
+                // 发送聊天消息
+                sendPendingChatMessage();
+            }
+            break;
+        case "chunk":
+            chatStore.appendToLastAI(msg.data?.content || "");
+            scrollToBottom();
+            break;
+        case "thinking":
+            chatStore.updateThinking(msg.data?.content || "");
+            break;
+        case "tool_call":
+            chatStore.addToolCall({
+                id: msg.data?.tool_call_id,
+                tool_name: msg.data?.tool_name,
+                arguments: msg.data?.arguments,
+                status: "pending",
+                timestamp: Date.now(),
+            });
+            scrollToBottom();
+            break;
+        case "tool_result":
+            chatStore.updateToolResult({
+                id: msg.data?.tool_call_id,
+                status: "completed",
+                content: msg.data?.result,
+            });
+            scrollToBottom();
+            break;
+        case "end":
             chatStore.finishLastAI();
-        }
-        chatStore.isLoading = false;
-        scrollToBottom();
-    } else if (msg.type === "error") {
-        chatStore.finishLastAI("[错误] " + (msg.content || "未知错误"));
-        chatStore.isLoading = false;
+            chatStore.isLoading = false;
+            scrollToBottom();
+            break;
+        case "error":
+            chatStore.finishLastAI(
+                "[错误] " + (msg.error?.message || "未知错误")
+            );
+            chatStore.isLoading = false;
+            break;
+        case "queue_status":
+            // 队列状态更新，可以显示给用户
+            console.log("队列状态:", msg.data);
+            break;
+        case "pong":
+            // 心跳响应
+            break;
+        default:
+            console.log("未处理的消息类型:", msg.type, msg);
     }
 });
+
+// 待发送的聊天消息
+let pendingChatContent = null;
+
+function sendPendingChatMessage() {
+    if (!pendingChatContent) return;
+    
+    const wsSessionId = chatStore.getWsSessionId(chatStore.currentSessionId);
+    if (!wsSessionId) {
+        console.error("没有有效的 WebSocket 会话ID");
+        return;
+    }
+
+    const sent = send({
+        type: "chat",
+        data: {
+            session_id: wsSessionId,
+            content: pendingChatContent,
+        },
+    });
+
+    if (!sent) {
+        chatStore.finishLastAI(
+            "⚠️ 发送失败：WebSocket 未连接，请检查 Agent 服务是否启动"
+        );
+        chatStore.isLoading = false;
+    }
+    
+    pendingChatContent = null;
+}
 
 async function sendMessage(text) {
     if (!text?.trim()) return;
@@ -190,18 +256,35 @@ async function sendMessage(text) {
     chatStore.isLoading = true;
     scrollToBottom();
 
-    const sent = send({
-        type: "message",
-        content: text,
-        chat_id: session.chatId,
-        user_id: chatStore.userId,
-    });
+    // 检查是否已有 WebSocket 会话
+    const wsSessionId = chatStore.getWsSessionId(chatStore.currentSessionId);
+    
+    if (wsSessionId) {
+        // 已有会话，直接发送聊天消息
+        const sent = send({
+            type: "chat",
+            data: {
+                session_id: wsSessionId,
+                content: text,
+            },
+        });
 
-    if (!sent) {
-        chatStore.finishLastAI(
-            "⚠️ 发送失败：WebSocket 未连接，请检查 Agent 服务是否启动",
-        );
-        chatStore.isLoading = false;
+        if (!sent) {
+            chatStore.finishLastAI(
+                "⚠️ 发送失败：WebSocket 未连接，请检查 Agent 服务是否启动"
+            );
+            chatStore.isLoading = false;
+        }
+    } else {
+        // 需要先创建 WebSocket 会话
+        pendingChatContent = text;
+        send({
+            type: "create_session",
+            data: {
+                channel: "websocket",
+                user_id: chatStore.userId,
+            },
+        });
     }
 }
 

@@ -68,6 +68,12 @@ export async function getSessionsPage(params = {}) {
   });
 }
 
+// 获取所有会话列表（简化版）
+export async function getSessions(params = {}) {
+  const data = await getSessionsPage({ page: 1, size: 100, ...params });
+  return data?.list || [];
+}
+
 export async function getSession(id) {
   return request('/api/v1/sessions/get', {
     method: 'POST',
@@ -76,7 +82,7 @@ export async function getSession(id) {
 }
 
 export async function createSession(data) {
-  return request('/api/v1/sessions/save', {
+  return request('/api/v1/sessions/create', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -107,6 +113,12 @@ export async function getMessagesPage(params = {}) {
       role: params.role || '',
     }),
   });
+}
+
+// 获取会话的所有消息（简化版）
+export async function getSessionMessages(sessionId, params = {}) {
+  const data = await getMessagesPage({ session_id: sessionId, page: 1, size: 100, ...params });
+  return data?.list || [];
 }
 
 export async function createMessage(data) {
@@ -601,16 +613,18 @@ export default {
   getApiBaseUrl,
   setApiBaseUrl,
   checkHealth,
-  
+
   // Session
   getSessionsPage,
+  getSessions,
   getSession,
   createSession,
   updateSession,
   deleteSession,
-  
+
   // Message
   getMessagesPage,
+  getSessionMessages,
   createMessage,
   updateMessage,
   deleteMessage,

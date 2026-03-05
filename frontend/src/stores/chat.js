@@ -13,15 +13,24 @@ export const useChatStore = defineStore("chat", () => {
   const isLoadingSessions = ref(false);
   const apiBase = ref(api.getApiBaseUrl());
   const wsUrl = ref(
-    localStorage.getItem("icooclaw_ws_url") || "ws://localhost:8080/ws",
+    localStorage.getItem("icooclaw_ws_url") || "ws://localhost:8080/ws/chat",
   );
   const userId = ref(localStorage.getItem("icooclaw_user_id") || "user-1");
+
+  // WebSocket 会话ID映射: 前端sessionId -> 后端wsSessionId
+  const wsSessionIdMap = ref({});
 
   const currentSession = computed(
     () => sessions.value.find((s) => s.id === currentSessionId.value) || null,
   );
 
   const currentMessages = computed(() => currentSession.value?.messages || []);
+
+  // 获取当前会话的 WebSocket session_id
+  const currentWsSessionId = computed(() => {
+    if (!currentSessionId.value) return null;
+    return wsSessionIdMap.value[currentSessionId.value] || null;
+  });
 
   async function loadSessions() {
     isLoadingSessions.value = true;
@@ -277,6 +286,21 @@ export const useChatStore = defineStore("chat", () => {
     localStorage.setItem("icooclaw_user_id", id);
   }
 
+  // 设置 WebSocket 会话ID映射
+  function setWsSessionId(frontendSessionId, wsSessionId) {
+    wsSessionIdMap.value[frontendSessionId] = wsSessionId;
+  }
+
+  // 获取 WebSocket 会话ID
+  function getWsSessionId(frontendSessionId) {
+    return wsSessionIdMap.value[frontendSessionId] || null;
+  }
+
+  // 清除 WebSocket 会话ID
+  function clearWsSessionId(frontendSessionId) {
+    delete wsSessionIdMap.value[frontendSessionId];
+  }
+
   return {
     sessions,
     currentSessionId,
@@ -285,8 +309,10 @@ export const useChatStore = defineStore("chat", () => {
     apiBase,
     wsUrl,
     userId,
+    wsSessionIdMap,
     currentSession,
     currentMessages,
+    currentWsSessionId,
     loadSessions,
     loadMessages,
     createSession,
@@ -305,5 +331,8 @@ export const useChatStore = defineStore("chat", () => {
     setApiBase,
     setWsUrl,
     setUserId,
+    setWsSessionId,
+    getWsSessionId,
+    clearWsSessionId,
   };
 });
