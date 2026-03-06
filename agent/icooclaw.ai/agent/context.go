@@ -18,7 +18,7 @@ import (
 
 // ContextBuilder 上下文构建器
 type ContextBuilder struct {
-	sessionID    uint
+	sessionID    string
 	workspace    string
 	skillLoader  skill.Loader
 	memoryLoader memory.Loader
@@ -28,7 +28,7 @@ type ContextBuilder struct {
 
 // NewContextBuilder 创建上下文构建器
 func NewContextBuilder(
-	sessionID uint,
+	sessionID string,
 	workspace string,
 	logger *slog.Logger,
 	skillLoader skill.Loader,

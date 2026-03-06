@@ -24,7 +24,7 @@ func NewStorage(storage *storage.Storage, logger *slog.Logger) *Storage {
 }
 
 // Load 加载记忆
-func (s *Storage) Load(id uint, maxCount int) ([]*Message, error) {
+func (s *Storage) Load(id string, maxCount int) ([]*Message, error) {
 	// 从数据库加载消息
 	msgs, err := s.storage.Message().GetBySessionID(id, maxCount, 0)
 	if err != nil {
@@ -51,7 +51,7 @@ func (s *Storage) Load(id uint, maxCount int) ([]*Message, error) {
 }
 
 // Save 保存记忆
-func (s *Storage) Save(id uint, msg *Message) error {
+func (s *Storage) Save(id string, msg *Message) error {
 	saveData := &storage.Message{}
 	saveData.Role = consts.ToRole(msg.Role)
 	saveData.Content = msg.Content
@@ -71,7 +71,7 @@ func (s *Storage) Save(id uint, msg *Message) error {
 }
 
 // BatchSave 批量保存记忆
-func (s *Storage) BatchSave(id uint, messages []*Message) error {
+func (s *Storage) BatchSave(id string, messages []*Message) error {
 	// 保存消息到数据库
 	for _, msg := range messages {
 		err := s.Save(id, msg)
@@ -84,7 +84,7 @@ func (s *Storage) BatchSave(id uint, messages []*Message) error {
 }
 
 // Delete 删除记忆
-func (s *Storage) Delete(id uint) error {
+func (s *Storage) Delete(id string) error {
 	err := s.storage.Message().Delete(id)
 	if err != nil {
 		s.logger.Error("删除记忆失败", slog.Any("错误信息", err.Error()))
@@ -94,7 +94,7 @@ func (s *Storage) Delete(id uint) error {
 }
 
 // DeleteBySessionID 删除会话的所有记忆
-func (s *Storage) DeleteBySessionID(id uint) error {
+func (s *Storage) DeleteBySessionID(id string) error {
 	err := s.storage.Message().DeleteBySessionID(id)
 	if err != nil {
 		s.logger.Error("删除会话的所有记忆失败", slog.Any("错误信息", err.Error()))
@@ -104,7 +104,7 @@ func (s *Storage) DeleteBySessionID(id uint) error {
 }
 
 // Update 更新记忆
-func (s *Storage) Update(id uint, msg *Message) error {
+func (s *Storage) Update(id string, msg *Message) error {
 	err := s.Save(id, msg)
 	if err != nil {
 		return err
@@ -173,6 +173,6 @@ func truncate(s string, maxLen int) string {
 }
 
 // Search 搜索记忆
-func (s *Storage) Search(id uint, query string) ([]*Message, error) {
+func (s *Storage) Search(id string, query string) ([]*Message, error) {
 	return nil, nil
 }

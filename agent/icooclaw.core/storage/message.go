@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"icooclaw.core/consts"
 )
@@ -8,7 +9,7 @@ import (
 // Message 消息模型
 type Message struct {
 	Model
-	SessionID        uint            `gorm:"index" json:"session_id"`
+	SessionID        string          `gorm:"index" json:"session_id"`
 	Role             consts.RoleType `gorm:"size:20;index" json:"role"`          // user, assistant, system, tool_call, tool_result
 	Content          string          `gorm:"type:text" json:"content"`           // 消息内容
 	ToolCallID       string          `gorm:"size:100" json:"tool_call_id"`       // 工具调用ID
@@ -25,11 +26,17 @@ func (Message) TableName() string {
 	return tableNamePrefix + "messages"
 }
 
+// BeforeCreate 创建前回调
+func (c *Message) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
+}
+
 func NewMessage() *Message {
 	return &Message{}
 }
 
-func NewUserMessage(sessionID uint, content string) *Message {
+func NewUserMessage(sessionID string, content string) *Message {
 	return &Message{
 		SessionID: sessionID,
 		Role:      consts.RoleUser,
@@ -37,7 +44,7 @@ func NewUserMessage(sessionID uint, content string) *Message {
 	}
 }
 
-func NewAssistantMessage(sessionID uint, content string, reasoningContent string) *Message {
+func NewAssistantMessage(sessionID string, content string, reasoningContent string) *Message {
 	return &Message{
 		SessionID:        sessionID,
 		Role:             consts.RoleAssistant,
@@ -67,14 +74,14 @@ func (s *MessageStorage) Create(msg *Message) error {
 }
 
 // GetByID 通过ID获取消息
-func (s *MessageStorage) GetByID(id uint) (*Message, error) {
+func (s *MessageStorage) GetByID(id string) (*Message, error) {
 	var msg Message
 	err := s.db.First(&msg, id).Error
 	return &msg, err
 }
 
 // GetBySessionID 通过会话ID获取消息
-func (s *MessageStorage) GetBySessionID(sessionID uint, limit, offset int) ([]Message, error) {
+func (s *MessageStorage) GetBySessionID(sessionID string, limit, offset int) ([]Message, error) {
 	query := s.db.Where("session_id = ?", sessionID).Order("created_at DESC")
 
 	var (
@@ -90,19 +97,19 @@ func (s *MessageStorage) GetBySessionID(sessionID uint, limit, offset int) ([]Me
 }
 
 // GetToolMessages 获取工具消息
-func (s *MessageStorage) GetToolMessages(sessionID uint) ([]Message, error) {
+func (s *MessageStorage) GetToolMessages(sessionID string) ([]Message, error) {
 	var messages []Message
 	err := s.db.Where("session_id = ? AND role = ?", sessionID, "tool").Order("created_at ASC").Find(&messages).Error
 	return messages, err
 }
 
 // DeleteBySessionID 删除会话的所有消息
-func (s *MessageStorage) DeleteBySessionID(sessionID uint) error {
+func (s *MessageStorage) DeleteBySessionID(sessionID string) error {
 	return s.db.Where("session_id = ?", sessionID).Delete(&Message{}).Error
 }
 
 // Delete 删除消息
-func (s *MessageStorage) Delete(id uint) error {
+func (s *MessageStorage) Delete(id string) error {
 	return s.db.Delete(&Message{}, id).Error
 }
 

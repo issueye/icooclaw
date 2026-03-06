@@ -1,23 +1,20 @@
 package storage
 
 import (
-	"time"
-
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"icooclaw.core/consts"
 )
 
 // Session 会话模型
 type Session struct {
-	ID               string    `gorm:"primaryKey" json:"id"`               // 主键 使用 uuid
-	Key              string    `gorm:"uniqueIndex;size:255" json:"key"`    // channel:chat_id
-	Channel          string    `gorm:"size:50;index" json:"channel"`       // telegram, discord, feishu...
-	ChatID           string    `gorm:"size:255;index" json:"chat_id"`      // 用户/群组ID
-	UserID           string    `gorm:"size:255" json:"user_id"`            // 用户唯一标识
-	LastConsolidated int       `gorm:"default:0" json:"last_consolidated"` // 已整合的消息数
-	Metadata         string    `gorm:"type:text" json:"metadata"`          // JSON元数据
-	CreatedAt        time.Time `gorm:"created_at" json:"created_at"`       // 创建时间
-	UpdatedAt        time.Time `gorm:"updated_at" json:"updated_at"`       // 更新时间
+	Model
+	Key              string `gorm:"size:255" json:"key"`                // channel:chat_id
+	Channel          string `gorm:"size:50;index" json:"channel"`       // telegram, discord, feishu...
+	ChatID           string `gorm:"size:255;index" json:"chat_id"`      // 用户/群组ID
+	UserID           string `gorm:"size:255" json:"user_id"`            // 用户唯一标识
+	LastConsolidated int    `gorm:"default:0" json:"last_consolidated"` // 已整合的消息数
+	Metadata         string `gorm:"type:text" json:"metadata"`          // JSON元数据
 
 	Messages []Message `gorm:"foreignKey:SessionID" json:"messages"`
 }
@@ -37,6 +34,12 @@ type ResQuerySession struct {
 // TableName 表名
 func (Session) TableName() string {
 	return tableNamePrefix + "sessions"
+}
+
+// BeforeCreate 创建前回调
+func (c *Session) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
 }
 
 // SessionStorage 会话存储
@@ -60,7 +63,7 @@ func (s *SessionStorage) Create(session *Session) error {
 // GetByID 通过ID获取会话
 func (s *SessionStorage) GetByID(id string) (*Session, error) {
 	var session Session
-	err := s.db.First(&session, id).Error
+	err := s.db.Where("id = ?", id).First(&session).Error
 	return &session, err
 }
 
@@ -119,7 +122,7 @@ func (s *SessionStorage) Page(q *QuerySession) (*ResQuerySession, error) {
 }
 
 // AddMessage 添加消息到会话
-func (s *SessionStorage) AddMessage(sessionID uint, role consts.RoleType, content, reasoningContent, toolCallID, toolName, toolArguments, toolResult string) (*Message, error) {
+func (s *SessionStorage) AddMessage(sessionID string, role consts.RoleType, content, reasoningContent, toolCallID, toolName, toolArguments, toolResult string) (*Message, error) {
 	msg := Message{
 		SessionID:        sessionID,
 		Role:             role,
@@ -134,19 +137,19 @@ func (s *SessionStorage) AddMessage(sessionID uint, role consts.RoleType, conten
 	return &msg, err
 }
 
-func (s *SessionStorage) UpdateSessionMetadata(sessionID uint, metadata string) error {
+func (s *SessionStorage) UpdateSessionMetadata(sessionID string, metadata string) error {
 	return s.db.Model(&Session{}).Where("id = ?", sessionID).Update("metadata", metadata).Error
 }
 
 // GetMessages 获取会话消息
-func (s *SessionStorage) GetMessages(id uint, limit int) ([]Message, error) {
+func (s *SessionStorage) GetMessages(id string, limit int) ([]Message, error) {
 	var messages []Message
 	err := s.db.Where("session_id = ?", id).Order("created_at ASC").Limit(limit).Find(&messages).Error
 	return messages, err
 }
 
 // UpdateLastConsolidated 更新已整合的消息数
-func (s *SessionStorage) UpdateLastConsolidated(id uint) error {
+func (s *SessionStorage) UpdateLastConsolidated(id string) error {
 	var count int64
 	err := s.db.Model(&Message{}).Where("session_id = ?", id).Count(&count).Error
 	if err != nil {

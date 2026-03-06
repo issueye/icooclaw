@@ -1101,7 +1101,7 @@
               <button
                 v-for="(llm, llmIdx) in provider.llms"
                 :key="llmIdx"
-                @click="selectModel(llm.model)"
+                @click="selectModel(provider.name, llm.model)"
                 :class="[
                   'px-3 py-1.5 rounded-lg text-xs transition-colors',
                   agentModelForm.model === llm.model
@@ -1109,7 +1109,7 @@
                     : 'bg-bg-secondary text-text-secondary hover:bg-bg-hover'
                 ]"
               >
-                {{ llm.model }}
+                {{ `${provider.name}/${llm.model}` }}
               </button>
             </div>
           </div>
@@ -1682,8 +1682,8 @@ function closeAgentModelDialog() {
 }
 
 // 选择模型
-function selectModel(model) {
-  agentModelForm.model = model;
+function selectModel(provider, model) {
+  agentModelForm.model = `${provider}/${model}`;
 }
 
 // 保存 AI Agent 默认模型

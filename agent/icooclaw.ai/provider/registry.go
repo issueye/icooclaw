@@ -8,6 +8,20 @@ import (
 	"icooclaw.core/config"
 )
 
+type ProviderType string
+
+const (
+	OPENAI            ProviderType = "openai"
+	ANTHROPIC         ProviderType = "anthropic"
+	DEEPSEEK          ProviderType = "deepseek"
+	OLLAMA            ProviderType = "ollama"
+	OPENROUTER        ProviderType = "openrouter"
+	AZURE_OPENAI      ProviderType = "azure_openai"
+	LOCAL_AI          ProviderType = "local_ai"
+	ONEAPI            ProviderType = "oneapi"
+	OPENAI_COMPATIBLE ProviderType = "openai_compatible"
+)
+
 // ProviderSpec Provider规格定义
 type ProviderSpec struct {
 	Name            string

@@ -14,12 +14,12 @@ type Message struct {
 
 // Loader 记忆加载器接口 以会话ID为单位
 type Loader interface {
-	Load(id uint, maxCount int) ([]*Message, error)        // Load 加载记忆 最多加载maxCount条 如果是0则加载所有
-	Save(id uint, msg *Message) error                      // Save 保存记忆
-	BatchSave(id uint, messages []*Message) error          // BatchSave 批量保存记忆
-	Delete(id uint) error                                  // Delete 删除记忆
-	Update(id uint, msg *Message) error                    // Update 更新记忆
-	Search(id uint, query string) ([]*Message, error)      // Search 搜索记忆
+	Load(id string, maxCount int) ([]*Message, error)      // Load 加载记忆 最多加载maxCount条 如果是0则加载所有
+	Save(id string, msg *Message) error                    // Save 保存记忆
+	BatchSave(id string, messages []*Message) error        // BatchSave 批量保存记忆
+	Delete(id string) error                                // Delete 删除记忆
+	Update(id string, msg *Message) error                  // Update 更新记忆
+	Search(id string, query string) ([]*Message, error)    // Search 搜索记忆
 	SummarizeMessages(messages []*Message) (string, error) // SummarizeMessages 对消息进行摘要 默认摘要100条
 }
 

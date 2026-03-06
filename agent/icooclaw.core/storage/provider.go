@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -30,21 +31,36 @@ func (llms LLMs) Value() (driver.Value, error) {
 	return llms.ToString(), nil
 }
 
+func (llms *LLMs) IsHave(model string) bool {
+	for _, llm := range *llms {
+		if llm.Model == model {
+			return true
+		}
+	}
+	return false
+}
+
 // ProviderConfig Provider 配置模型
 type ProviderConfig struct {
 	Model
-	Name         string `gorm:"size:50;uniqueIndex" json:"name"`           // openai, anthropic...
-	BaseUrl      string `gorm:"size:255" json:"base_url"`                  // 基础 URL
-	ApiKey       string `gorm:"size:255" json:"api_key"`                   // API 密钥
-	LLMs         LLMs   `gorm:"type:text;serializer:json" json:"llms"`     // 支持的 LLMs
-	Enabled      bool   `gorm:"default:false" json:"enabled"`              // 是否启用
-	DefaultModel string `gorm:"size:100;default:''" json:"default_model"`  // 默认模型
-	Config       string `gorm:"type:text" json:"config"`                   // JSON 配置
+	Name         string `gorm:"size:50;uniqueIndex" json:"name"`          // openai, anthropic...
+	BaseUrl      string `gorm:"size:255" json:"base_url"`                 // 基础 URL
+	ApiKey       string `gorm:"size:255" json:"api_key"`                  // API 密钥
+	LLMs         LLMs   `gorm:"type:text;serializer:json" json:"llms"`    // 支持的 LLMs
+	Enabled      bool   `gorm:"default:false" json:"enabled"`             // 是否启用
+	DefaultModel string `gorm:"size:100;default:''" json:"default_model"` // 默认模型
+	Config       string `gorm:"type:text" json:"config"`                  // JSON 配置
 }
 
 // TableName 表名
 func (ProviderConfig) TableName() string {
 	return tableNamePrefix + "provider_configs"
+}
+
+// BeforeCreate 创建前回调
+func (c *ProviderConfig) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
 }
 
 // ProviderConfigStorage Provider 配置存储
@@ -73,7 +89,7 @@ func (s *ProviderConfigStorage) Update(config *ProviderConfig) error {
 }
 
 // GetByID 通过 ID 获取 Provider 配置
-func (s *ProviderConfigStorage) GetByID(id uint) (*ProviderConfig, error) {
+func (s *ProviderConfigStorage) GetByID(id string) (*ProviderConfig, error) {
 	var config ProviderConfig
 	err := s.db.First(&config, id).Error
 	return &config, err
@@ -87,7 +103,7 @@ func (s *ProviderConfigStorage) GetByName(name string) (*ProviderConfig, error) 
 }
 
 // Delete 删除 Provider 配置
-func (s *ProviderConfigStorage) Delete(id uint) error {
+func (s *ProviderConfigStorage) Delete(id string) error {
 	return s.db.Delete(&ProviderConfig{}, id).Error
 }
 

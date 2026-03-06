@@ -1,6 +1,9 @@
 package storage
 
-import "gorm.io/gorm"
+import (
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 // ChannelConfig 通道配置模型
 type ChannelConfig struct {
@@ -13,6 +16,12 @@ type ChannelConfig struct {
 // TableName 表名
 func (ChannelConfig) TableName() string {
 	return tableNamePrefix + "channel_configs"
+}
+
+// BeforeCreate 创建前回调
+func (c *ChannelConfig) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
 }
 
 // ChannelConfigStorage 通道配置存储
@@ -36,7 +45,7 @@ func (s *ChannelConfigStorage) Update(config *ChannelConfig) error {
 }
 
 // GetByID 通过ID获取通道配置
-func (s *ChannelConfigStorage) GetByID(id uint) (*ChannelConfig, error) {
+func (s *ChannelConfigStorage) GetByID(id string) (*ChannelConfig, error) {
 	var config ChannelConfig
 	err := s.db.First(&config, id).Error
 	return &config, err
@@ -50,7 +59,7 @@ func (s *ChannelConfigStorage) GetByName(name string) (*ChannelConfig, error) {
 }
 
 // Delete 删除通道配置
-func (s *ChannelConfigStorage) Delete(id uint) error {
+func (s *ChannelConfigStorage) Delete(id string) error {
 	return s.db.Delete(&ChannelConfig{}, id).Error
 }
 

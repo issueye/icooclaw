@@ -37,7 +37,8 @@ func (s MessageStatus) ToString() string {
 
 // InboundMessage 接收消息
 type InboundMessage struct {
-	ID        string         `json:"id,omitempty"`        // 消息ID
+	ID        string         `json:"id,omitempty"`        // 消息ID  
+	SessionID uint           `json:"session_id,omitempty"`  // 会话 ID
 	Channel   string         `json:"channel,omitempty"`   // 通道
 	ChatID    string         `json:"chat_id,omitempty"`   // 会话ID
 	UserID    string         `json:"user_id,omitempty"`   // 用户ID

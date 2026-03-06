@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -19,6 +20,12 @@ type Skill struct {
 // TableName 表名
 func (Skill) TableName() string {
 	return tableNamePrefix + "skills"
+}
+
+// BeforeCreate 创建前回调
+func (c *Skill) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
 }
 
 // SkillStorage 技能存储
@@ -47,7 +54,7 @@ func (s *SkillStorage) Update(skill *Skill) error {
 }
 
 // GetByID 通过ID获取技能
-func (s *SkillStorage) GetByID(id uint) (*Skill, error) {
+func (s *SkillStorage) GetByID(id string) (*Skill, error) {
 	var skill Skill
 	err := s.db.First(&skill, id).Error
 	return &skill, err
@@ -61,7 +68,7 @@ func (s *SkillStorage) GetByName(name string) (*Skill, error) {
 }
 
 // Delete 删除技能
-func (s *SkillStorage) Delete(id uint) error {
+func (s *SkillStorage) Delete(id string) error {
 	return s.db.Delete(&Skill{}, id).Error
 }
 

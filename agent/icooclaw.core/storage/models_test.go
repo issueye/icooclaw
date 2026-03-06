@@ -11,7 +11,7 @@ import (
 func TestSession_Structure(t *testing.T) {
 
 	session := Session{
-		Model:   Model{ID: 1},
+		Model:   Model{ID: "1"},
 		Key:     "telegram:chat_123",
 		Channel: "telegram",
 		ChatID:  "chat_123",
@@ -32,8 +32,8 @@ func TestSession_TableName(t *testing.T) {
 // TestMessage tests for Message struct
 func TestMessage_Structure(t *testing.T) {
 	msg := Message{
-		Model:            Model{ID: 1},
-		SessionID:        1,
+		Model:            Model{ID: "1"},
+		SessionID:        "1",
 		Role:             "user",
 		Content:          "Hello",
 		ToolCallID:       "",
@@ -56,7 +56,7 @@ func TestMessage_TableName(t *testing.T) {
 // TestTask tests for Task struct
 func TestTask_Structure(t *testing.T) {
 	task := Task{
-		Model:       Model{ID: 1},
+		Model:       Model{ID: "1"},
 		Name:        "test_task",
 		Description: "A test task",
 		CronExpr:    "*/5 * * * *",
@@ -82,7 +82,7 @@ func TestTask_TableName(t *testing.T) {
 // TestSkill tests for Skill struct
 func TestSkill_Structure(t *testing.T) {
 	skill := Skill{
-		Model:       Model{ID: 1},
+		Model:       Model{ID: "1"},
 		Name:        "test_skill",
 		Description: "A test skill",
 		Content:     "skill content",
@@ -102,7 +102,7 @@ func TestSkill_TableName(t *testing.T) {
 // TestMemory tests for Memory struct
 func TestMemory_Structure(t *testing.T) {
 	base := Model{
-		ID:        1,
+		ID:        "1",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -126,13 +126,13 @@ func TestMemory_TableName(t *testing.T) {
 // TestChannelConfig tests for ChannelConfig struct
 func TestChannelConfig_Structure(t *testing.T) {
 	config := ChannelConfig{
-		Model:   Model{ID: 1},
+		Model:   Model{ID: "1"},
 		Name:    "telegram",
 		Enabled: true,
 		Config:  `{"token":"test"}`,
 	}
 
-	assert.Equal(t, uint(1), config.ID)
+	assert.Equal(t, "1", config.ID)
 	assert.Equal(t, "telegram", config.Name)
 	assert.True(t, config.Enabled)
 	assert.Contains(t, config.Config, "token")
@@ -145,13 +145,13 @@ func TestChannelConfig_TableName(t *testing.T) {
 // TestProviderConfig tests for ProviderConfig struct
 func TestProviderConfig_Structure(t *testing.T) {
 	config := ProviderConfig{
-		Model:   Model{ID: 1},
+		Model:   Model{ID: "1"},
 		Name:    "openai",
 		Enabled: true,
 		Config:  `{"api_key":"test"}`,
 	}
 
-	assert.Equal(t, uint(1), config.ID)
+	assert.Equal(t, "1", config.ID)
 	assert.Equal(t, "openai", config.Name)
 	assert.True(t, config.Enabled)
 }

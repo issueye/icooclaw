@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -17,16 +18,22 @@ func unmarshalJSON(data string, v interface{}) error {
 // ParamConfig 运行时参数配置模型
 type ParamConfig struct {
 	Model
-	Key         string `gorm:"size:100;uniqueIndex" json:"key"`          // 参数键
-	Value       string `gorm:"type:text" json:"value"`                   // 参数值（JSON 格式）
-	Description string `gorm:"size:500" json:"description"`              // 参数描述
-	Group       string `gorm:"size:50;default:'general'" json:"group"`   // 参数分组
-	Enabled     bool   `gorm:"default:true" json:"enabled"`              // 是否启用
+	Key         string `gorm:"size:100" json:"key"`                    // 参数键
+	Value       string `gorm:"type:text" json:"value"`                 // 参数值（JSON 格式）
+	Description string `gorm:"size:500" json:"description"`            // 参数描述
+	Group       string `gorm:"size:50;default:'general'" json:"group"` // 参数分组
+	Enabled     bool   `gorm:"default:true" json:"enabled"`            // 是否启用
 }
 
 // TableName 表名
 func (ParamConfig) TableName() string {
 	return tableNamePrefix + "param_configs"
+}
+
+// BeforeCreate 创建前回调
+func (c *ParamConfig) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
 }
 
 // ParamConfigStorage 运行时参数配置存储
@@ -55,7 +62,7 @@ func (s *ParamConfigStorage) Update(config *ParamConfig) error {
 }
 
 // GetByID 通过 ID 获取参数配置
-func (s *ParamConfigStorage) GetByID(id uint) (*ParamConfig, error) {
+func (s *ParamConfigStorage) GetByID(id string) (*ParamConfig, error) {
 	var config ParamConfig
 	err := s.db.First(&config, id).Error
 	return &config, err
@@ -69,7 +76,7 @@ func (s *ParamConfigStorage) GetByKey(key string) (*ParamConfig, error) {
 }
 
 // Delete 删除参数配置
-func (s *ParamConfigStorage) Delete(id uint) error {
+func (s *ParamConfigStorage) Delete(id string) error {
 	return s.db.Delete(&ParamConfig{}, id).Error
 }
 
@@ -205,6 +212,6 @@ type QueryParamConfig struct {
 
 // ResQueryParamConfig 参数配置查询结果
 type ResQueryParamConfig struct {
-	Page    Page           `json:"page"`
-	Records []ParamConfig  `json:"records"`
+	Page    Page          `json:"page"`
+	Records []ParamConfig `json:"records"`
 }

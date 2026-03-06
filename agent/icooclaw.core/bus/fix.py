@@ -7,11 +7,14 @@ i = content.find('type InboundMessage struct {')
 j = content.find('}', i)
 old_struct = content[i:j+1]
 
-# ID 行的确切内容（从文件中提取）
-old_id_line = '\tID        string         `json:"id,omitempty"`        // 消息 ID'
+# 从文件中提取 ID 行
+for line in old_struct.split('\n'):
+    if line.startswith('\tID') and 'SessionID' not in line:
+        old_id_line = line
+        break
 
-# 新的 ID 行和 SessionID 行
-new_id_line = '\tID        string         `json:"id,omitempty"`          // 消息 ID'
+# 构建新的 ID 行（调整空格对齐）
+new_id_line = old_id_line + '  '  # 添加两个空格以对齐
 session_line = '\tSessionID uint           `json:"session_id,omitempty"`  // 会话 ID'
 
 # 构建新的结构体

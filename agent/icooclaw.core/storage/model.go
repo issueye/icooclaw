@@ -9,7 +9,7 @@ import (
 const tableNamePrefix = "icooclaw_"
 
 type Model struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`         // 主键
+	ID        string    `gorm:"primaryKey" json:"id"`         // 主键 uuid
 	CreatedAt time.Time `gorm:"created_at" json:"created_at"` // 创建时间
 	UpdatedAt time.Time `gorm:"updated_at" json:"updated_at"` // 更新时间
 }

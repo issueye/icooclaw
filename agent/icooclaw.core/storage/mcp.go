@@ -3,6 +3,7 @@ package storage
 import (
 	"strings"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -19,9 +20,9 @@ func (mcpType MCPType) String() string {
 
 type MCPConfig struct {
 	Model                // 嵌入 Model 结构体
-	Name        string   `gorm:"size:100;uniqueIndex" json:"name"` // MCP 名称
-	Description string   `gorm:"size:255" json:"description"`      // MCP 描述
-	Type        MCPType  `gorm:"size:100" json:"type"`             // MCP 类型
+	Name        string   `gorm:"size:100;uniqueIndex" json:"name"`      // MCP 名称
+	Description string   `gorm:"size:255" json:"description"`           // MCP 描述
+	Type        MCPType  `gorm:"size:100" json:"type"`                  // MCP 类型
 	Args        []string `gorm:"type:text;serializer:json" json:"args"` // MCP 参数
 }
 
@@ -39,6 +40,12 @@ func (table *MCPConfig) ArgsString() string {
 
 func (table *MCPConfig) TableName() string {
 	return tableNamePrefix + "mcp"
+}
+
+// BeforeCreate 创建前回调
+func (c *MCPConfig) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
 }
 
 // MCPConfigStorage MCP配置存储
@@ -67,7 +74,7 @@ func (s *MCPConfigStorage) Update(config *MCPConfig) error {
 }
 
 // GetByID 通过ID获取MCP配置
-func (s *MCPConfigStorage) GetByID(id uint) (*MCPConfig, error) {
+func (s *MCPConfigStorage) GetByID(id string) (*MCPConfig, error) {
 	var config MCPConfig
 	err := s.db.First(&config, id).Error
 	return &config, err
@@ -81,7 +88,7 @@ func (s *MCPConfigStorage) GetByName(name string) (*MCPConfig, error) {
 }
 
 // Delete 删除MCP配置
-func (s *MCPConfigStorage) Delete(id uint) error {
+func (s *MCPConfigStorage) Delete(id string) error {
 	return s.db.Delete(&MCPConfig{}, id).Error
 }
 

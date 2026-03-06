@@ -30,7 +30,7 @@ type SessionMetadata struct {
 type Agent struct {
 	name           string                  // Agent 名称
 	workspace      string                  // 工作空间
-	sessionID      uint                    // 会话 ID
+	sessionID      string                  // 会话 ID
 	config         *config.AgentSettings   // Agent 配置
 	bus            *icooclawbus.MessageBus // 消息总线
 	logger         *slog.Logger            // 日志记录器
@@ -44,7 +44,7 @@ type Agent struct {
 
 // NewAgent 创建 Agent 实例（使用函数式选项模式）
 func NewAgent(
-	id uint,
+	sessionID string,
 	name string,
 	provider provider.Provider,
 	storage *storage.Storage,
@@ -58,7 +58,7 @@ func NewAgent(
 	}
 
 	agent := &Agent{
-		sessionID: id,
+		sessionID: sessionID,
 		name:      name,
 		provider:  provider,
 		tools:     tools.NewRegistry(), // 默认实现
@@ -208,15 +208,15 @@ func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 	}
 }
 
-func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.InboundMessage) {
+func (a *Agent) handleMessage(ctx context.Context, sessionID string, msg bus.InboundMessage) {
 	// 获取客户端 ID 用于追踪
 	clientID, _ := msg.Metadata["client_id"].(string)
-	
+
 	content := msg.Content
 	if len(content) > 100 {
 		content = content[:100] + "..."
 	}
-	
+
 	a.logger.Info("[AI Agent] 开始处理消息",
 		"session_id", sessionID,
 		"channel", msg.Channel,
@@ -229,7 +229,7 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.Inbou
 
 	// 获取会话
 	session, err := a.storage.Session().GetByID(sessionID)
-	if err != nil || (session != nil && session.ID == 0) {
+	if err != nil || (session != nil && session.ID == "") {
 		// 如果会话不存在，创建一个新的会话
 		a.logger.Info("[AI Agent] 会话不存在，创建新会话",
 			"session_id", sessionID,
@@ -294,9 +294,12 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.Inbou
 		}
 	}
 
+	// 获取 Provider
+	provider := a.GetProvider()
+
 	// 使用解耦的 LoopHooks
 	reactCfg := NewReActConfig()
-	reactCfg.Provider = a.Provider()
+	reactCfg.Provider = provider
 	reactCfg.Tools = a.tools
 	reactCfg.Session = session
 	reactCfg.Logger = a.logger
@@ -350,6 +353,61 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.Inbou
 	)
 }
 
+func (a *Agent) GetProvider() provider.Provider {
+	// 重新从数据库中获取设置的默认AI模型
+	defaultModel := a.storage.ParamConfig().GetStringValue("agent.default_model", "")
+	if defaultModel == "" {
+		a.logger.Error("[AI Agent] 获取默认AI模型失败，默认模型为空")
+		return nil
+	}
+
+	a.logger.WithGroup("[AI Agent]").Info("设置的默认模型", "model", defaultModel)
+
+	// 分解默认模型为供应商和模型名称
+	parts := strings.SplitN(defaultModel, "/", 2)
+	if len(parts) != 2 {
+		a.logger.Error("[AI Agent] 默认模型格式错误，必须为供应商/模型名称")
+		return nil
+	}
+	providerName := parts[0]
+	modelName := parts[1]
+
+	// 从模型商存储对象中获取供应商配置
+	providerConfig, err := a.storage.ProviderConfig().GetByName(providerName)
+	if err != nil {
+		a.logger.Error("[AI Agent] 获取供应商配置失败", "provider", providerName, "error", err)
+		return nil
+	}
+
+	// 判断是否存在该模型
+	if !providerConfig.LLMs.IsHave(modelName) {
+		a.logger.Error("[AI Agent] 供应商配置中不存在该模型", "provider", providerName, "model", modelName)
+		return nil
+	}
+
+	a.logger.WithGroup("[AI Agent]").Info("使用模型", "provider", providerName, "model", modelName)
+
+	// 根据不同类型获取
+	switch provider.ProviderType(providerConfig.Name) {
+	case provider.OPENAI:
+		return provider.NewOpenAIProvider(providerConfig.BaseUrl, modelName)
+	case provider.ANTHROPIC:
+		return provider.NewAnthropicProvider(providerConfig.BaseUrl, modelName)
+	case provider.DEEPSEEK:
+		return provider.NewDeepSeekProvider(providerConfig.BaseUrl, modelName)
+	case provider.OLLAMA:
+		return provider.NewOllamaProvider(providerConfig.BaseUrl, modelName)
+	case provider.OPENROUTER:
+		return provider.NewOpenRouterProvider(providerConfig.BaseUrl, modelName)
+	case provider.LOCAL_AI:
+		return provider.NewLocalAIProvider(providerConfig.BaseUrl, modelName)
+	case provider.ONEAPI:
+		return provider.NewOneAPIProvider(providerConfig.BaseUrl, "", modelName)
+	default:
+		return provider.NewOpenAICompatibleProvider(providerConfig.Name, providerConfig.ApiKey, providerConfig.BaseUrl, modelName)
+	}
+}
+
 func (a *Agent) SetSystemPrompt(prompt string) {
 	a.config.SystemPrompt = prompt
 }
@@ -358,24 +416,24 @@ func (a *Agent) GetSystemPrompt() string {
 	return a.config.SystemPrompt
 }
 
-func (a *Agent) ProcessMessage(ctx context.Context, content string) (uint, string, error) {
+func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, string, error) {
 	session, err := a.storage.Session().GetOrCreateSession("cli", "cli-session", "cli-user")
 	if err != nil {
-		return 0, "", fmt.Errorf("创建会话失败: %w", err)
+		return "", "", fmt.Errorf("创建会话失败: %w", err)
 	}
 
 	// 创建用户消息
 	userMsg := storage.NewUserMessage(session.ID, content)
 	err = a.storage.Message().CreateOrUpdate(userMsg)
 	if err != nil {
-		return 0, "", fmt.Errorf("添加用户消息失败: %w", err)
+		return "", "", fmt.Errorf("添加用户消息失败: %w", err)
 	}
 
 	// 构建上下文
 	contextBuilder := NewContextBuilder(session.ID, a.workspace, a.logger, a.skills, a.memory)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
-		return 0, "", fmt.Errorf("构建上下文失败: %w", err)
+		return "", "", fmt.Errorf("构建上下文失败: %w", err)
 	}
 
 	// 运行 ReactActAgent
@@ -390,7 +448,7 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (uint, strin
 	reactAgent := NewReActAgent(reactCfg)
 	response, reasoningContent, toolCalls, err := reactAgent.Run(ctx, messages, systemPrompt)
 	if err != nil {
-		return 0, "", fmt.Errorf("处理消息时出错: %w", err)
+		return "", "", fmt.Errorf("处理消息时出错: %w", err)
 	}
 
 	// 序列化工具调用
@@ -404,16 +462,16 @@ func (a *Agent) ProcessMessage(ctx context.Context, content string) (uint, strin
 	assistantMsg.ToolResult = string(toolCallsJSON)
 	err = a.storage.Message().CreateOrUpdate(assistantMsg)
 	if err != nil {
-		return 0, "", fmt.Errorf("添加助手消息失败: %w", err)
+		return "", "", fmt.Errorf("添加助手消息失败: %w", err)
 	}
 
 	return session.ID, response, nil
 }
 
-func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
+func (a *Agent) SetSessionRolePrompt(sessionID string, rolePrompt string) error {
 	session, err := a.storage.Session().GetByID(sessionID)
 	if err != nil {
-		return fmt.Errorf("failed to get session: %w", err)
+		return fmt.Errorf("获取会话失败: %w", err)
 	}
 
 	var metadata SessionMetadata
@@ -427,13 +485,13 @@ func (a *Agent) SetSessionRolePrompt(sessionID uint, rolePrompt string) error {
 
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
+		return fmt.Errorf("序列化会话元数据失败: %w", err)
 	}
 
 	return a.storage.Session().UpdateSessionMetadata(sessionID, string(metadataJSON))
 }
 
-func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
+func (a *Agent) GetSessionRolePrompt(sessionID string) (string, error) {
 	session, err := a.storage.Session().GetByID(sessionID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get session: %w", err)
@@ -445,7 +503,7 @@ func (a *Agent) GetSessionRolePrompt(sessionID uint) (string, error) {
 
 	var metadata SessionMetadata
 	if err := json.Unmarshal([]byte(session.Metadata), &metadata); err != nil {
-		return "", fmt.Errorf("failed to unmarshal metadata: %w", err)
+		return "", fmt.Errorf("反序列化会话元数据失败: %w", err)
 	}
 
 	return metadata.RolePrompt, nil
@@ -460,7 +518,7 @@ func (a *Agent) GetMemoryFile() (string, error) {
 	memoryPath := filepath.Join(a.workspace, "memory", "MEMORY.md")
 	data, err := os.ReadFile(memoryPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read memory file: %w", err)
+		return "", fmt.Errorf("读取记忆文件失败: %w", err)
 	}
 
 	return string(data), nil
@@ -479,7 +537,7 @@ func (a *Agent) UpdateMemoryFile(section, content string) error {
 	if data, err := os.ReadFile(memoryPath); err == nil {
 		fileContent = string(data)
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read memory file: %w", err)
+		return fmt.Errorf("读取记忆文件失败: %w", err)
 	} else {
 		// 文件不存在，创建默认内容
 		fileContent = `# 记忆
@@ -531,7 +589,7 @@ func (a *Agent) UpdateMemoryFile(section, content string) error {
 	// 确保目录存在
 	memoryDir := filepath.Dir(memoryPath)
 	if err := os.MkdirAll(memoryDir, 0755); err != nil {
-		return fmt.Errorf("failed to create memory directory: %w", err)
+		return fmt.Errorf("创建记忆目录失败: %w", err)
 	}
 
 	return os.WriteFile(memoryPath, []byte(result.String()), 0644)

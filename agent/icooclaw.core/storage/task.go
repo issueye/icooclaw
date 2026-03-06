@@ -3,6 +3,7 @@ package storage
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -45,6 +46,12 @@ func (Task) TableName() string {
 	return tableNamePrefix + "tasks"
 }
 
+// BeforeCreate 创建前回调
+func (c *Task) BeforeCreate(tx *gorm.DB) error {
+	c.ID = uuid.New().String()
+	return nil
+}
+
 // TaskStorage 任务存储
 type TaskStorage struct {
 	db *gorm.DB
@@ -71,7 +78,7 @@ func (s *TaskStorage) Update(task *Task) error {
 }
 
 // GetByID 通过ID获取任务
-func (s *TaskStorage) GetByID(id uint) (*Task, error) {
+func (s *TaskStorage) GetByID(id string) (*Task, error) {
 	var task Task
 	err := s.db.First(&task, id).Error
 	return &task, err
@@ -85,7 +92,7 @@ func (s *TaskStorage) GetByName(name string) (*Task, error) {
 }
 
 // Delete 删除任务
-func (s *TaskStorage) Delete(id uint) error {
+func (s *TaskStorage) Delete(id string) error {
 	return s.db.Delete(&Task{}, id).Error
 }
 
@@ -113,17 +120,17 @@ func (s *TaskStorage) GetDue() ([]Task, error) {
 }
 
 // UpdateNextRun 更新下次执行时间
-func (s *TaskStorage) UpdateNextRun(id uint, nextRun time.Time) error {
+func (s *TaskStorage) UpdateNextRun(id string, nextRun time.Time) error {
 	return s.db.Model(&Task{}).Where("id = ?", id).Update("next_run_at", nextRun).Error
 }
 
 // UpdateLastRun 更新上次执行时间
-func (s *TaskStorage) UpdateLastRun(id uint) error {
+func (s *TaskStorage) UpdateLastRun(id string) error {
 	return s.db.Model(&Task{}).Where("id = ?", id).Update("last_run_at", time.Now()).Error
 }
 
 // ToggleEnabled 切换启用状态
-func (s *TaskStorage) ToggleEnabled(id uint) error {
+func (s *TaskStorage) ToggleEnabled(id string) error {
 	return s.db.Model(&Task{}).Where("id = ?", id).Update("enabled", gorm.Expr("NOT enabled")).Error
 }
 

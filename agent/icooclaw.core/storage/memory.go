@@ -3,6 +3,7 @@ package storage
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +26,7 @@ type Memory struct {
 	Type       MemoryType  `gorm:"size:20;index" json:"type"`             // memory, history, session, user
 	Key        string      `gorm:"size:255;index" json:"key"`             // 记忆键
 	Content    string      `gorm:"type:text" json:"content"`              // 记忆内容
-	SessionID  *uint       `gorm:"index" json:"session_id"`               // 关联会话ID
+	SessionID  string      `gorm:"index" json:"session_id"`               // 关联会话ID
 	UserID     string      `gorm:"size:100;index" json:"user_id"`         // 用户ID
 	Tags       StringArray `gorm:"size:500" json:"tags"`                  // 标签，逗号分隔
 	Importance int         `gorm:"default:0" json:"importance"`           // 重要性级别 0-10
@@ -41,13 +42,7 @@ func (Memory) TableName() string {
 
 // BeforeCreate 创建前回调
 func (m *Memory) BeforeCreate(tx *gorm.DB) error {
-	m.UpdatedAt = time.Now()
-	return nil
-}
-
-// BeforeUpdate 更新前回调
-func (m *Memory) BeforeUpdate(tx *gorm.DB) error {
-	m.UpdatedAt = time.Now()
+	m.ID = uuid.New().String()
 	return nil
 }
 
@@ -77,7 +72,7 @@ func (s *MemoryStorage) Update(memory *Memory) error {
 }
 
 // GetByID 通过ID获取记忆
-func (s *MemoryStorage) GetByID(id uint) (*Memory, error) {
+func (s *MemoryStorage) GetByID(id string) (*Memory, error) {
 	var memory Memory
 	err := s.db.First(&memory, id).Error
 	return &memory, err
@@ -91,7 +86,7 @@ func (s *MemoryStorage) GetByKey(key string) (*Memory, error) {
 }
 
 // Delete 删除记忆
-func (s *MemoryStorage) Delete(id uint) error {
+func (s *MemoryStorage) Delete(id string) error {
 	return s.db.Delete(&Memory{}, id).Error
 }
 
@@ -130,7 +125,7 @@ func (s *MemoryStorage) GetByUserID(userID string) ([]Memory, error) {
 }
 
 // GetBySessionID 按会话ID获取记忆
-func (s *MemoryStorage) GetBySessionID(sessionID uint) ([]Memory, error) {
+func (s *MemoryStorage) GetBySessionID(sessionID string) ([]Memory, error) {
 	var memories []Memory
 	err := s.db.
 		Where("session_id = ? AND is_deleted = ?", sessionID, false).
@@ -150,22 +145,22 @@ func (s *MemoryStorage) GetPinned() ([]Memory, error) {
 }
 
 // SoftDelete 软删除记忆
-func (s *MemoryStorage) SoftDelete(id uint) error {
+func (s *MemoryStorage) SoftDelete(id string) error {
 	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_deleted", true).Error
 }
 
 // Restore 恢复记忆
-func (s *MemoryStorage) Restore(id uint) error {
+func (s *MemoryStorage) Restore(id string) error {
 	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_deleted", false).Error
 }
 
 // Pin 置顶记忆
-func (s *MemoryStorage) Pin(id uint) error {
+func (s *MemoryStorage) Pin(id string) error {
 	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_pinned", true).Error
 }
 
 // Unpin 取消置顶
-func (s *MemoryStorage) Unpin(id uint) error {
+func (s *MemoryStorage) Unpin(id string) error {
 	return s.db.Model(&Memory{}).Where("id = ?", id).Update("is_pinned", false).Error
 }
 

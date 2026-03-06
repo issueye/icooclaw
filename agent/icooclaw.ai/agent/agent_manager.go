@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"icooclaw.core/bus"
-	"icooclaw.core/storage"
 	"icooclaw.ai/provider"
+	"icooclaw.core/bus"
 	"icooclaw.core/config"
+	"icooclaw.core/storage"
 )
 
 // AgentManagerConfig Agent 管理器配置
@@ -23,15 +23,15 @@ type AgentManagerConfig struct {
 // DefaultAgentManagerConfig 默认配置
 func DefaultAgentManagerConfig() *AgentManagerConfig {
 	return &AgentManagerConfig{
-		MaxAgents:     10,                // 默认最大 10 个 Agent
-		IdleTimeout:   10 * time.Minute,  // 默认空闲超时 10 分钟
-		PreStartCount: 2,                 // 默认预启动 2 个 Agent
+		MaxAgents:     10,               // 默认最大 10 个 Agent
+		IdleTimeout:   10 * time.Minute, // 默认空闲超时 10 分钟
+		PreStartCount: 2,                // 默认预启动 2 个 Agent
 	}
 }
 
 // AgentInfo Agent 信息
 type AgentInfo struct {
-	ID           uint      // Agent ID（会话 ID）
+	ID           string    // Agent ID（会话 ID）
 	Name         string    // Agent 名称
 	CreatedAt    time.Time // 创建时间
 	LastUsedAt   time.Time // 最后使用时间
@@ -41,19 +41,19 @@ type AgentInfo struct {
 
 // AgentManager Agent 管理器
 type AgentManager struct {
-	config       *AgentManagerConfig
-	logger       *slog.Logger
-	storage      *storage.Storage  // 存储接口
-	provider     provider.Provider // Provider 接口
-	agentConfig  *config.AgentSettings // Agent 配置
-	workspace    string
-	agents       map[uint]*Agent // 会话 ID -> Agent
-	agentInfos   map[uint]*AgentInfo
-	mu           sync.RWMutex
-	ctx          context.Context
-	cancel       context.CancelFunc
-	wg           sync.WaitGroup
-	messageBus   *bus.MessageBus
+	config      *AgentManagerConfig
+	logger      *slog.Logger
+	storage     *storage.Storage      // 存储接口
+	provider    provider.Provider     // Provider 接口
+	agentConfig *config.AgentSettings // Agent 配置
+	workspace   string
+	agents      map[string]*Agent // 会话 ID -> Agent
+	agentInfos  map[string]*AgentInfo
+	mu          sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	messageBus  *bus.MessageBus
 }
 
 // NewAgentManager 创建 Agent 管理器
@@ -78,8 +78,8 @@ func NewAgentManager(
 		provider:    provider,
 		agentConfig: agentConfig,
 		workspace:   workspace,
-		agents:      make(map[uint]*Agent),
-		agentInfos:  make(map[uint]*AgentInfo),
+		agents:      make(map[string]*Agent),
+		agentInfos:  make(map[string]*AgentInfo),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -204,18 +204,18 @@ func (m *AgentManager) processMessage(ctx context.Context, msg bus.InboundMessag
 
 // getSessionIDFromMessage 从消息中提取会话 ID
 // 这里简化处理，实际可能需要更复杂的逻辑
-func (m *AgentManager) getSessionIDFromMessage(msg bus.InboundMessage) (uint, error) {
+func (m *AgentManager) getSessionIDFromMessage(msg bus.InboundMessage) (string, error) {
 	// 这里需要根据实际业务逻辑实现
 	// 目前返回一个基于 chat_id 的哈希值作为会话 ID
 	// 实际应该从存储中获取真实的会话 ID
-	
+
 	// 临时实现：返回 0 表示使用全局 Agent
 	// TODO: 实现真实的会话 ID 获取逻辑
-	return 0, nil
+	return msg.ChatID, nil
 }
 
 // getOrCreateAgent 获取或创建 Agent
-func (m *AgentManager) getOrCreateAgent(sessionID uint) *Agent {
+func (m *AgentManager) getOrCreateAgent(sessionID string) *Agent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -233,10 +233,10 @@ func (m *AgentManager) getOrCreateAgent(sessionID uint) *Agent {
 			"current_count", len(m.agents),
 			"max_count", m.config.MaxAgents,
 		)
-		
+
 		// 尝试回收一个空闲 Agent
 		m.recycleIdleAgent()
-		
+
 		// 如果还是超过限制，返回 nil
 		if len(m.agents) >= m.config.MaxAgents {
 			m.logger.Error("[AgentManager] 无法创建新 Agent，已达到最大数量限制",
@@ -264,10 +264,10 @@ func (m *AgentManager) getOrCreateAgent(sessionID uint) *Agent {
 }
 
 // createAgent 创建 Agent
-func (m *AgentManager) createAgent(sessionID uint) *Agent {
+func (m *AgentManager) createAgent(sessionID string) *Agent {
 	// 创建 Agent 配置
 	agentConfig := &config.AgentSettings{
-		Name:         fmt.Sprintf("agent-%d", sessionID),
+		Name:         fmt.Sprintf("agent-%s", sessionID),
 		Model:        m.agentConfig.Model,
 		Temperature:  m.agentConfig.Temperature,
 		MaxTokens:    m.agentConfig.MaxTokens,
@@ -299,7 +299,7 @@ func (m *AgentManager) createAgent(sessionID uint) *Agent {
 }
 
 // updateAgentUsage 更新 Agent 使用状态
-func (m *AgentManager) updateAgentUsage(sessionID uint) {
+func (m *AgentManager) updateAgentUsage(sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -311,7 +311,7 @@ func (m *AgentManager) updateAgentUsage(sessionID uint) {
 }
 
 // markAgentIdle 标记 Agent 为空闲
-func (m *AgentManager) markAgentIdle(sessionID uint) {
+func (m *AgentManager) markAgentIdle(sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -325,20 +325,20 @@ func (m *AgentManager) recycleIdleAgent() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var oldestSessionID uint
+	var oldestSessionID string
 	var oldestTime time.Time
 
 	// 找到最长时间未使用的空闲 Agent
 	for sessionID, info := range m.agentInfos {
 		if !info.IsActive {
-			if oldestSessionID == 0 || info.LastUsedAt.Before(oldestTime) {
+			if oldestSessionID == "" || info.LastUsedAt.Before(oldestTime) {
 				oldestSessionID = sessionID
 				oldestTime = info.LastUsedAt
 			}
 		}
 	}
 
-	if oldestSessionID == 0 {
+	if oldestSessionID == "" {
 		m.logger.Warn("[AgentManager] 没有找到可回收的空闲 Agent")
 		return
 	}
@@ -376,7 +376,7 @@ func (m *AgentManager) doCleanup() {
 	timeout := m.config.IdleTimeout
 	now := time.Now()
 
-	var toDelete []uint
+	var toDelete []string
 
 	for sessionID, info := range m.agentInfos {
 		if !info.IsActive && now.Sub(info.LastUsedAt) > timeout {
@@ -480,7 +480,7 @@ func (m *AgentManager) Close() {
 	for sessionID := range m.agents {
 		delete(m.agents, sessionID)
 	}
-	m.agentInfos = make(map[uint]*AgentInfo)
+	m.agentInfos = make(map[string]*AgentInfo)
 
 	m.logger.Info("[AgentManager] 管理器已关闭")
 }
