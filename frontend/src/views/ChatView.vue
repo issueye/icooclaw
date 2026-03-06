@@ -303,6 +303,7 @@ async function handleSelectSession(id) {
 }
 
 function handleDeleteSession(id) {
+    console.log('删除会话:', id);
     chatStore.deleteSession(id);
 }
 

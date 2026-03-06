@@ -85,9 +85,14 @@ func (s *SessionStorage) GetByName(name string) (*Session, error) {
 	return &session, err
 }
 
-// Delete 删除会话
+// Delete 删除会话（按 uint ID）
 func (s *SessionStorage) Delete(id uint) error {
 	return s.db.Delete(&Session{}, id).Error
+}
+
+// DeleteByID 删除会话（按字符串 ID）
+func (s *SessionStorage) DeleteByID(id string) error {
+	return s.db.Where("id = ?", id).Delete(&Session{}).Error
 }
 
 // GetAll 获取所有会话

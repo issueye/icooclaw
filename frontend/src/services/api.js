@@ -79,7 +79,7 @@ export async function getSessions(params = {}) {
 export async function getSession(id) {
   return request('/api/v1/sessions/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -100,7 +100,7 @@ export async function updateSession(data) {
 export async function deleteSession(id) {
   return request('/api/v1/sessions/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -142,14 +142,14 @@ export async function updateMessage(data) {
 export async function deleteMessage(id) {
   return request('/api/v1/messages/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function getMessage(id) {
   return request('/api/v1/messages/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -177,7 +177,7 @@ export async function getEnabledProviders() {
 export async function getProvider(id) {
   return request('/api/v1/providers/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -198,7 +198,7 @@ export async function updateProvider(data) {
 export async function deleteProvider(id) {
   return request('/api/v1/providers/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -240,7 +240,7 @@ export async function getEnabledSkills() {
 export async function getSkill(id) {
   return request('/api/v1/skills/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -275,7 +275,7 @@ export async function upsertSkill(data) {
 export async function deleteSkill(id) {
   return request('/api/v1/skills/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -298,7 +298,7 @@ export async function getMCPs() {
 export async function getMCP(id) {
   return request('/api/v1/mcp/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -319,7 +319,7 @@ export async function updateMCP(data) {
 export async function deleteMCP(id) {
   return request('/api/v1/mcp/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -355,42 +355,42 @@ export async function updateMemory(data) {
 export async function deleteMemory(id) {
   return request('/api/v1/memories/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function getMemory(id) {
   return request('/api/v1/memories/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function pinMemory(id) {
   return request('/api/v1/memories/pin', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function unpinMemory(id) {
   return request('/api/v1/memories/unpin', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function softDeleteMemory(id) {
   return request('/api/v1/memories/soft-delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function restoreMemory(id) {
   return request('/api/v1/memories/restore', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -425,7 +425,7 @@ export async function getEnabledTasks() {
 export async function getTask(id) {
   return request('/api/v1/tasks/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -446,14 +446,14 @@ export async function updateTask(data) {
 export async function deleteTask(id) {
   return request('/api/v1/tasks/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
 export async function toggleTask(id) {
   return request('/api/v1/tasks/toggle', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -481,7 +481,7 @@ export async function getEnabledChannels() {
 export async function getChannel(id) {
   return request('/api/v1/channels/get', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 
@@ -502,7 +502,7 @@ export async function updateChannel(data) {
 export async function deleteChannel(id) {
   return request('/api/v1/channels/delete', {
     method: 'POST',
-    body: JSON.stringify({ id: Number(id) }),
+    body: JSON.stringify({ id }),
   });
 }
 

@@ -157,21 +157,14 @@ func (h *SessionHandler) Save(w http.ResponseWriter, r *http.Request) {
 
 func (h *SessionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// 从请求体获取 ID
-	req, err := models.Bind[map[string]any](r)
+	id, err := models.BindID(r)
 	if err != nil {
-		h.logger.Error("绑定删除会话请求失败", "error", err)
-		http.Error(w, "绑定删除会话请求失败", http.StatusBadRequest)
+		h.logger.Error("绑定获取消息请求失败", "error", err)
+		http.Error(w, "绑定获取消息请求失败", http.StatusBadRequest)
 		return
 	}
 
-	idFloat, ok := req["id"].(float64)
-	if !ok {
-		http.Error(w, "缺少或无效的 id 参数", http.StatusBadRequest)
-		return
-	}
-	id := uint(idFloat)
-
-	err = h.storage.Session().Delete(id)
+	err = h.storage.Session().DeleteByID(id)
 	if err != nil {
 		h.logger.Error("删除会话失败", "error", err)
 		http.Error(w, "删除会话失败", http.StatusInternalServerError)
