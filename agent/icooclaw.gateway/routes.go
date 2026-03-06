@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/go-chi/chi/v5"
+	"icooclaw.ai/agent"
 	"icooclaw.core/storage"
 	"icooclaw.core/ws"
 	"icooclaw.gateway/handlers"
@@ -25,7 +26,7 @@ type Handlers struct {
 }
 
 // NewHandlers 创建所有处理器
-func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Manager) *Handlers {
+func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Manager, agentManager *agent.AgentManager) *Handlers {
 	return &Handlers{
 		Common:   handlers.NewCommonHandler(logger),
 		Session:  handlers.NewSessionHandler(logger, storage),
@@ -37,7 +38,7 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Ma
 		Skill:    handlers.NewSkillHandler(logger, storage),
 		Channel:  handlers.NewChannelHandler(logger, storage),
 		Config:   handlers.NewConfigHandler(logger),
-		Chat:     handlers.NewChatHandler(logger, wsManager),
+		Chat:     handlers.NewChatHandler(logger, wsManager, agentManager),
 	}
 }
 
@@ -157,6 +158,12 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 	r.Route("/api/v1/queue", func(r chi.Router) {
 		r.Get("/status", h.Chat.GetQueueStatus)       // 获取队列状态
 		r.Post("/max-concurrent", h.Chat.SetMaxConcurrent) // 设置最大并发数
+	})
+
+	// Agent 管理路由
+	r.Route("/api/v1/agents", func(r chi.Router) {
+		r.Get("/status", h.Chat.GetAgentStatus)       // 获取 Agent 状态
+		r.Post("/max-agents", h.Chat.SetMaxAgents)    // 设置最大 Agent 数量
 	})
 }
 

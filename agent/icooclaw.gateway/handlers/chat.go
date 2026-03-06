@@ -4,19 +4,22 @@ import (
 	"log/slog"
 	"net/http"
 
+	"icooclaw.ai/agent"
 	"icooclaw.core/ws"
 	"icooclaw.gateway/models"
 )
 
 type ChatHandler struct {
-	logger    *slog.Logger
-	wsManager *ws.Manager
+	logger       *slog.Logger
+	wsManager    *ws.Manager
+	agentManager *agent.AgentManager
 }
 
-func NewChatHandler(logger *slog.Logger, wsManager *ws.Manager) *ChatHandler {
+func NewChatHandler(logger *slog.Logger, wsManager *ws.Manager, agentManager *agent.AgentManager) *ChatHandler {
 	return &ChatHandler{
-		logger:    logger,
-		wsManager: wsManager,
+		logger:       logger,
+		wsManager:    wsManager,
+		agentManager: agentManager,
 	}
 }
 
@@ -59,7 +62,7 @@ func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Max <= 0 {
-		http.Error(w, "最大并发数必须大于0", http.StatusBadRequest)
+		http.Error(w, "最大并发数必须大于 0", http.StatusBadRequest)
 		return
 	}
 
@@ -70,6 +73,67 @@ func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 		Message: "最大并发数设置成功",
 		Data: map[string]int{
 			"max_concurrent": req.Max,
+		},
+	})
+}
+
+// GetAgentStatus 获取 Agent 状态
+func (h *ChatHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
+	if h.agentManager == nil {
+		models.WriteData(w, models.BaseResponse[any]{
+			Code:    http.StatusOK,
+			Message: "Agent Manager 未初始化",
+			Data:    nil,
+		})
+		return
+	}
+
+	infos := h.agentManager.GetAgentInfos()
+	status := map[string]any{
+		"agent_count":      h.agentManager.GetAgentCount(),
+		"active_count":     h.agentManager.GetActiveAgentCount(),
+		"max_agents":       h.agentManager.GetMaxAgents(),
+		"agent_infos":      infos,
+	}
+
+	models.WriteData(w, models.BaseResponse[map[string]any]{
+		Code:    http.StatusOK,
+		Message: "Agent 状态获取成功",
+		Data:    status,
+	})
+}
+
+// SetMaxAgentsRequest 设置最大 Agent 数量请求
+type SetMaxAgentsRequest struct {
+	Max int `json:"max"`
+}
+
+// SetMaxAgents 设置最大 Agent 数量
+func (h *ChatHandler) SetMaxAgents(w http.ResponseWriter, r *http.Request) {
+	req, err := models.Bind[*SetMaxAgentsRequest](r)
+	if err != nil {
+		h.logger.Error("绑定设置最大 Agent 数量请求失败", "error", err)
+		http.Error(w, "绑定设置最大 Agent 数量请求失败", http.StatusBadRequest)
+		return
+	}
+
+	if req.Max <= 0 {
+		http.Error(w, "最大 Agent 数量必须大于 0", http.StatusBadRequest)
+		return
+	}
+
+	if h.agentManager == nil {
+		http.Error(w, "Agent Manager 未初始化", http.StatusInternalServerError)
+		return
+	}
+
+	h.agentManager.SetMaxAgents(req.Max)
+
+	models.WriteData(w, models.BaseResponse[any]{
+		Code:    http.StatusOK,
+		Message: "最大 Agent 数量设置成功",
+		Data: map[string]int{
+			"max_agents": req.Max,
 		},
 	})
 }

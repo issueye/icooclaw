@@ -22,15 +22,15 @@ import (
 
 // RESTGateway REST API 网关实现
 type RESTGateway struct {
-	workspace   string
-	config      *config.Config
-	logger      *slog.Logger
-	dataStorage *storage.Storage
-	server      *http.Server
-	router      *chi.Mux
-	running     bool
-	mu          sync.RWMutex
-	Agents      map[uint]*agent.Agent
+	workspace    string
+	config       *config.Config
+	logger       *slog.Logger
+	dataStorage  *storage.Storage
+	server       *http.Server
+	router       *chi.Mux
+	running      bool
+	mu           sync.RWMutex
+	agentManager *agent.AgentManager
 
 	handlers  *Handlers
 	wsManager *ws.Manager
@@ -59,7 +59,7 @@ func NewRESTGateway() (*RESTGateway, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化数据库失败: %w", err)
 	}
-	logger.Info("数据库初始化成功", "path", cfg.Database.Path)
+	logger.WithGroup("[Gateway]").Info("数据库初始化成功", "path", cfg.Database.Path)
 
 	dataStorage := storage.NewStorage(db)
 
@@ -73,8 +73,7 @@ func NewRESTGateway() (*RESTGateway, error) {
 		logger:      logger,
 		dataStorage: dataStorage,
 		wsManager:   wsManager,
-		handlers:    NewHandlers(logger, dataStorage, wsManager),
-		Agents:      make(map[uint]*agent.Agent),
+		handlers:    NewHandlers(logger, dataStorage, wsManager, nil), // agentManager 会在 startAgent 中创建
 	}
 
 	g.setupRouter()
@@ -119,7 +118,7 @@ func (g *RESTGateway) corsMiddleware(next http.Handler) http.Handler {
 // Start 启动网关
 func (g *RESTGateway) Start(ctx context.Context) error {
 	if g.config == nil || !g.config.Gateway.Enabled {
-		g.logger.Info("REST 网关已禁用")
+		g.logger.WithGroup("[Gateway]").Info("REST 网关已禁用")
 		return nil
 	}
 
@@ -146,9 +145,9 @@ func (g *RESTGateway) Start(ctx context.Context) error {
 	g.mu.Unlock()
 
 	go func() {
-		g.logger.Info("REST 网关启动", slog.String("addr", addr))
+		g.logger.WithGroup("[Gateway]").Info("REST 网关启动", slog.String("addr", addr))
 		if err := g.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			g.logger.Error("REST 网关启动失败", "error", err)
+			g.logger.WithGroup("[Gateway]").Error("REST 网关启动失败", "error", err)
 		}
 	}()
 
@@ -158,8 +157,8 @@ func (g *RESTGateway) Start(ctx context.Context) error {
 	return nil
 }
 
-// startAgent 创建并启动 AI Agent
-func (g *RESTGateway) startAgent(ctx context.Context) {
+// startAgent 创建并启动 Agent Manager
+func (g *RESTGateway) startAgent(_ context.Context) {
 	// 获取消息总线（使用 WebSocket Manager 的消息总线）
 	messageBus := g.wsManager.Bus()
 
@@ -193,36 +192,35 @@ func (g *RESTGateway) startAgent(ctx context.Context) {
 	// 创建 Provider
 	prov, err := createProvider(providerSettings, agentConfig.Model, g.logger)
 	if err != nil {
-		g.logger.Error("[Gateway] 创建 Provider 失败", "error", err)
+		g.logger.WithGroup("[Gateway]").Error("创建 Provider 失败", "error", err)
 		return
 	}
 
-	// 创建 Agent
-	// sessionID 设置为 0 表示使用全局 Agent，处理所有会话的消息
-	agentInstance := agent.NewAgent(
-		0, // sessionID: 0 表示全局 Agent
-		agentConfig.Name,
-		prov,
+	// 创建 Agent Manager 配置
+	managerConfig := agent.DefaultAgentManagerConfig()
+	// 可以从配置中读取这些值
+	// managerConfig.MaxAgents = g.config.Agents.MaxAgents // 如果有这个配置项
+
+	// 创建 Agent Manager
+	g.agentManager = agent.NewAgentManager(
+		managerConfig,
 		g.dataStorage,
+		prov,
 		&agentConfig,
-		g.logger,
 		g.workspace,
+		g.logger,
 	)
 
-	// 保存 Agent 实例
-	g.mu.Lock()
-	g.Agents[0] = agentInstance
-	g.mu.Unlock()
-
-	g.logger.Info("[Gateway] 创建 AI Agent 成功",
-		"name", agentInstance.Name(),
-		"workspace", g.workspace,
+	g.logger.WithGroup("[Gateway]").Info("创建 Agent Manager 成功",
+		"max_agents", managerConfig.MaxAgents,
+		"idle_timeout", managerConfig.IdleTimeout.String(),
+		"pre_start_count", managerConfig.PreStartCount,
 		"provider", providerName,
 		"model", agentConfig.Model,
 	)
 
-	// 启动 Agent（开始消费消息总线）
-	agentInstance.Run(ctx, messageBus)
+	// 设置消息总线，开始监听消息
+	g.agentManager.SetMessageBus(messageBus)
 }
 
 // createProvider 创建 LLM Provider
@@ -230,7 +228,7 @@ func createProvider(providerSettings config.ProviderSettings, model string, logg
 	// 这里可以根据配置创建不同的 Provider
 	// 目前使用 OpenAI Provider
 	apiKey := providerSettings.APIKey
-	
+
 	if apiKey == "" {
 		return nil, fmt.Errorf("API key 不能为空")
 	}
@@ -240,9 +238,9 @@ func createProvider(providerSettings config.ProviderSettings, model string, logg
 	if useModel == "" {
 		useModel = providerSettings.Model
 	}
-	
+
 	prov := provider.NewOpenAIProvider(apiKey, useModel)
-	logger.Info("[Gateway] 创建 Provider 成功",
+	logger.WithGroup("[Gateway]").Info("创建 Provider 成功",
 		"model", prov.GetDefaultModel(),
 	)
 	return prov, nil
@@ -250,6 +248,13 @@ func createProvider(providerSettings config.ProviderSettings, model string, logg
 
 // Stop 停止网关
 func (g *RESTGateway) Stop() error {
+	g.logger.WithGroup("[Gateway]").Info("开始关闭网关")
+
+	// 关闭 Agent Manager
+	if g.agentManager != nil {
+		g.agentManager.Close()
+	}
+
 	// 关闭 WebSocket 管理器
 	if g.wsManager != nil {
 		g.wsManager.Close()
@@ -263,7 +268,7 @@ func (g *RESTGateway) Stop() error {
 	defer cancel()
 
 	if err := g.server.Shutdown(ctx); err != nil {
-		g.logger.Error("REST 网关关闭失败", "error", err)
+		g.logger.WithGroup("[Gateway]").Error("REST 网关关闭失败", "error", err)
 		return err
 	}
 
@@ -271,7 +276,7 @@ func (g *RESTGateway) Stop() error {
 	g.running = false
 	g.mu.Unlock()
 
-	g.logger.Info("REST 网关关闭成功")
+	g.logger.WithGroup("[Gateway]").Info("REST 网关关闭成功")
 	return nil
 }
 
@@ -290,7 +295,7 @@ func (g *RESTGateway) Router() http.Handler {
 // Mount 挂载到外部路由器
 func (g *RESTGateway) Mount(r chi.Router, pattern string) {
 	r.Mount(pattern, g.router)
-	g.logger.Info("REST 网关挂载到路由", "pattern", pattern)
+	g.logger.WithGroup("[Gateway]").Info("REST 网关挂载到路由", "pattern", pattern)
 }
 
 // WSManager 获取 WebSocket 管理器
