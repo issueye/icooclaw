@@ -209,6 +209,32 @@
             </button>
           </div>
 
+          <!-- AI Agent 默认模型设置 -->
+          <div class="bg-bg-secondary rounded-xl border border-border p-4">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <h3 class="text-sm font-medium mb-1">AI Agent 默认模型</h3>
+                <p class="text-xs text-text-secondary">设置 AI Agent 默认使用的模型，此设置优先于 Provider 的默认模型</p>
+              </div>
+              <button
+                @click="openAgentModelDialog"
+                class="px-3 py-1.5 bg-accent hover:bg-accent-hover rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+              >
+                <EditIcon :size="14" />
+                设置
+              </button>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-text-secondary">当前模型：</span>
+              <span v-if="agentDefaultModel" class="text-accent font-medium">
+                {{ agentDefaultModel }}
+              </span>
+              <span v-else class="text-text-muted italic">
+                未设置（将使用 Provider 的默认模型）
+              </span>
+            </div>
+          </div>
+
           <div v-if="loading" class="text-text-secondary text-center py-8">
             加载中...
           </div>
@@ -1030,6 +1056,83 @@
       </div>
     </div>
   </div>
+
+  <!-- AI Agent 默认模型对话框 -->
+  <div
+    v-if="showAgentModelDialog"
+    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+  >
+    <div
+      class="bg-bg-secondary rounded-2xl border border-border w-full max-w-md mx-4 overflow-hidden shadow-2xl"
+    >
+      <div
+        class="p-4 border-b border-border sticky top-0 bg-bg-secondary z-10"
+      >
+        <h2 class="text-lg font-medium">设置 AI Agent 默认模型</h2>
+      </div>
+      <div class="p-4 space-y-4">
+        <div>
+          <label class="block text-sm text-text-secondary mb-2">
+            默认模型
+          </label>
+          <input
+            v-model="agentModelForm.model"
+            type="text"
+            placeholder="例如：gpt-4, claude-sonnet-4-20250514"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+          />
+          <p class="text-xs text-text-secondary mt-1">
+            设置后将优先使用此模型，优先级高于 Provider 的默认模型
+          </p>
+        </div>
+        <div v-if="agentModelForm.providers.length > 0" class="space-y-2">
+          <label class="block text-sm text-text-secondary mb-2">
+            可选：从 Provider 支持的模型中选择
+          </label>
+          <div
+            v-for="(provider, idx) in agentModelForm.providers"
+            :key="idx"
+            class="bg-bg-tertiary rounded-lg p-3"
+          >
+            <div class="text-xs font-medium text-text-secondary mb-2">
+              {{ provider.name }}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="(llm, llmIdx) in provider.llms"
+                :key="llmIdx"
+                @click="selectModel(llm.model)"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-xs transition-colors',
+                  agentModelForm.model === llm.model
+                    ? 'bg-accent text-white'
+                    : 'bg-bg-secondary text-text-secondary hover:bg-bg-hover'
+                ]"
+              >
+                {{ llm.model }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        class="p-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-bg-secondary"
+      >
+        <button
+          @click="closeAgentModelDialog"
+          class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
+        >
+          取消
+        </button>
+        <button
+          @click="handleSaveAgentModel"
+          class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors"
+        >
+          {{ savingAgentModel ? "保存中..." : "保存" }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -1102,6 +1205,15 @@ const savingConfig = ref(false);
 const providers = ref([]);
 const loading = ref(true);
 const apiHealth = ref("checking");
+
+// AI Agent 默认模型数据
+const agentDefaultModel = ref("");
+const showAgentModelDialog = ref(false);
+const savingAgentModel = ref(false);
+const agentModelForm = reactive({
+  model: "",
+  providers: [],
+});
 
 // Provider 对话框
 const showProviderDialog = ref(false);
@@ -1472,11 +1584,25 @@ async function loadProviders() {
   try {
     const response = await api.getProviders();
     providers.value = response.data || [];
+    // 加载默认模型后，更新 providers 到表单
+    await loadAgentDefaultModel();
   } catch (error) {
     console.error("获取 Provider 失败:", error);
     providers.value = [];
   }
   loading.value = false;
+}
+
+// 加载 AI Agent 默认模型
+async function loadAgentDefaultModel() {
+  try {
+    const response = await api.getDefaultModel();
+    if (response.data && response.data.model) {
+      agentDefaultModel.value = response.data.model;
+    }
+  } catch (error) {
+    console.error("获取 AI Agent 默认模型失败:", error);
+  }
 }
 
 // 检查 API 健康状态
@@ -1539,6 +1665,48 @@ async function handleOverwriteConfig() {
     alert("保存配置文件失败: " + error.message);
   }
   savingConfig.value = false;
+}
+
+// ===== AI Agent 默认模型相关函数 =====
+
+// 打开 AI Agent 默认模型对话框
+function openAgentModelDialog() {
+  agentModelForm.model = agentDefaultModel.value || "";
+  agentModelForm.providers = providers.value.filter(p => p.enabled && p.llms && p.llms.length > 0);
+  showAgentModelDialog.value = true;
+}
+
+// 关闭 AI Agent 默认模型对话框
+function closeAgentModelDialog() {
+  showAgentModelDialog.value = false;
+}
+
+// 选择模型
+function selectModel(model) {
+  agentModelForm.model = model;
+}
+
+// 保存 AI Agent 默认模型
+async function handleSaveAgentModel() {
+  if (!agentModelForm.model) {
+    alert("请输入模型名称");
+    return;
+  }
+
+  savingAgentModel.value = true;
+  try {
+    await api.setDefaultModel({
+      provider_id: null,
+      model: agentModelForm.model,
+    });
+    agentDefaultModel.value = agentModelForm.model;
+    closeAgentModelDialog();
+    alert("AI Agent 默认模型设置成功");
+  } catch (error) {
+    console.error("设置 AI Agent 默认模型失败:", error);
+    alert("设置失败：" + error.message);
+  }
+  savingAgentModel.value = false;
 }
 
 // 打开添加 Provider 对话框

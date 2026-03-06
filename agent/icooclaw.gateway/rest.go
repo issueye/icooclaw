@@ -173,6 +173,16 @@ func (g *RESTGateway) startAgent(_ context.Context) {
 	if len(enabledProviders) == 0 {
 		g.logger.WithGroup("[Gateway]").Warn("没有启用的 Provider 配置，请先到设置页面配置 Provider")
 		// 继续执行，允许运行时配置
+		// 不创建 AgentManager，只监听消息总线
+		g.agentManager = agent.NewAgentManager(
+			agent.DefaultAgentManagerConfig(),
+			g.dataStorage,
+			nil, // provider 为空，等待运行时配置
+			&config.AgentSettings{Name: "gateway-agent"},
+			g.workspace,
+			g.logger,
+		)
+		g.agentManager.SetMessageBus(messageBus)
 		return
 	}
 
@@ -181,6 +191,14 @@ func (g *RESTGateway) startAgent(_ context.Context) {
 	g.logger.WithGroup("[Gateway]").Info("使用默认 Provider",
 		"name", defaultProvider.Name,
 		"llms", len(defaultProvider.LLMs),
+		"default_model", defaultProvider.DefaultModel,
+	)
+
+	// 确定最终使用的模型（优先级：param_configs > Provider 默认模型 > 配置文件）
+	finalModel := g.determineModel(defaultProvider)
+	g.logger.WithGroup("[Gateway]").Info("确定使用模型",
+		"model", finalModel,
+		"source", g.getModelSource(finalModel, defaultProvider),
 	)
 
 	// 加载 Agent 配置
@@ -188,6 +206,8 @@ func (g *RESTGateway) startAgent(_ context.Context) {
 	if agentConfig.Name == "" {
 		agentConfig.Name = "gateway-agent"
 	}
+	// 使用确定的模型
+	agentConfig.Model = finalModel
 
 	// 创建 Provider
 	prov, err := createProviderFromStorage(&defaultProvider, agentConfig.Model, g.logger)
@@ -219,6 +239,81 @@ func (g *RESTGateway) startAgent(_ context.Context) {
 
 	// 设置消息总线，开始监听消息
 	g.agentManager.SetMessageBus(messageBus)
+}
+
+// determineModel 确定最终使用的模型
+// 优先级：
+// 1. param_configs 中配置的默认模型 (agent.default_model)
+// 2. Provider 的默认模型 (default_model 字段)
+// 3. Provider 支持的第一个模型 (llms[0].model)
+// 4. 配置文件中的模型 (agents.defaults.model)
+func (g *RESTGateway) determineModel(provider storage.ProviderConfig) string {
+	// 1. 优先从 param_configs 读取
+	paramModel := g.dataStorage.ParamConfig().GetStringValue("agent.default_model", "")
+	if paramModel != "" {
+		g.logger.WithGroup("[Gateway]").Debug("使用 param_configs 中的默认模型",
+			"model", paramModel,
+		)
+		return paramModel
+	}
+
+	// 2. 使用 Provider 的默认模型
+	if provider.DefaultModel != "" {
+		g.logger.WithGroup("[Gateway]").Debug("使用 Provider 的默认模型",
+			"model", provider.DefaultModel,
+		)
+		return provider.DefaultModel
+	}
+
+	// 3. 使用 Provider 支持的第一个模型
+	if len(provider.LLMs) > 0 {
+		firstModel := provider.LLMs[0].Model
+		g.logger.WithGroup("[Gateway]").Debug("使用 Provider 支持的第一个模型",
+			"model", firstModel,
+		)
+		return firstModel
+	}
+
+	// 4. 使用配置文件中的模型
+	configModel := g.config.Agents.Defaults.Model
+	if configModel != "" {
+		g.logger.WithGroup("[Gateway]").Debug("使用配置文件中的模型",
+			"model", configModel,
+		)
+		return configModel
+	}
+
+	// 都没有则返回空，由 Provider 使用其内部默认值
+	g.logger.WithGroup("[Gateway]").Debug("未指定模型，将使用 Provider 内部默认值")
+	return ""
+}
+
+// getModelSource 获取模型来源描述（用于日志）
+func (g *RESTGateway) getModelSource(model string, provider storage.ProviderConfig) string {
+	if model == "" {
+		return "provider_default"
+	}
+
+	// 检查是否来自 param_configs
+	paramModel := g.dataStorage.ParamConfig().GetStringValue("agent.default_model", "")
+	if paramModel == model {
+		return "param_configs"
+	}
+
+	// 检查是否来自 Provider 默认模型
+	if provider.DefaultModel == model {
+		return "provider_default_model"
+	}
+
+	// 检查是否来自 Provider 支持的模型
+	for _, llm := range provider.LLMs {
+		if llm.Model == model {
+			return "provider_llms"
+		}
+	}
+
+	// 来自配置文件
+	return "config_file"
 }
 
 // createProviderFromStorage 从 storage 创建 LLM Provider

@@ -23,6 +23,7 @@ type Handlers struct {
 	Channel  *handlers.ChannelHandler
 	Config   *handlers.ConfigHandler
 	Chat     *handlers.ChatHandler
+	Param    *handlers.ParamHandler
 }
 
 // NewHandlers 创建所有处理器
@@ -39,6 +40,7 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Ma
 		Channel:  handlers.NewChannelHandler(logger, storage),
 		Config:   handlers.NewConfigHandler(logger),
 		Chat:     handlers.NewChatHandler(logger, wsManager, agentManager),
+		Param:    handlers.NewParamHandler(logger, storage),
 	}
 }
 
@@ -164,6 +166,22 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 	r.Route("/api/v1/agents", func(r chi.Router) {
 		r.Get("/status", h.Chat.GetAgentStatus)       // 获取 Agent 状态
 		r.Post("/max-agents", h.Chat.SetMaxAgents)    // 设置最大 Agent 数量
+	})
+
+	// 参数配置路由
+	r.Route("/api/v1/params", func(r chi.Router) {
+		r.Post("/page", h.Param.Page)           // 分页查询
+		r.Post("/create", h.Param.Create)       // 创建
+		r.Post("/update", h.Param.Update)       // 更新
+		r.Post("/delete", h.Param.Delete)       // 删除
+		r.Post("/get", h.Param.GetByID)         // 通过 ID 获取
+		r.Post("/get-by-key", h.Param.GetByKey) // 通过键获取
+		r.Get("/all", h.Param.GetAll)           // 获取所有
+		r.Post("/by-group", h.Param.GetByGroup) // 按分组获取
+
+		// 便捷接口
+		r.Post("/default-model/set", h.Param.SetDefaultModel)   // 设置默认模型
+		r.Get("/default-model/get", h.Param.GetDefaultModel)    // 获取默认模型
 	})
 }
 

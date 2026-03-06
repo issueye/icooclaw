@@ -14,26 +14,26 @@ const (
 
 // QueueItem 队列项
 type QueueItem struct {
-	SessionID   uint
+	SessionID    string
 	ConnectionID string
-	Content     string
-	Timestamp   time.Time
-	Ctx         context.Context
-	Cancel      context.CancelFunc
+	Content      string
+	Timestamp    time.Time
+	Ctx          context.Context
+	Cancel       context.CancelFunc
 }
 
 // QueueStatus 队列状态
 type QueueStatus struct {
-	ActiveCount  int         `json:"active_count"`
-	WaitingCount int         `json:"waiting_count"`
-	MaxConcurrent int        `json:"max_concurrent"`
-	ActiveItems  []QueueInfo `json:"active_items"`
-	WaitingItems []QueueInfo `json:"waiting_items"`
+	ActiveCount   int         `json:"active_count"`
+	WaitingCount  int         `json:"waiting_count"`
+	MaxConcurrent int         `json:"max_concurrent"`
+	ActiveItems   []QueueInfo `json:"active_items"`
+	WaitingItems  []QueueInfo `json:"waiting_items"`
 }
 
 // QueueInfo 队列项信息
 type QueueInfo struct {
-	SessionID    uint      `json:"session_id"`
+	SessionID    string    `json:"session_id"`
 	ConnectionID string    `json:"connection_id"`
 	Timestamp    time.Time `json:"timestamp"`
 	Position     int       `json:"position,omitempty"` // 队列位置
@@ -55,8 +55,8 @@ func (hf QueueHandlerFunc) ProcessItem(ctx context.Context, item *QueueItem) err
 // ConversationQueue 对话队列管理器
 type ConversationQueue struct {
 	maxConcurrent int
-	active        map[uint]*QueueItem // 正在处理的对话
-	waiting       []*QueueItem        // 等待队列
+	active        map[string]*QueueItem // 正在处理的对话
+	waiting       []*QueueItem          // 等待队列
 	mu            sync.RWMutex
 	handler       QueueHandler
 	logger        *slog.Logger
@@ -65,15 +65,15 @@ type ConversationQueue struct {
 
 // QueueNotifier 队列状态通知器
 type QueueNotifier interface {
-	NotifyQueueStatus(sessionID uint, status *QueueStatus)
-	NotifyQueuePosition(sessionID uint, position int)
+	NotifyQueueStatus(sessionID string, status *QueueStatus)
+	NotifyQueuePosition(sessionID string, position int)
 }
 
 // QueueNotifierFunc 队列状态通知函数
-type QueueNotifierFunc func(sessionID uint, status *QueueStatus)
+type QueueNotifierFunc func(sessionID string, status *QueueStatus)
 
 // NotifyQueueStatus 实现 QueueNotifier 接口
-func (nf QueueNotifierFunc) NotifyQueueStatus(sessionID uint, status *QueueStatus) {
+func (nf QueueNotifierFunc) NotifyQueueStatus(sessionID string, status *QueueStatus) {
 	nf(sessionID, status)
 }
 
@@ -84,7 +84,7 @@ func NewConversationQueue(maxConcurrent int, logger *slog.Logger) *ConversationQ
 	}
 	return &ConversationQueue{
 		maxConcurrent: maxConcurrent,
-		active:        make(map[uint]*QueueItem),
+		active:        make(map[string]*QueueItem),
 		waiting:       make([]*QueueItem, 0),
 		logger:        logger,
 	}
@@ -101,7 +101,7 @@ func (q *ConversationQueue) SetNotifier(notifier QueueNotifier) {
 }
 
 // Enqueue 将对话加入队列
-func (q *ConversationQueue) Enqueue(ctx context.Context, sessionID uint, connectionID, content string) (*QueueItem, bool) {
+func (q *ConversationQueue) Enqueue(ctx context.Context, sessionID string, connectionID, content string) (*QueueItem, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -162,7 +162,7 @@ func (q *ConversationQueue) processItem(item *QueueItem) {
 }
 
 // complete 完成对话处理
-func (q *ConversationQueue) complete(sessionID uint) {
+func (q *ConversationQueue) complete(sessionID string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -197,7 +197,7 @@ func (q *ConversationQueue) complete(sessionID uint) {
 }
 
 // Cancel 取消对话
-func (q *ConversationQueue) Cancel(sessionID uint) bool {
+func (q *ConversationQueue) Cancel(sessionID string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -255,7 +255,7 @@ func (q *ConversationQueue) GetStatus() *QueueStatus {
 }
 
 // GetPosition 获取会话在队列中的位置
-func (q *ConversationQueue) GetPosition(sessionID uint) int {
+func (q *ConversationQueue) GetPosition(sessionID string) int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -275,7 +275,7 @@ func (q *ConversationQueue) GetPosition(sessionID uint) int {
 }
 
 // IsActive 检查会话是否正在处理
-func (q *ConversationQueue) IsActive(sessionID uint) bool {
+func (q *ConversationQueue) IsActive(sessionID string) bool {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	_, exists := q.active[sessionID]
@@ -283,7 +283,7 @@ func (q *ConversationQueue) IsActive(sessionID uint) bool {
 }
 
 // IsWaiting 检查会话是否在等待队列中
-func (q *ConversationQueue) IsWaiting(sessionID uint) bool {
+func (q *ConversationQueue) IsWaiting(sessionID string) bool {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	for _, item := range q.waiting {
@@ -295,7 +295,7 @@ func (q *ConversationQueue) IsWaiting(sessionID uint) bool {
 }
 
 // IsQueued 检查会话是否在队列中（活跃或等待）
-func (q *ConversationQueue) IsQueued(sessionID uint) bool {
+func (q *ConversationQueue) IsQueued(sessionID string) bool {
 	return q.IsActive(sessionID) || q.IsWaiting(sessionID)
 }
 
@@ -322,6 +322,6 @@ func (q *ConversationQueue) Close() {
 		item.Cancel()
 	}
 
-	q.active = make(map[uint]*QueueItem)
+	q.active = make(map[string]*QueueItem)
 	q.waiting = make([]*QueueItem, 0)
 }

@@ -25,14 +25,14 @@ var upgrader = websocket.Upgrader{
 
 // MessageHandler 消息处理器接口
 type MessageHandler interface {
-	HandleMessage(ctx context.Context, sessionID uint, content string, clientID string) error
+	HandleMessage(ctx context.Context, sessionID string, content string, clientID string) error
 }
 
 // HandlerFunc 消息处理函数
-type HandlerFunc func(ctx context.Context, sessionID uint, content string, clientID string) error
+type HandlerFunc func(ctx context.Context, sessionID string, content string, clientID string) error
 
 // HandleMessage 实现 MessageHandler 接口
-func (hf HandlerFunc) HandleMessage(ctx context.Context, sessionID uint, content string, clientID string) error {
+func (hf HandlerFunc) HandleMessage(ctx context.Context, sessionID string, content string, clientID string) error {
 	return hf(ctx, sessionID, content, clientID)
 }
 
@@ -110,7 +110,7 @@ func (m *Manager) SetHandler(handler MessageHandler) {
 }
 
 // NotifyQueueStatus 实现 QueueNotifier 接口
-func (m *Manager) NotifyQueueStatus(sessionID uint, status *QueueStatus) {
+func (m *Manager) NotifyQueueStatus(sessionID string, status *QueueStatus) {
 	m.mu.RLock()
 	for _, conn := range m.connections {
 		if conn.SessionID() == sessionID {
@@ -131,7 +131,7 @@ func (m *Manager) NotifyQueueStatus(sessionID uint, status *QueueStatus) {
 }
 
 // NotifyQueuePosition 实现 QueueNotifier 接口
-func (m *Manager) NotifyQueuePosition(sessionID uint, position int) {
+func (m *Manager) NotifyQueuePosition(sessionID string, position int) {
 	m.mu.RLock()
 	for _, conn := range m.connections {
 		if conn.SessionID() == sessionID {
@@ -169,7 +169,7 @@ func (m *Manager) run() {
 			m.mu.Lock()
 			if _, ok := m.connections[conn.ID()]; ok {
 				// 取消该连接的队列任务
-				if conn.SessionID() > 0 {
+				if conn.SessionID() != "" {
 					m.queue.Cancel(conn.SessionID())
 				}
 				delete(m.connections, conn.ID())
@@ -322,13 +322,13 @@ func (m *Manager) handleClientMessage(conn *Connection, msg *Message) {
 func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 	data, err := json.Marshal(msg.Data)
 	if err != nil {
-		conn.SendMessage(NewErrorMessage(0, 400, "无效的请求数据"))
+		conn.SendMessage(NewErrorMessage(conn.SessionID(), 400, "无效的请求数据"))
 		return
 	}
 
 	var req CreateSessionRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		conn.SendMessage(NewErrorMessage(0, 400, "无效的请求数据格式"))
+		conn.SendMessage(NewErrorMessage(conn.SessionID(), 400, "无效的请求数据格式"))
 		return
 	}
 
@@ -343,7 +343,7 @@ func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 	// 创建会话
 	session, err := m.storage.Session().GetOrCreateSession(req.Channel, chatID, req.UserID)
 	if err != nil {
-		conn.SendMessage(NewErrorMessage(0, 500, "创建会话失败"))
+		conn.SendMessage(NewErrorMessage(conn.SessionID(), 500, "创建会话失败"))
 		return
 	}
 
@@ -370,8 +370,8 @@ func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 // handleChat 处理聊天消息
 func (m *Manager) handleChat(conn *Connection, msg *Message) {
 	sessionID := conn.SessionID()
-	if sessionID == 0 {
-		conn.SendMessage(NewErrorMessage(0, 400, "请先创建会话"))
+	if sessionID == "" {
+		conn.SendMessage(NewErrorMessage(conn.SessionID(), 400, "请先创建会话"))
 		return
 	}
 
@@ -433,7 +433,7 @@ func (m *Manager) handleChat(conn *Connection, msg *Message) {
 }
 
 // processChatMessage 处理聊天消息
-func (m *Manager) processChatMessage(ctx context.Context, sessionID uint, content string, clientID string) error {
+func (m *Manager) processChatMessage(ctx context.Context, sessionID string, content string, clientID string) error {
 	// 如果设置了消息处理器，使用处理器处理消息
 	if m.handler != nil {
 		m.logger.Info("[WebSocket] 使用自定义消息处理器",
@@ -507,7 +507,7 @@ func (m *Manager) handleQueueStatus(conn *Connection, msg *Message) {
 	sessionID := conn.SessionID()
 	status := m.queue.GetStatus()
 	position := -1
-	if sessionID > 0 {
+	if sessionID != "" {
 		position = m.queue.GetPosition(sessionID)
 	}
 

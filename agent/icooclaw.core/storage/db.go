@@ -88,6 +88,7 @@ func InitDB(dsn string) (*gorm.DB, error) {
 		&ChannelConfig{},
 		&ProviderConfig{},
 		&MCPConfig{},
+		&ParamConfig{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)

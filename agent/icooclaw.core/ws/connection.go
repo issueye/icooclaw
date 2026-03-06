@@ -30,7 +30,7 @@ type Connection struct {
 	conn      *websocket.Conn
 	manager   *Manager
 	send      chan []byte
-	sessionID uint
+	sessionID string
 	userID    string
 	mu        sync.RWMutex
 	logger    *slog.Logger
@@ -58,14 +58,14 @@ func (c *Connection) ID() string {
 }
 
 // SessionID 获取会话ID
-func (c *Connection) SessionID() uint {
+func (c *Connection) SessionID() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.sessionID
 }
 
 // SetSessionID 设置会话ID
-func (c *Connection) SetSessionID(sessionID uint) {
+func (c *Connection) SetSessionID(sessionID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.sessionID = sessionID
@@ -189,7 +189,7 @@ func (c *Connection) handleMessage(data []byte) {
 	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
 		c.logger.Error("解析消息失败", "error", err, "connection_id", c.id)
-		c.SendMessage(NewErrorMessage(0, 400, "无效的消息格式"))
+		c.SendMessage(NewErrorMessage(c.SessionID(), 400, "无效的消息格式"))
 		return
 	}
 

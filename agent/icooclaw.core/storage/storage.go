@@ -13,8 +13,9 @@ type Storage struct {
 	session        *SessionStorage        // 会话
 	message        *MessageStorage        // 消息
 	channelConfig  *ChannelConfigStorage  // 渠道配置
-	mcpConfig      *MCPConfigStorage      // MCP配置
+	mcpConfig      *MCPConfigStorage      // MCP 配置
 	providerConfig *ProviderConfigStorage // 提供程序配置
+	paramConfig    *ParamConfigStorage    // 参数配置
 }
 
 // NewStorage 创建存储实例
@@ -29,6 +30,7 @@ func NewStorage(db *gorm.DB) *Storage {
 		mcpConfig:      NewMCPConfigStorage(db),
 		channelConfig:  NewChannelConfigStorage(db),
 		providerConfig: NewProviderConfigStorage(db),
+		paramConfig:    NewParamConfigStorage(db),
 	}
 }
 
@@ -73,4 +75,8 @@ func (s *Storage) Message() *MessageStorage {
 
 func (s *Storage) ProviderConfig() *ProviderConfigStorage {
 	return s.providerConfig
+}
+
+func (s *Storage) ParamConfig() *ParamConfigStorage {
+	return s.paramConfig
 }

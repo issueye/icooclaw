@@ -202,6 +202,19 @@ export async function deleteProvider(id) {
   });
 }
 
+// 设置 AI Agent 默认模型
+export async function setDefaultModel(data) {
+  return request('/api/v1/params/default-model/set', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// 获取 AI Agent 默认模型
+export async function getDefaultModel() {
+  return request('/api/v1/params/default-model/get');
+}
+
 // ===== Skill API =====
 
 export async function getSkillsPage(params = {}) {
@@ -642,7 +655,9 @@ export default {
   createProvider,
   updateProvider,
   deleteProvider,
-  
+  setDefaultModel,
+  getDefaultModel,
+
   // Skill
   getSkillsPage,
   getSkills,

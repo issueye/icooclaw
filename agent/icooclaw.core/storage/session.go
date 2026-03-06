@@ -1,19 +1,23 @@
 package storage
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 	"icooclaw.core/consts"
 )
 
 // Session 会话模型
 type Session struct {
-	Model
-	Key              string `gorm:"uniqueIndex;size:255" json:"key"`    // channel:chat_id
-	Channel          string `gorm:"size:50;index" json:"channel"`       // telegram, discord, feishu...
-	ChatID           string `gorm:"size:255;index" json:"chat_id"`      // 用户/群组ID
-	UserID           string `gorm:"size:255" json:"user_id"`            // 用户唯一标识
-	LastConsolidated int    `gorm:"default:0" json:"last_consolidated"` // 已整合的消息数
-	Metadata         string `gorm:"type:text" json:"metadata"`          // JSON元数据
+	ID               string    `gorm:"primaryKey" json:"id"`               // 主键 使用 uuid
+	Key              string    `gorm:"uniqueIndex;size:255" json:"key"`    // channel:chat_id
+	Channel          string    `gorm:"size:50;index" json:"channel"`       // telegram, discord, feishu...
+	ChatID           string    `gorm:"size:255;index" json:"chat_id"`      // 用户/群组ID
+	UserID           string    `gorm:"size:255" json:"user_id"`            // 用户唯一标识
+	LastConsolidated int       `gorm:"default:0" json:"last_consolidated"` // 已整合的消息数
+	Metadata         string    `gorm:"type:text" json:"metadata"`          // JSON元数据
+	CreatedAt        time.Time `gorm:"created_at" json:"created_at"`       // 创建时间
+	UpdatedAt        time.Time `gorm:"updated_at" json:"updated_at"`       // 更新时间
 
 	Messages []Message `gorm:"foreignKey:SessionID" json:"messages"`
 }
@@ -54,7 +58,7 @@ func (s *SessionStorage) Create(session *Session) error {
 }
 
 // GetByID 通过ID获取会话
-func (s *SessionStorage) GetByID(id uint) (*Session, error) {
+func (s *SessionStorage) GetByID(id string) (*Session, error) {
 	var session Session
 	err := s.db.First(&session, id).Error
 	return &session, err
