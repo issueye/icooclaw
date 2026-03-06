@@ -98,14 +98,47 @@ func (b *MessageBus) SetLogger(logger *slog.Logger) {
 
 // PublishInbound 发布接收消息
 func (b *MessageBus) PublishInbound(ctx context.Context, msg InboundMessage) error {
+	// 获取客户端 ID 用于追踪
+	clientID := ""
+	if msg.Metadata != nil {
+		if id, ok := msg.Metadata["client_id"].(string); ok {
+			clientID = id
+		}
+	}
+	
+	content := msg.Content
+	if len(content) > 100 {
+		content = content[:100] + "..."
+	}
+	
+	b.logger.Info("[消息总线] 发布入站消息",
+		"channel", msg.Channel,
+		"chat_id", msg.ChatID,
+		"user_id", msg.UserID,
+		"client_id", clientID,
+		"content_length", len(msg.Content),
+		"content_preview", content,
+	)
+	
 	select {
 	case b.inbound <- msg:
-		b.logger.Debug("Published inbound message", "channel", msg.Channel, "chat_id", msg.ChatID)
+		b.logger.Debug("[消息总线] 入站消息已写入通道",
+			"channel", msg.Channel,
+			"chat_id", msg.ChatID,
+		)
 		return nil
 	case <-ctx.Done():
+		b.logger.Warn("[消息总线] 上下文已取消，无法发布入站消息",
+			"channel", msg.Channel,
+			"chat_id", msg.ChatID,
+		)
 		return ctx.Err()
 	default:
-		b.logger.Warn("Inbound channel full, dropping message")
+		b.logger.Warn("[消息总线] 入站通道已满，消息被丢弃",
+			"channel", msg.Channel,
+			"chat_id", msg.ChatID,
+			"buffer_size", b.bufferSize,
+		)
 		return ErrChannelFull
 	}
 }
@@ -159,23 +192,66 @@ func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) e
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
+	// 获取客户端 ID 用于追踪
+	clientID := ""
+	if msg.Metadata != nil {
+		if id, ok := msg.Metadata["client_id"].(string); ok {
+			clientID = id
+		}
+	}
+	
+	content := msg.Content
+	if len(content) > 100 {
+		content = content[:100] + "..."
+	}
+	
+	b.logger.Info("[消息总线] 发布出站消息",
+		"type", msg.Type,
+		"channel", msg.Channel,
+		"chat_id", msg.ChatID,
+		"client_id", clientID,
+		"content_length", len(content),
+		"content_preview", content,
+	)
+
 	// 优先分发给订阅者
 	for _, ch := range b.outboundSubscribers {
 		select {
 		case ch <- msg:
+			b.logger.Debug("[消息总线] 出站消息已分发给订阅者",
+				"type", msg.Type,
+				"channel", msg.Channel,
+				"chat_id", msg.ChatID,
+			)
 		default:
-			// 忽略阻塞的订阅者或进行日志记录
+			b.logger.Warn("[消息总线] 订阅者通道已满，消息被丢弃",
+				"type", msg.Type,
+				"channel", msg.Channel,
+				"chat_id", msg.ChatID,
+			)
 		}
 	}
 
 	select {
 	case b.outbound <- msg:
-		b.logger.Debug("Published outbound message", "channel", msg.Channel, "chat_id", msg.ChatID)
+		b.logger.Debug("[消息总线] 出站消息已写入通道",
+			"type", msg.Type,
+			"channel", msg.Channel,
+			"chat_id", msg.ChatID,
+		)
 		return nil
 	case <-ctx.Done():
+		b.logger.Warn("[消息总线] 上下文已取消，无法发布出站消息",
+			"type", msg.Type,
+			"channel", msg.Channel,
+		)
 		return ctx.Err()
 	default:
-		b.logger.Warn("Outbound channel full")
+		b.logger.Warn("[消息总线] 出站通道已满，消息被丢弃",
+			"type", msg.Type,
+			"channel", msg.Channel,
+			"buffer_size", b.bufferSize,
+		)
 		return ErrChannelFull
 	}
 }
@@ -184,8 +260,29 @@ func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) e
 func (b *MessageBus) ConsumeInbound(ctx context.Context) (InboundMessage, error) {
 	select {
 	case msg := <-b.inbound:
+		clientID := ""
+		if msg.Metadata != nil {
+			if id, ok := msg.Metadata["client_id"].(string); ok {
+				clientID = id
+			}
+		}
+		
+		content := msg.Content
+		if len(content) > 100 {
+			content = content[:100] + "..."
+		}
+		
+		b.logger.Info("[消息总线] AI Agent 消费入站消息",
+			"channel", msg.Channel,
+			"chat_id", msg.ChatID,
+			"user_id", msg.UserID,
+			"client_id", clientID,
+			"content_length", len(msg.Content),
+			"content_preview", content,
+		)
 		return msg, nil
 	case <-ctx.Done():
+		b.logger.Warn("[消息总线] 上下文已取消，无法消费入站消息")
 		return InboundMessage{}, ctx.Err()
 	}
 }

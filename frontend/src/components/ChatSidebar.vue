@@ -57,11 +57,11 @@
                     v-for="session in sessions"
                     :key="session.id"
                     @click="$emit('select', session.id)"
-                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left group transition-colors text-sm truncate"
+                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left group transition-all text-sm truncate border"
                     :class="
                         session.id === currentSessionId
-                            ? 'bg-bg-tertiary text-text-primary border border-border-light'
-                            : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+                            ? 'bg-accent/15 text-accent border-accent/30'
+                            : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary border-transparent'
                     "
                 >
                     <MessageSquareIcon

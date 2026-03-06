@@ -314,7 +314,7 @@ func (m *Manager) handleClientMessage(conn *Connection, msg *Message) {
 	case MessageTypeQueueStatus:
 		m.handleQueueStatus(conn, msg)
 	default:
-		conn.SendMessage(NewErrorMessage(conn.SessionID(), 400, fmt.Sprintf("未知的消息类型: %s", msg.Type)))
+		conn.SendMessage(NewErrorMessage(conn.SessionID(), 400, fmt.Sprintf("未知的消息类型：%s", msg.Type)))
 	}
 }
 
@@ -337,7 +337,7 @@ func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 		req.Channel = "websocket"
 	}
 
-	// 生成唯一的 ChatID (使用连接ID)
+	// 生成唯一的 ChatID (使用连接 ID)
 	chatID := fmt.Sprintf("ws-%s", conn.ID())
 
 	// 创建会话
@@ -347,7 +347,7 @@ func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 		return
 	}
 
-	// 设置连接的会话ID和用户ID
+	// 设置连接的会话 ID 和用户 ID
 	conn.SetSessionID(session.ID)
 	conn.SetUserID(req.UserID)
 
@@ -387,16 +387,16 @@ func (m *Manager) handleChat(conn *Connection, msg *Message) {
 		return
 	}
 
-	// 验证会话ID
+	// 验证会话 ID
 	if req.SessionID != sessionID {
-		conn.SendMessage(NewErrorMessage(sessionID, 400, "会话ID不匹配"))
+		conn.SendMessage(NewErrorMessage(sessionID, 400, "会话 ID 不匹配"))
 		return
 	}
 
 	// 检查是否已在队列中
 	if m.queue.IsQueued(sessionID) {
 		position := m.queue.GetPosition(sessionID)
-		conn.SendMessage(NewErrorMessage(sessionID, 429, fmt.Sprintf("请求正在处理中，队列位置: %d", position)))
+		conn.SendMessage(NewErrorMessage(sessionID, 429, fmt.Sprintf("请求正在处理中，队列位置：%d", position)))
 		return
 	}
 
@@ -436,14 +436,37 @@ func (m *Manager) handleChat(conn *Connection, msg *Message) {
 func (m *Manager) processChatMessage(ctx context.Context, sessionID uint, content string, clientID string) error {
 	// 如果设置了消息处理器，使用处理器处理消息
 	if m.handler != nil {
+		m.logger.Info("[WebSocket] 使用自定义消息处理器",
+			"session_id", sessionID,
+			"client_id", clientID,
+			"content_length", len(content),
+		)
 		return m.handler.HandleMessage(ctx, sessionID, content, clientID)
 	}
 
 	// 获取会话
 	session, err := m.storage.Session().GetByID(sessionID)
 	if err != nil {
-		return fmt.Errorf("获取会话失败: %w", err)
+		m.logger.Error("[WebSocket] 获取会话失败",
+			"session_id", sessionID,
+			"error", err,
+		)
+		return fmt.Errorf("获取会话失败：%w", err)
 	}
+
+	contentPreview := content
+	if len(content) > 100 {
+		contentPreview = content[:100] + "..."
+	}
+
+	m.logger.Info("[WebSocket] 发布消息到总线",
+		"session_id", sessionID,
+		"channel", session.Channel,
+		"chat_id", session.ChatID,
+		"client_id", clientID,
+		"content_length", len(content),
+		"content_preview", contentPreview,
+	)
 
 	// 发布入站消息到消息总线
 	err = m.bus.PublishInbound(ctx, bus.InboundMessage{
@@ -456,8 +479,17 @@ func (m *Manager) processChatMessage(ctx context.Context, sessionID uint, conten
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("发送消息失败: %w", err)
+		m.logger.Error("[WebSocket] 发布消息到总线失败",
+			"session_id", sessionID,
+			"error", err,
+		)
+		return fmt.Errorf("发送消息失败：%w", err)
 	}
+
+	m.logger.Debug("[WebSocket] 消息已成功发布到总线",
+		"session_id", sessionID,
+		"client_id", clientID,
+	)
 
 	return nil
 }
@@ -535,7 +567,7 @@ func (m *Manager) SendToConnection(connectionID string, msg *Message) error {
 	m.mu.RUnlock()
 
 	if !ok {
-		return fmt.Errorf("连接不存在: %s", connectionID)
+		return fmt.Errorf("连接不存在：%s", connectionID)
 	}
 
 	return conn.SendMessage(msg)

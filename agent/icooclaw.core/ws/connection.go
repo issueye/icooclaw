@@ -26,16 +26,16 @@ const (
 
 // Connection WebSocket 连接
 type Connection struct {
-	id         string
-	conn       *websocket.Conn
-	manager    *Manager
-	send       chan []byte
-	sessionID  uint
-	userID     string
-	mu         sync.RWMutex
-	logger     *slog.Logger
-	ctx        context.Context
-	cancel     context.CancelFunc
+	id        string
+	conn      *websocket.Conn
+	manager   *Manager
+	send      chan []byte
+	sessionID uint
+	userID    string
+	mu        sync.RWMutex
+	logger    *slog.Logger
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // NewConnection 创建新的 WebSocket 连接
@@ -92,7 +92,7 @@ func (c *Connection) ReadPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(512 * 1024) // 512KB
+	c.conn.SetReadLimit(10 * 1024 * 1024) // 10MB
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))

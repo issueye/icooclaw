@@ -141,27 +141,67 @@ func (a *Agent) RegisterTool(tool tools.Tool) {
 // Run 运行 Agent
 func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 	a.bus = messageBus
-	a.logger.Info("启动 Agent", "name", a.name)
+	a.logger.Info("[AI Agent] 启动 Agent，开始监听消息总线",
+		"name", a.name,
+		"session_id", a.sessionID,
+	)
 
 	for {
 		select {
 		case <-ctx.Done():
-			a.logger.Info("停止 Agent 成功", "name", a.name)
+			a.logger.Info("[AI Agent] 上下文已取消，停止 Agent",
+				"name", a.name,
+			)
 			return
 		default:
+			a.logger.Debug("[AI Agent] 等待消息总线中的消息...")
 			msg, err := messageBus.ConsumeInbound(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
+					a.logger.Warn("[AI Agent] 上下文已取消，停止接收消息",
+						"name", a.name,
+					)
 					return
 				}
-				a.logger.Error("消费消息失败", "error", err)
+				a.logger.Error("[AI Agent] 从消息总线消费消息失败",
+					"name", a.name,
+					"error", err,
+				)
 				continue
 			}
+
+			// 获取客户端 ID 用于追踪
+			clientID := ""
+			if msg.Metadata != nil {
+				if id, ok := msg.Metadata["client_id"].(string); ok {
+					clientID = id
+				}
+			}
+
+			content := msg.Content
+			if len(content) > 100 {
+				content = content[:100] + "..."
+			}
+
+			a.logger.Info("[AI Agent] ✓ 从消息总线接收到消息",
+				"name", a.name,
+				"session_id", a.sessionID,
+				"channel", msg.Channel,
+				"chat_id", msg.ChatID,
+				"user_id", msg.UserID,
+				"client_id", clientID,
+				"content_length", len(msg.Content),
+				"content_preview", content,
+			)
 
 			// 为每个消息处理创建独立的上下文，避免 goroutine 泄漏
 			msgCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 			go func(ctx context.Context, msg bus.InboundMessage) {
 				defer cancel()
+				a.logger.Debug("[AI Agent] 开始处理消息协程",
+					"chat_id", msg.ChatID,
+					"client_id", clientID,
+				)
 				a.handleMessage(ctx, a.sessionID, msg)
 			}(msgCtx, msg)
 		}
@@ -169,41 +209,64 @@ func (a *Agent) Run(ctx context.Context, messageBus *icooclawbus.MessageBus) {
 }
 
 func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.InboundMessage) {
-	a.logger.Info("开始处理消息",
+	// 获取客户端 ID 用于追踪
+	clientID, _ := msg.Metadata["client_id"].(string)
+	
+	content := msg.Content
+	if len(content) > 100 {
+		content = content[:100] + "..."
+	}
+	
+	a.logger.Info("[AI Agent] 开始处理消息",
+		"session_id", sessionID,
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID,
 		"user_id", msg.UserID,
-		"content", msg.Content)
+		"client_id", clientID,
+		"content_length", len(msg.Content),
+		"content_preview", content,
+	)
 
 	// 获取会话
 	session, err := a.storage.Session().GetByID(sessionID)
 	if err != nil || (session != nil && session.ID == 0) {
 		// 如果会话不存在，创建一个新的会话
+		a.logger.Info("[AI Agent] 会话不存在，创建新会话",
+			"session_id", sessionID,
+			"channel", msg.Channel,
+			"chat_id", msg.ChatID,
+		)
 		session, err = a.storage.Session().GetOrCreateSession(msg.Channel, msg.ChatID, msg.UserID)
 		if err != nil {
-			a.logger.Error("获取或创建会话失败", "error", err)
+			a.logger.Error("[AI Agent] 获取或创建会话失败", "error", err)
 			return
 		}
+		a.logger.Info("[AI Agent] 会话创建成功", "session_id", session.ID)
 	}
 
 	// 创建用户消息
 	userMsg := storage.NewUserMessage(session.ID, msg.Content)
 	err = a.storage.Message().CreateOrUpdate(userMsg)
 	if err != nil {
-		a.logger.Error("添加用户消息失败", "error", err)
+		a.logger.Error("[AI Agent] 添加用户消息失败", "error", err)
 		return
 	}
+	a.logger.Debug("[AI Agent] 用户消息已保存",
+		"session_id", session.ID,
+		"message_length", len(msg.Content),
+	)
 
 	// 构建上下文
 	contextBuilder := NewContextBuilder(session.ID, a.workspace, a.logger, a.skills, a.memory)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
-		a.logger.Error("构建上下文失败", "error", err)
+		a.logger.Error("[AI Agent] 构建上下文失败", "error", err)
 		return
 	}
-
-	// 获取客户端 ID
-	clientID, _ := msg.Metadata["client_id"].(string)
+	a.logger.Debug("[AI Agent] 上下文构建成功",
+		"messages_count", len(messages),
+		"system_prompt_length", len(systemPrompt),
+	)
 
 	// 处理 OnLLMChunk 钩子
 	onChunk := func(chunk, thinking string) {
@@ -268,17 +331,23 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID uint, msg bus.Inbou
 
 	toolCallsJSON, err := json.Marshal(toolCalls)
 	if err != nil {
-		a.logger.Warn("序列化工具调用失败失败", "error", err)
+		a.logger.Warn("[AI Agent] 序列化工具调用失败", "error", err)
 	}
 
 	assistantMsg := storage.NewAssistantMessage(session.ID, response, reasoningContent)
 	assistantMsg.ToolResult = string(toolCallsJSON)
 	err = a.storage.Message().CreateOrUpdate(assistantMsg)
 	if err != nil {
-		a.logger.Error("添加助手消息失败", "error", err)
+		a.logger.Error("[AI Agent] 添加助手消息失败", "error", err)
 	}
 
-	a.logger.Info("处理消息成功", "response_length", len(response))
+	a.logger.Info("[AI Agent] 处理消息成功",
+		"session_id", session.ID,
+		"chat_id", msg.ChatID,
+		"client_id", clientID,
+		"response_length", len(response),
+		"tool_calls_count", len(toolCalls),
+	)
 }
 
 func (a *Agent) SetSystemPrompt(prompt string) {

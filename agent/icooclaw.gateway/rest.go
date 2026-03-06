@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/docgen"
 	"icooclaw.ai/agent"
+	"icooclaw.ai/provider"
 	"icooclaw.core/bus"
 	"icooclaw.core/config"
 	"icooclaw.core/consts"
@@ -151,7 +152,100 @@ func (g *RESTGateway) Start(ctx context.Context) error {
 		}
 	}()
 
+	// 创建并启动 AI Agent
+	go g.startAgent(ctx)
+
 	return nil
+}
+
+// startAgent 创建并启动 AI Agent
+func (g *RESTGateway) startAgent(ctx context.Context) {
+	// 获取消息总线（使用 WebSocket Manager 的消息总线）
+	messageBus := g.wsManager.Bus()
+
+	// 加载 Agent 配置
+	agentConfig := g.config.Agents.Defaults
+	if agentConfig.Name == "" {
+		agentConfig.Name = "gateway-agent"
+	}
+
+	// 获取默认 Provider 配置
+	providerName := g.config.Agents.DefaultProvider
+	if providerName == "" {
+		providerName = "openai" // 默认使用 OpenAI
+	}
+
+	// 根据 Provider 名称获取配置
+	var providerSettings config.ProviderSettings
+	switch providerName {
+	case "openai":
+		providerSettings = g.config.Providers.OpenAI
+	case "openrouter":
+		providerSettings = g.config.Providers.OpenRouter
+	case "deepseek":
+		providerSettings = g.config.Providers.DeepSeek
+	case "anthropic":
+		providerSettings = g.config.Providers.Anthropic
+	default:
+		providerSettings = g.config.Providers.OpenAI
+	}
+
+	// 创建 Provider
+	prov, err := createProvider(providerSettings, agentConfig.Model, g.logger)
+	if err != nil {
+		g.logger.Error("[Gateway] 创建 Provider 失败", "error", err)
+		return
+	}
+
+	// 创建 Agent
+	// sessionID 设置为 0 表示使用全局 Agent，处理所有会话的消息
+	agentInstance := agent.NewAgent(
+		0, // sessionID: 0 表示全局 Agent
+		agentConfig.Name,
+		prov,
+		g.dataStorage,
+		&agentConfig,
+		g.logger,
+		g.workspace,
+	)
+
+	// 保存 Agent 实例
+	g.mu.Lock()
+	g.Agents[0] = agentInstance
+	g.mu.Unlock()
+
+	g.logger.Info("[Gateway] 创建 AI Agent 成功",
+		"name", agentInstance.Name(),
+		"workspace", g.workspace,
+		"provider", providerName,
+		"model", agentConfig.Model,
+	)
+
+	// 启动 Agent（开始消费消息总线）
+	agentInstance.Run(ctx, messageBus)
+}
+
+// createProvider 创建 LLM Provider
+func createProvider(providerSettings config.ProviderSettings, model string, logger *slog.Logger) (provider.Provider, error) {
+	// 这里可以根据配置创建不同的 Provider
+	// 目前使用 OpenAI Provider
+	apiKey := providerSettings.APIKey
+	
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key 不能为空")
+	}
+
+	// 如果未指定模型，使用 Provider 的默认模型
+	useModel := model
+	if useModel == "" {
+		useModel = providerSettings.Model
+	}
+	
+	prov := provider.NewOpenAIProvider(apiKey, useModel)
+	logger.Info("[Gateway] 创建 Provider 成功",
+		"model", prov.GetDefaultModel(),
+	)
+	return prov, nil
 }
 
 // Stop 停止网关
