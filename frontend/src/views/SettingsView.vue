@@ -945,6 +945,20 @@
               可选，用于自定义 API 端点
             </p>
           </div>
+          <div>
+            <label class="block text-sm text-text-secondary mb-2"
+              >默认模型</label
+            >
+            <input
+              v-model="providerForm.defaultModel"
+              type="text"
+              placeholder="例如：gpt-4, claude-sonnet-4-20250514"
+              class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+            />
+            <p class="text-xs text-text-secondary mt-1">
+              可选，此 Provider 的默认模型。如果未设置，将使用第一个支持的模型。
+            </p>
+          </div>
 
           <!-- 模型列表 -->
           <div>
@@ -1098,6 +1112,7 @@ const providerForm = reactive({
   enabled: true,
   apiKey: "",
   apiBase: "",
+  defaultModel: "",
   models: [], // { name: string, alias: string }
 });
 
@@ -1434,7 +1449,11 @@ async function handleDeleteChannel(ch) {
 // 获取 Provider 模型名称
 function getProviderModel(provider) {
   try {
-    // 优先从 LLMs 字段获取
+    // 优先显示默认模型
+    if (provider.default_model) {
+      return provider.default_model + " (默认)";
+    }
+    // 从 LLMs 字段获取
     if (provider.llms && provider.llms.length > 0) {
       const names = provider.llms.map((l) => l.alias || l.name);
       return names.slice(0, 3).join(", ") + (names.length > 3 ? "..." : "");
@@ -1529,6 +1548,7 @@ function openAddProvider() {
   providerForm.enabled = true;
   providerForm.apiKey = "";
   providerForm.apiBase = "";
+  providerForm.defaultModel = "";
   providerForm.models = [];
   showProviderDialog.value = true;
 }
@@ -1540,6 +1560,7 @@ function openEditProvider(provider) {
   providerForm.enabled = provider.enabled;
   providerForm.apiKey = provider.api_key || "";
   providerForm.apiBase = provider.base_url || "";
+  providerForm.defaultModel = provider.default_model || "";
 
   // 解析 LLMs 字段
   if (provider.llms && provider.llms.length > 0) {
@@ -1589,6 +1610,7 @@ async function handleSaveProvider() {
     enabled: providerForm.enabled,
     api_key: providerForm.apiKey,
     base_url: providerForm.apiBase,
+    default_model: providerForm.defaultModel,
     llms: llms,
   };
 

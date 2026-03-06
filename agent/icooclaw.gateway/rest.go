@@ -239,6 +239,9 @@ func createProviderFromStorage(providerConfig *storage.ProviderConfig, model str
 
 	// 确定使用的模型
 	useModel := model
+	if useModel == "" && providerConfig.DefaultModel != "" {
+		useModel = providerConfig.DefaultModel
+	}
 	if useModel == "" && len(providerConfig.LLMs) > 0 {
 		useModel = providerConfig.LLMs[0].Model
 	}
