@@ -37,14 +37,14 @@ func (s MessageStatus) ToString() string {
 
 // InboundMessage 接收消息
 type InboundMessage struct {
-	ID        string         `json:"id,omitempty"`        // 消息ID  
-	SessionID uint           `json:"session_id,omitempty"`  // 会话 ID
-	Channel   string         `json:"channel,omitempty"`   // 通道
-	ChatID    string         `json:"chat_id,omitempty"`   // 会话ID
-	UserID    string         `json:"user_id,omitempty"`   // 用户ID
-	Content   string         `json:"content,omitempty"`   // 内容
-	Timestamp time.Time      `json:"timestamp,omitempty"` // 时间戳
-	Metadata  map[string]any `json:"metadata,omitempty"`  // 元数据
+	ID        string         `json:"id,omitempty"`         // 消息ID
+	SessionID string         `json:"session_id,omitempty"` // 会话 ID
+	Channel   string         `json:"channel,omitempty"`    // 通道
+	ChatID    string         `json:"chat_id,omitempty"`    // 会话ID
+	UserID    string         `json:"user_id,omitempty"`    // 用户ID
+	Content   string         `json:"content,omitempty"`    // 内容
+	Timestamp time.Time      `json:"timestamp,omitempty"`  // 时间戳
+	Metadata  map[string]any `json:"metadata,omitempty"`   // 元数据
 }
 
 // OutboundMessage 发送消息
@@ -106,12 +106,12 @@ func (b *MessageBus) PublishInbound(ctx context.Context, msg InboundMessage) err
 			clientID = id
 		}
 	}
-	
+
 	content := msg.Content
 	if len(content) > 100 {
 		content = content[:100] + "..."
 	}
-	
+
 	b.logger.Info("[消息总线] 发布入站消息",
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID,
@@ -120,7 +120,7 @@ func (b *MessageBus) PublishInbound(ctx context.Context, msg InboundMessage) err
 		"content_length", len(msg.Content),
 		"content_preview", content,
 	)
-	
+
 	select {
 	case b.inbound <- msg:
 		b.logger.Debug("[消息总线] 入站消息已写入通道",
@@ -200,12 +200,12 @@ func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) e
 			clientID = id
 		}
 	}
-	
+
 	content := msg.Content
 	if len(content) > 100 {
 		content = content[:100] + "..."
 	}
-	
+
 	b.logger.Info("[消息总线] 发布出站消息",
 		"type", msg.Type,
 		"channel", msg.Channel,
@@ -267,12 +267,12 @@ func (b *MessageBus) ConsumeInbound(ctx context.Context) (InboundMessage, error)
 				clientID = id
 			}
 		}
-		
+
 		content := msg.Content
 		if len(content) > 100 {
 			content = content[:100] + "..."
 		}
-		
+
 		b.logger.Info("[消息总线] AI Agent 消费入站消息",
 			"channel", msg.Channel,
 			"chat_id", msg.ChatID,

@@ -159,6 +159,7 @@ func (m *AgentManager) listenMessages() {
 				"chat_id", msg.ChatID,
 				"user_id", msg.UserID,
 				"client_id", clientID,
+				"session_id", msg.SessionID,
 				"content_length", len(msg.Content),
 				"content_preview", content,
 			)
@@ -175,17 +176,8 @@ func (m *AgentManager) listenMessages() {
 
 // processMessage 处理消息（为每个会话分配/创建 Agent）
 func (m *AgentManager) processMessage(ctx context.Context, msg bus.InboundMessage) {
-	// 从消息中提取会话标识
-	// 这里使用 chat_id 作为会话标识
-	sessionID, err := m.getSessionIDFromMessage(msg)
-	if err != nil {
-		m.logger.Error("[AgentManager] 获取会话 ID 失败",
-			"chat_id", msg.ChatID,
-			"error", err,
-		)
-		return
-	}
-
+	// 从消息中提取会话 ID
+	sessionID := msg.SessionID
 	// 获取或创建 Agent
 	agent := m.getOrCreateAgent(sessionID)
 	if agent == nil {
@@ -200,18 +192,6 @@ func (m *AgentManager) processMessage(ctx context.Context, msg bus.InboundMessag
 
 	// 将消息交给 Agent 处理
 	agent.handleMessage(ctx, sessionID, msg)
-}
-
-// getSessionIDFromMessage 从消息中提取会话 ID
-// 这里简化处理，实际可能需要更复杂的逻辑
-func (m *AgentManager) getSessionIDFromMessage(msg bus.InboundMessage) (string, error) {
-	// 这里需要根据实际业务逻辑实现
-	// 目前返回一个基于 chat_id 的哈希值作为会话 ID
-	// 实际应该从存储中获取真实的会话 ID
-
-	// 临时实现：返回 0 表示使用全局 Agent
-	// TODO: 实现真实的会话 ID 获取逻辑
-	return msg.ChatID, nil
 }
 
 // getOrCreateAgent 获取或创建 Agent
