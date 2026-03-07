@@ -17,6 +17,27 @@ type Model struct {
 type StringArray []string
 
 func (s *StringArray) Scan(value interface{}) error {
+	if value == nil {
+		*s = nil
+		return nil
+	}
+
+	var str string
+	switch v := value.(type) {
+	case []byte:
+		str = string(v)
+	case string:
+		str = v
+	default:
+		return nil
+	}
+
+	if str == "" {
+		*s = nil
+		return nil
+	}
+
+	*s = strings.Split(str, ",")
 	return nil
 }
 

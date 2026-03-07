@@ -34,7 +34,9 @@ type Agent struct {
 	config         *config.AgentSettings   // Agent 配置
 	bus            *icooclawbus.MessageBus // 消息总线
 	logger         *slog.Logger            // 日志记录器
-	provider       provider.Provider       // 模型提供器
+	provider       provider.Provider       // 模型提供器（初始化时设置）
+	cachedProvider provider.Provider       // 缓存的 Provider 实例（运行时使用）
+	cachedModel    string                  // 缓存的模型名称，用于检测配置变化
 	tools          *tools.Registry         // 工具注册表
 	storage        *storage.Storage        // 存储接口
 	memory         memory.Loader           // 记忆加载器
@@ -357,13 +359,18 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID string, msg bus.Inb
 	)
 }
 
-// GetProvider 获取 Provider
+// GetProvider 获取 Provider（带缓存）
 func (a *Agent) GetProvider() provider.Provider {
 	// 重新从数据库中获取设置的默认AI模型
 	defaultModel := a.storage.ParamConfig().GetStringValue("agent.default_model", "")
 	if defaultModel == "" {
 		a.logger.Error("[AI Agent] 获取默认AI模型失败，默认模型为空")
 		return nil
+	}
+
+	// 如果缓存的模型名称与当前配置一致，直接返回缓存的 Provider
+	if a.cachedProvider != nil && a.cachedModel == defaultModel {
+		return a.cachedProvider
 	}
 
 	a.logger.Info("[AI Agent] 设置的默认模型", "model", defaultModel)
@@ -393,24 +400,37 @@ func (a *Agent) GetProvider() provider.Provider {
 	a.logger.Info("使用模型", "provider", providerName, "model", modelName)
 
 	// 根据不同类型获取
+	var newProvider provider.Provider
 	switch provider.ProviderType(providerConfig.Name) {
 	case provider.OPENAI:
-		return provider.NewOpenAIProvider(providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewOpenAIProvider(providerConfig.BaseUrl, modelName)
 	case provider.ANTHROPIC:
-		return provider.NewAnthropicProvider(providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewAnthropicProvider(providerConfig.BaseUrl, modelName)
 	case provider.DEEPSEEK:
-		return provider.NewDeepSeekProvider(providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewDeepSeekProvider(providerConfig.BaseUrl, modelName)
 	case provider.OLLAMA:
-		return provider.NewOllamaProvider(providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewOllamaProvider(providerConfig.BaseUrl, modelName)
 	case provider.OPENROUTER:
-		return provider.NewOpenRouterProvider(providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewOpenRouterProvider(providerConfig.BaseUrl, modelName)
 	case provider.LOCAL_AI:
-		return provider.NewLocalAIProvider(providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewLocalAIProvider(providerConfig.BaseUrl, modelName)
 	case provider.ONEAPI:
-		return provider.NewOneAPIProvider(providerConfig.BaseUrl, "", modelName)
+		newProvider = provider.NewOneAPIProvider(providerConfig.BaseUrl, "", modelName)
 	default:
-		return provider.NewOpenAICompatibleProvider(providerConfig.Name, providerConfig.ApiKey, providerConfig.BaseUrl, modelName)
+		newProvider = provider.NewOpenAICompatibleProvider(providerConfig.Name, providerConfig.ApiKey, providerConfig.BaseUrl, modelName)
 	}
+
+	// 缓存 Provider 实例
+	a.cachedProvider = newProvider
+	a.cachedModel = defaultModel
+
+	return newProvider
+}
+
+// RefreshProvider 强制刷新 Provider 缓存
+func (a *Agent) RefreshProvider() {
+	a.cachedProvider = nil
+	a.cachedModel = ""
 }
 
 func (a *Agent) SetSystemPrompt(prompt string) {

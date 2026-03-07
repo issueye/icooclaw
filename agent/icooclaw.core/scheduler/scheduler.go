@@ -13,18 +13,19 @@ import (
  * 使用依赖注入接口，与具体实现解耦
  */
 type Scheduler struct {
-	storage     TaskStorage
-	config      SchedulerConfig
-	logger      Logger
-	slogLogger  *slog.Logger
-	wg          sync.WaitGroup
-	ctx         context.Context
-	cancel      context.CancelFunc
-	mu          sync.RWMutex
-	TaskRunners map[string]TaskRunner
-	running     bool
-	taskCh      chan TaskRunner
+	storage      TaskStorage
+	config       SchedulerConfig
+	logger       Logger
+	slogLogger   *slog.Logger
+	wg           sync.WaitGroup
+	ctx          context.Context
+	cancel       context.CancelFunc
+	mu           sync.RWMutex
+	TaskRunners  map[string]TaskRunner
+	running      bool
+	taskCh       chan TaskRunner
 	taskCallback TaskCallback
+	updateWg     sync.WaitGroup // 用于等待任务状态更新完成
 }
 
 /**
@@ -39,7 +40,7 @@ type SchedulerOptions struct {
 // NewScheduler 创建调度器（使用接口）
 func NewScheduler(storage TaskStorage, config SchedulerConfig, logger Logger) *Scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	slogLogger := slog.Default()
 	if logger != nil {
 		// 如果传入了自定义 Logger，尝试转换为 slog
@@ -47,12 +48,12 @@ func NewScheduler(storage TaskStorage, config SchedulerConfig, logger Logger) *S
 			slogLogger = l
 		}
 	}
-	
+
 	queueSize := config.GetQueueSize()
 	if queueSize <= 0 {
 		queueSize = 100
 	}
-	
+
 	return &Scheduler{
 		storage:     storage,
 		config:      config,
@@ -69,12 +70,12 @@ func NewScheduler(storage TaskStorage, config SchedulerConfig, logger Logger) *S
 // NewSchedulerWithSlog 使用 slog.Logger 创建调度器
 func NewSchedulerWithSlog(storage TaskStorage, config SchedulerConfig, slogLogger *slog.Logger) *Scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	queueSize := config.GetQueueSize()
 	if queueSize <= 0 {
 		queueSize = 100
 	}
-	
+
 	return &Scheduler{
 		storage:     storage,
 		config:      config,
@@ -107,7 +108,7 @@ func (s *Scheduler) Start() error {
 	for _, task := range tasks {
 		var runner TaskRunner
 		var err error
-		
+
 		switch task.Type {
 		case TaskTypeOnce:
 			runner, err = NewOnceTaskRunner(task.Name, &task, s.slogLogger)
@@ -152,6 +153,9 @@ func (s *Scheduler) Stop() error {
 	s.cancel()
 	s.wg.Wait()
 
+	// 等待所有待处理的任务状态更新完成
+	s.updateWg.Wait()
+
 	for name := range s.TaskRunners {
 		if err := s.TaskRunners[name].Stop(s.ctx); err != nil {
 			s.slogLogger.Warn("终止任务失败", "name", name, "error", err)
@@ -180,7 +184,7 @@ func (s *Scheduler) run() {
 	if checkInterval <= 0 {
 		checkInterval = 60 * time.Second
 	}
-	
+
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 
@@ -343,10 +347,12 @@ func (s *Scheduler) OnComplete(ctx context.Context, task *TaskInfo, err error) {
 	} else {
 		s.slogLogger.Debug("Task completed", "name", task.Name)
 	}
-	
-	// 更新任务状态到存储
+
+	// 更新任务状态到存储（同步更新，确保不丢失）
 	if s.storage != nil {
+		s.updateWg.Add(1)
 		go func() {
+			defer s.updateWg.Done()
 			if updateErr := s.storage.UpdateTask(task); updateErr != nil {
 				s.slogLogger.Error("Failed to update task", "name", task.Name, "error", updateErr)
 			}

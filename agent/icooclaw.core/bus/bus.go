@@ -73,6 +73,9 @@ type MessageBus struct {
 	mu                  sync.RWMutex
 	logger              *slog.Logger
 	bufferSize          int
+	inboundDropped      int64
+	outboundDropped     int64
+	droppedAlerted      bool
 }
 
 // NewMessageBus 创建消息总线
@@ -135,11 +138,26 @@ func (b *MessageBus) PublishInbound(ctx context.Context, msg InboundMessage) err
 		)
 		return ctx.Err()
 	default:
-		b.logger.Warn("[消息总线] 入站通道已满，消息被丢弃",
+		b.mu.Lock()
+		b.inboundDropped++
+		dropped := b.inboundDropped
+		b.mu.Unlock()
+
+		b.logger.Error("[消息总线] 入站通道已满，消息被丢弃",
 			"channel", msg.Channel,
 			"chat_id", msg.ChatID,
 			"buffer_size", b.bufferSize,
+			"total_dropped", dropped,
 		)
+
+		if !b.droppedAlerted && dropped >= int64(b.bufferSize) {
+			b.droppedAlerted = true
+			b.logger.Error("[消息总线] 消息丢弃超过缓冲区大小，请检查系统负载或增加缓冲区大小",
+				"buffer_size", b.bufferSize,
+				"dropped_count", dropped,
+			)
+		}
+
 		return ErrChannelFull
 	}
 }
@@ -190,8 +208,8 @@ func (b *MessageBus) UnsubscribeOutbound(channel string) {
 
 // PublishOutbound 发布发送消息
 func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) error {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	// 获取客户端 ID 用于追踪
 	clientID := ""
@@ -248,11 +266,24 @@ func (b *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) e
 		)
 		return ctx.Err()
 	default:
-		b.logger.Warn("[消息总线] 出站通道已满，消息被丢弃",
+		b.outboundDropped++
+		dropped := b.outboundDropped
+
+		b.logger.Error("[消息总线] 出站通道已满，消息被丢弃",
 			"type", msg.Type,
 			"channel", msg.Channel,
 			"buffer_size", b.bufferSize,
+			"total_dropped", dropped,
 		)
+
+		if !b.droppedAlerted && dropped >= int64(b.bufferSize) {
+			b.droppedAlerted = true
+			b.logger.Error("[消息总线] 消息丢弃超过缓冲区大小，请检查系统负载或增加缓冲区大小",
+				"buffer_size", b.bufferSize,
+				"dropped_count", dropped,
+			)
+		}
+
 		return ErrChannelFull
 	}
 }
@@ -306,6 +337,20 @@ func (b *MessageBus) InboundChannel() <-chan InboundMessage {
 // OutboundChannel 返回发送消息通道
 func (b *MessageBus) OutboundChannel() <-chan OutboundMessage {
 	return b.outbound
+}
+
+// GetDroppedStats 获取丢弃消息统计
+func (b *MessageBus) GetDroppedStats() (inbound, outbound int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.inboundDropped, b.outboundDropped
+}
+
+// ResetDroppedAlert 重置丢弃告警状态
+func (b *MessageBus) ResetDroppedAlert() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.droppedAlerted = false
 }
 
 // Close 关闭消息总线
