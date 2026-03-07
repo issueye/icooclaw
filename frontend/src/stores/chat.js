@@ -46,6 +46,10 @@ export const useChatStore = defineStore("chat", () => {
         updatedAt: new Date(s.updated_at).getTime(),
         raw: s,
       }));
+      // 为每个会话设置 WebSocket 会话 ID 映射
+      sessions.value.forEach((s) => {
+        setWsSessionId(s.id, s.id);
+      });
       if (sessions.value.length > 0 && !currentSessionId.value) {
         currentSessionId.value = sessions.value[0].id;
       }
@@ -101,12 +105,14 @@ export const useChatStore = defineStore("chat", () => {
         userId: data.user_id,
         title,
         messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        created_at: Date.now(),
+        updated_at: Date.now(),
         raw: data,
       };
       sessions.value.unshift(session);
       currentSessionId.value = session.id;
+      // REST API 创建的会话 ID 可以直接用于 WebSocket
+      setWsSessionId(session.id, session.id);
       return session;
     } catch (error) {
       console.error("创建会话失败:", error);
@@ -166,7 +172,7 @@ export const useChatStore = defineStore("chat", () => {
       id: generateId(),
       role: "user",
       content,
-      timestamp: Date.now(),
+      created_at: Date.now(),
     };
     currentSession.value.messages.push(msg);
     currentSession.value.updatedAt = Date.now();
@@ -188,7 +194,7 @@ export const useChatStore = defineStore("chat", () => {
       content: "",
       thinking: "",
       toolCalls: [],
-      timestamp: Date.now(),
+      created_at: Date.now(),
       streaming: true,
     };
     currentSession.value.messages.push(msg);

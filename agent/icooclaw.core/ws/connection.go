@@ -108,6 +108,7 @@ func (c *Connection) ReadPump() {
 			break
 		}
 
+		c.logger.Debug("收到消息", "message", string(message), "connection_id", c.sessionID)
 		c.handleMessage(message)
 	}
 }
@@ -193,7 +194,14 @@ func (c *Connection) handleMessage(data []byte) {
 		return
 	}
 
-	msg.Timestamp = time.Now()
+	msg.CreatedAt = time.Now()
+
+	c.logger.Debug("处理消息", "handle_message", msg, "connection_id", c.sessionID)
+
+	// 如果存在 session_id，设置会话ID
+	if msg.SessionID != "" {
+		c.SetSessionID(msg.SessionID)
+	}
 
 	// 将消息发送到管理器处理
 	c.manager.handleClientMessage(c, &msg)

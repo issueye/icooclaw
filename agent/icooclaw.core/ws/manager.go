@@ -122,7 +122,7 @@ func (m *Manager) NotifyQueueStatus(sessionID string, status *QueueStatus) {
 					WaitingCount:  status.WaitingCount,
 					MaxConcurrent: status.MaxConcurrent,
 				},
-				Timestamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 			break
 		}
@@ -145,7 +145,7 @@ func (m *Manager) NotifyQueuePosition(sessionID string, position int) {
 					MaxConcurrent: status.MaxConcurrent,
 					Position:      position,
 				},
-				Timestamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 			break
 		}
@@ -218,7 +218,7 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 				SessionID: conn.SessionID(),
 				Content:   msg.Content,
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		}
 	case bus.MessageTypeThinking:
 		wsMsg = &Message{
@@ -228,7 +228,7 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 				SessionID: conn.SessionID(),
 				Content:   msg.Thinking,
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		}
 	case bus.MessageTypeToolCall:
 		wsMsg = &Message{
@@ -240,7 +240,7 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 				ToolName:   msg.ToolName,
 				Arguments:  msg.Arguments,
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		}
 	case bus.MessageTypeToolResult:
 		wsMsg = &Message{
@@ -251,7 +251,7 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 				ToolCallID: msg.ToolCallID,
 				Result:     msg.Content,
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		}
 	case bus.MessageTypeEnd:
 		wsMsg = &Message{
@@ -260,7 +260,7 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 			Data: &EndData{
 				SessionID: conn.SessionID(),
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		}
 	case bus.MessageTypeError:
 		wsMsg = &Message{
@@ -270,7 +270,7 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 				Code:    500,
 				Message: msg.Error,
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		}
 	}
 
@@ -337,19 +337,33 @@ func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 		req.Channel = "websocket"
 	}
 
-	// 生成唯一的 ChatID (使用连接 ID)
-	chatID := fmt.Sprintf("ws-%s", conn.ID())
+	var session *storage.Session
 
-	// 创建会话
-	session, err := m.storage.Session().GetOrCreateSession(req.Channel, chatID, req.UserID)
-	if err != nil {
-		conn.SendMessage(NewErrorMessage(conn.SessionID(), 500, "创建会话失败"))
-		return
+	// 如果提供了 session_id，尝试复用已有会话
+	if req.SessionID != "" {
+		session, err = m.storage.Session().GetByID(req.SessionID)
+		if err == nil && session != nil && session.ID != "" {
+			m.logger.Info("复用已有会话", "session_id", session.ID, "connection_id", conn.ID())
+		} else {
+			session = nil
+		}
+	}
+
+	// 如果没有复用成功，创建新会话
+	if session == nil {
+		chatID := fmt.Sprintf("ws-%s", conn.ID())
+		session, err = m.storage.Session().GetOrCreateSession(req.Channel, chatID, req.UserID)
+		if err != nil {
+			conn.SendMessage(NewErrorMessage(conn.SessionID(), 500, "创建会话失败"))
+			return
+		}
 	}
 
 	// 设置连接的会话 ID 和用户 ID
 	conn.SetSessionID(session.ID)
-	conn.SetUserID(req.UserID)
+	if req.UserID != "" {
+		conn.SetUserID(req.UserID)
+	}
 
 	// 发送响应
 	conn.SendMessage(&Message{
@@ -361,7 +375,7 @@ func (m *Manager) handleCreateSession(conn *Connection, msg *Message) {
 			ChatID:    session.ChatID,
 			UserID:    session.UserID,
 		},
-		Timestamp: time.Now(),
+		CreatedAt: time.Now(),
 	})
 
 	m.logger.Info("会话创建成功", "session_id", session.ID, "connection_id", conn.ID())
@@ -425,7 +439,7 @@ func (m *Manager) handleChat(conn *Connection, msg *Message) {
 				MaxConcurrent: status.MaxConcurrent,
 				Position:      position,
 			},
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		})
 	}
 
@@ -470,10 +484,11 @@ func (m *Manager) processChatMessage(ctx context.Context, sessionID string, cont
 
 	// 发布入站消息到消息总线
 	err = m.bus.PublishInbound(ctx, bus.InboundMessage{
-		Channel: session.Channel,
-		ChatID:  session.ChatID,
-		UserID:  session.UserID,
-		Content: content,
+		SessionID: sessionID,
+		Channel:   session.Channel,
+		ChatID:    session.ChatID,
+		UserID:    session.UserID,
+		Content:   content,
 		Metadata: map[string]any{
 			"client_id": clientID,
 		},
@@ -498,7 +513,7 @@ func (m *Manager) processChatMessage(ctx context.Context, sessionID string, cont
 func (m *Manager) handlePing(conn *Connection, msg *Message) {
 	conn.SendMessage(&Message{
 		Type:      MessageTypePong,
-		Timestamp: time.Now(),
+		CreatedAt: time.Now(),
 	})
 }
 
@@ -520,7 +535,7 @@ func (m *Manager) handleQueueStatus(conn *Connection, msg *Message) {
 			MaxConcurrent: status.MaxConcurrent,
 			Position:      position,
 		},
-		Timestamp: time.Now(),
+		CreatedAt: time.Now(),
 	})
 }
 

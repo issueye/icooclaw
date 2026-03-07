@@ -263,8 +263,8 @@ async function sendMessage(text) {
         // 已有会话，直接发送聊天消息
         const sent = send({
             type: "chat",
+            session_id: wsSessionId,
             data: {
-                session_id: wsSessionId,
                 content: text,
             },
         });
@@ -280,6 +280,7 @@ async function sendMessage(text) {
         pendingChatContent = text;
         send({
             type: "create_session",
+            session_id: chatStore.currentSessionId,
             data: {
                 channel: "websocket",
                 user_id: chatStore.userId,
@@ -295,7 +296,7 @@ function handleNewChat() {
 }
 
 async function handleSelectSession(id) {
-    console.log('id =>', id);
+    console.log('切换会话:', id);
     
     await chatStore.switchSession(id);
     if (window.innerWidth < 768) {

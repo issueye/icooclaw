@@ -30,7 +30,7 @@ type Message struct {
 	Type      MessageType `json:"type"`
 	SessionID string      `json:"session_id,omitempty"`
 	Data      interface{} `json:"data,omitempty"`
-	Timestamp time.Time   `json:"timestamp"`
+	CreatedAt time.Time   `json:"created_at,omitempty"`
 	Error     *ErrorInfo  `json:"error,omitempty"`
 }
 
@@ -42,8 +42,9 @@ type ErrorInfo struct {
 
 // CreateSessionRequest 创建会话请求
 type CreateSessionRequest struct {
-	Channel string `json:"channel,omitempty"` // 渠道 (默认为 "websocket")
-	UserID  string `json:"user_id,omitempty"` // 用户ID
+	Channel   string `json:"channel,omitempty"`    // 渠道 (默认为 "websocket")
+	UserID    string `json:"user_id,omitempty"`    // 用户ID
+	SessionID string `json:"session_id,omitempty"` // 已有的会话ID (用于复用会话)
 }
 
 // CreateSessionResponse 创建会话响应
@@ -111,7 +112,7 @@ func NewMessage(msgType MessageType, data interface{}) *Message {
 	return &Message{
 		Type:      msgType,
 		Data:      data,
-		Timestamp: time.Now(),
+		CreatedAt: time.Now(),
 	}
 }
 
@@ -120,7 +121,7 @@ func NewErrorMessage(sessionID string, code int, message string) *Message {
 	return &Message{
 		Type:      MessageTypeError,
 		SessionID: sessionID,
-		Timestamp: time.Now(),
+		CreatedAt: time.Now(),
 		Error: &ErrorInfo{
 			Code:    code,
 			Message: message,
