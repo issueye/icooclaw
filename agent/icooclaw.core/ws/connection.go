@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -158,13 +159,18 @@ func (c *Connection) WritePump() {
 	}
 }
 
-// Send 发送消息
+// Send 发送消息（带超时和重试）
 func (c *Connection) Send(message []byte) bool {
+	// 带超时的发送，避免永久阻塞
 	select {
 	case c.send <- message:
 		return true
-	default:
-		c.logger.Warn("发送缓冲区已满", "connection_id", c.id)
+	case <-time.After(5 * time.Second):
+		c.logger.Error("发送消息超时，缓冲区可能已满",
+			"connection_id", c.id,
+			"buffer_size", len(c.send),
+			"message_length", len(message),
+		)
 		return false
 	}
 }
@@ -175,7 +181,9 @@ func (c *Connection) SendMessage(msg *Message) error {
 	if err != nil {
 		return err
 	}
-	c.Send(data)
+	if !c.Send(data) {
+		return fmt.Errorf("发送消息失败，缓冲区已满")
+	}
 	return nil
 }
 

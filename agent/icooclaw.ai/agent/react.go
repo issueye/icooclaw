@@ -101,6 +101,11 @@ func (r *ReActAgent) Run(ctx context.Context, messages []provider.Message, syste
 
 		logger.Debug("发送请求到 LLM", "iteration", iteration, "message_count", len(messages))
 
+		// 调试：打印所有消息的角色
+		for i, m := range messages {
+			logger.Debug("消息内容", "index", i, "role", m.Role, "content_length", len(m.Content), "tool_calls", len(m.ToolCalls))
+		}
+
 		// 调用 LLM
 		err := cfg.Provider.ChatStream(ctx, *req, streamCallback)
 		if err != nil {

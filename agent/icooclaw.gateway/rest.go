@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/docgen"
 	"icooclaw.ai/agent"
 	"icooclaw.ai/provider"
+	"icooclaw.ai/tools"
 	"icooclaw.core/bus"
 	"icooclaw.core/config"
 	"icooclaw.core/consts"
@@ -182,6 +183,9 @@ func (g *RESTGateway) startAgent(_ context.Context) {
 			g.workspace,
 			g.logger,
 		)
+		// 初始化工具注册表并设置到 AgentManager
+		toolRegistry := tools.InitTools(g.config, g.logger, nil)
+		g.agentManager.SetTools(toolRegistry)
 		g.agentManager.SetMessageBus(messageBus)
 		return
 	}
@@ -236,6 +240,10 @@ func (g *RESTGateway) startAgent(_ context.Context) {
 		"provider", defaultProvider.Name,
 		"model", agentConfig.Model,
 	)
+
+	// 初始化工具注册表并设置到 AgentManager
+	toolRegistry := tools.InitTools(g.config, g.logger, nil)
+	g.agentManager.SetTools(toolRegistry)
 
 	// 设置消息总线，开始监听消息
 	g.agentManager.SetMessageBus(messageBus)

@@ -165,7 +165,7 @@ onMessage((msg) => {
             scrollToBottom();
             break;
         case "thinking":
-            chatStore.updateThinking(msg.data?.content || "");
+            chatStore.updateThinking(cleanThinkingContent(msg.data?.content || ""));
             break;
         case "tool_call":
             chatStore.addToolCall({
@@ -217,11 +217,15 @@ function sendPendingChatMessage() {
     const wsSessionId = chatStore.getWsSessionId(chatStore.currentSessionId);
     if (!wsSessionId) {
         console.error("没有有效的 WebSocket 会话ID");
+        chatStore.finishLastAI("⚠️ 创建会话失败：无法获取会话ID");
+        chatStore.isLoading = false;
+        pendingChatContent = null;
         return;
     }
 
     const sent = send({
         type: "chat",
+        session_id: wsSessionId,
         data: {
             session_id: wsSessionId,
             content: pendingChatContent,
@@ -230,7 +234,7 @@ function sendPendingChatMessage() {
 
     if (!sent) {
         chatStore.finishLastAI(
-            "⚠️ 发送失败：WebSocket 未连接，请检查 Agent 服务是否启动"
+            "⚠️ 发送失败：WebSocket 连接缓冲区已满，请稍后重试"
         );
         chatStore.isLoading = false;
     }
@@ -243,10 +247,28 @@ async function sendMessage(text) {
 
     const session = chatStore.ensureSession();
 
-    // 检查 WS 是否已连接
-    if (wsStatus.value !== "connected") {
+    // 检查 WS 是否已连接，如未连接则等待连接成功
+    if (wsStatus.value !== "connected" && wsStatus.value !== "reconnecting") {
         connectWs();
-        await new Promise((r) => setTimeout(r, 800));
+        
+        // 轮询等待连接成功，最多等待 10 秒
+        const maxWaitTime = 10000;
+        const checkInterval = 200;
+        let waitedTime = 0;
+        
+        while (wsStatus.value !== "connected" && waitedTime < maxWaitTime) {
+            await new Promise(r => setTimeout(r, checkInterval));
+            waitedTime += checkInterval;
+        }
+        
+        if (wsStatus.value !== "connected") {
+            chatStore.addUserMessage(text);
+            chatStore.addAIMessage();
+            chatStore.finishLastAI(
+                "⚠️ 连接失败：请检查 Agent 服务是否启动"
+            );
+            return;
+        }
     }
 
     chatStore.addUserMessage(text);
@@ -265,23 +287,25 @@ async function sendMessage(text) {
             type: "chat",
             session_id: wsSessionId,
             data: {
+                session_id: wsSessionId,  // 后端需要这个字段进行校验
                 content: text,
             },
         });
 
         if (!sent) {
             chatStore.finishLastAI(
-                "⚠️ 发送失败：WebSocket 未连接，请检查 Agent 服务是否启动"
+                "⚠️ 发送失败：WebSocket 连接缓冲区已满，请稍后重试"
             );
             chatStore.isLoading = false;
         }
     } else {
         // 需要先创建 WebSocket 会话
         pendingChatContent = text;
+        // 传递前端已有的 session_id，让后端复用该会话
         send({
             type: "create_session",
-            session_id: chatStore.currentSessionId,
             data: {
+                session_id: chatStore.currentSessionId,
                 channel: "websocket",
                 user_id: chatStore.userId,
             },
@@ -321,6 +345,18 @@ const hints = [
     "今天天气怎么样？",
     "给我讲个有趣的笑话",
 ];
+
+// 清理思考内容中的模型特定标签
+function cleanThinkingContent(content) {
+    if (!content) return "";
+    return content
+        .replace(/<think>/g, "")
+        .replace(/<\/think>/g, "")
+        .replace(/<\|start_header_id\|>reasoning<\|end_header_id\|>/g, "")
+        .replace(/<\|start_header_id\|>assistant<\|end_header_id\|>/g, "")
+        .replace(/<\|message\|>/g, "")
+        .trim();
+}
 
 function scrollToBottom() {
     if (messagesContainer.value) {

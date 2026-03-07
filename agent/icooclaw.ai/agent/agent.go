@@ -115,6 +115,14 @@ func (a *Agent) SetTools(registry *tools.Registry) {
 	a.tools = registry
 }
 
+func (a *Agent) SetBus(bus *icooclawbus.MessageBus) {
+	a.bus = bus
+}
+
+func (a *Agent) GetBus() *icooclawbus.MessageBus {
+	return a.bus
+}
+
 func (a *Agent) Storage() *storage.Storage {
 	return a.storage
 }
@@ -259,7 +267,9 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID string, msg bus.Inb
 	)
 
 	// 构建上下文
-	contextBuilder := NewContextBuilder(session.ID, a.workspace, a.logger, a.skills, a.memory)
+	contextBuilder := NewContextBuilder(session.ID, a.workspace, a.logger, a.skills, a.memory).
+		WithStorage(a.storage).
+		WithMemoryWindow(a.config.MemoryWindow)
 	messages, systemPrompt, err := contextBuilder.Build(ctx)
 	if err != nil {
 		a.logger.Error("[AI Agent] 构建上下文失败", "error", err)
@@ -299,9 +309,36 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID string, msg bus.Inb
 	// 获取 Provider
 	provider := a.GetProvider()
 	if provider == nil {
-		a.logger.Error("[AI Agent] 获取默认模型失败，默认模型为空")
+		errorMsg := "请先配置 AI 模型提供商：进入设置页面，添加并启用至少一个 Provider（如 OpenAI、DeepSeek 等）"
+		a.logger.Error("[AI Agent] Provider 未配置", "error", errorMsg)
+		if a.bus != nil {
+			a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+				Type:      icooclawbus.MessageTypeError,
+				Channel:   msg.Channel,
+				ChatID:    msg.ChatID,
+				Content:   errorMsg,
+				Timestamp: time.Now(),
+				Metadata:  map[string]interface{}{"client_id": clientID},
+			})
+			// 发送 end 消息，让前端停止加载状态
+			a.bus.PublishOutbound(ctx, icooclawbus.OutboundMessage{
+				Type:      icooclawbus.MessageTypeEnd,
+				Channel:   msg.Channel,
+				ChatID:    msg.ChatID,
+				Timestamp: time.Now(),
+				Metadata:  map[string]interface{}{"client_id": clientID},
+			})
+		}
 		return
 	}
+
+	a.logger.Info("[AI Agent] 开始运行模型",
+		"session_id", session.ID,
+		"channel", msg.Channel,
+		"chat_id", msg.ChatID,
+		"user_id", msg.UserID,
+		"client_id", clientID,
+	)
 
 	// 使用解耦的 LoopHooks
 	reactCfg := NewReActConfig()

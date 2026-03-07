@@ -14,6 +14,8 @@ import (
 	"icooclaw.ai/memory"
 	"icooclaw.ai/provider"
 	"icooclaw.ai/skill"
+	"icooclaw.core/consts"
+	"icooclaw.core/storage"
 )
 
 // ContextBuilder 上下文构建器
@@ -24,6 +26,8 @@ type ContextBuilder struct {
 	memoryLoader memory.Loader
 	logger       *slog.Logger
 	fs           *OsFileSystem
+	storage      *storage.Storage
+	memoryWindow int
 }
 
 // NewContextBuilder 创建上下文构建器
@@ -41,7 +45,22 @@ func NewContextBuilder(
 		memoryLoader: memoryLoader,
 		sessionID:    sessionID,
 		fs:           &OsFileSystem{},
+		memoryWindow: 50, // 默认 memory window
 	}
+}
+
+// WithStorage 设置存储实例
+func (cb *ContextBuilder) WithStorage(s *storage.Storage) *ContextBuilder {
+	cb.storage = s
+	return cb
+}
+
+// WithMemoryWindow 设置记忆窗口大小
+func (cb *ContextBuilder) WithMemoryWindow(window int) *ContextBuilder {
+	if window > 0 {
+		cb.memoryWindow = window
+	}
+	return cb
 }
 
 // ContextBuilderOption 上下文构建器选项
@@ -436,39 +455,102 @@ func (cb *ContextBuilder) GetMemoryFilePath() string {
 
 // buildMessages 构建消息列表
 func (cb *ContextBuilder) buildMessages() ([]provider.Message, error) {
+	// 如果没有 storage，返回空消息列表
+	if cb.storage == nil {
+		cb.logger.Debug("ContextBuilder 没有 storage，无法加载历史消息")
+		return nil, nil
+	}
 
-	// 获取会话消息
-	// messages, err := cb.session.GetMessages(cb.agent.Config().MemoryWindow)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// 获取会话消息（倒序获取，最后的消息在前）
+	messages, err := cb.storage.Message().GetBySessionID(cb.sessionID, cb.memoryWindow, 0)
+	if err != nil {
+		cb.logger.Warn("获取历史消息失败", "error", err, "session_id", cb.sessionID)
+		return nil, nil // 不返回错误，允许继续执行
+	}
 
-	// // 转换为provider.Message
-	// result := make([]provider.Message, len(messages))
-	// for i, msg := range messages {
-	// 	result[i] = provider.Message{
-	// 		Role:             msg.Role,
-	// 		Content:          msg.Content,
-	// 		ReasoningContent: msg.ReasoningContent,
-	// 	}
+	if len(messages) == 0 {
+		cb.logger.Debug("没有历史消息", "session_id", cb.sessionID)
+		return nil, nil
+	}
 
-	// 	// 处理tool_calls
-	// 	if msg.ToolCalls != "" {
-	// 		var calls []provider.ToolCall
-	// 		if err := json.Unmarshal([]byte(msg.ToolCalls), &calls); err == nil {
-	// 			result[i].ToolCalls = calls
-	// 		}
-	// 	}
+	// 转换为 provider.Message（需要反转顺序，最早的消息在前）
+	result := make([]provider.Message, 0, len(messages))
 
-	// 	// 处理tool角色
-	// 	if msg.Role == "tool" {
-	// 		result[i].ToolCallID = msg.ToolCallID
-	// 		result[i].Name = msg.ToolName
-	// 	}
-	// }
+	// 反转消息顺序：数据库返回的是倒序（最新的在前），需要转为正序（最早的在前）
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
 
-	// return result, nil
-	return nil, nil
+		// 调试：打印原始消息角色
+		cb.logger.Debug("处理历史消息", "index", i, "original_role", msg.Role, "content_length", len(msg.Content), "tool_result_length", len(msg.ToolResult))
+
+		providerMsg := provider.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+
+		// 处理 thinking/reasoning_content
+		if msg.Thinking != "" {
+			providerMsg.ReasoningContent = msg.Thinking
+		} else if msg.ReasoningContent != "" {
+			providerMsg.ReasoningContent = msg.ReasoningContent
+		}
+
+		// 处理 tool 角色（工具调用结果）
+		// 注意：API 只接受 'tool' 角色，不接受 'tool_result'
+		if msg.Role == consts.RoleToolResult || msg.Role == "tool" || msg.Role == "tool_result" {
+			providerMsg.Role = "tool" // 统一转换为 tool 角色
+			providerMsg.ToolCallID = msg.ToolCallID
+			providerMsg.Name = msg.ToolName
+			// 如果有工具结果，放在 content 中
+			if msg.ToolResult != "" {
+				providerMsg.Content = msg.ToolResult
+			}
+			// tool 消息必须有 content，否则跳过
+			if providerMsg.Content == "" {
+				continue
+			}
+			result = append(result, providerMsg)
+			continue
+		}
+
+		// 处理 tool_call 角色（工具调用请求）
+		// 注意：API 不接受 'tool_call' 角色，需要转换为 assistant 消息 + tool_calls
+		if msg.Role == consts.RoleToolCall || msg.Role == "tool_call" {
+			providerMsg.Role = "assistant"
+			providerMsg.Content = "" // tool_call 消息通常没有 content
+			if msg.ToolName != "" && msg.ToolArguments != "" {
+				providerMsg.ToolCalls = []provider.ToolCall{{
+					ID:   msg.ToolCallID,
+					Type: "function",
+					Function: provider.ToolCallFunction{
+						Name:      msg.ToolName,
+						Arguments: msg.ToolArguments,
+					},
+				}}
+			}
+			result = append(result, providerMsg)
+			continue
+		}
+
+		// 跳过空内容的普通消息
+		if msg.Content == "" {
+			continue
+		}
+
+		result = append(result, providerMsg)
+	}
+
+	// 调试：打印转换后的所有消息角色
+	for i, m := range result {
+		cb.logger.Debug("转换后消息", "index", i, "role", m.Role, "content_length", len(m.Content))
+	}
+
+	cb.logger.Debug("加载历史消息成功",
+		"session_id", cb.sessionID,
+		"count", len(result),
+	)
+
+	return result, nil
 }
 
 // AddContext 添加额外上下文

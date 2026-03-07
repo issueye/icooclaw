@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"icooclaw.ai/provider"
+	"icooclaw.ai/tools"
 	"icooclaw.core/bus"
 	"icooclaw.core/config"
 	"icooclaw.core/storage"
@@ -54,6 +55,7 @@ type AgentManager struct {
 	cancel      context.CancelFunc
 	wg          sync.WaitGroup
 	messageBus  *bus.MessageBus
+	tools       *tools.Registry // 工具注册表
 }
 
 // NewAgentManager 创建 Agent 管理器
@@ -116,6 +118,12 @@ func (m *AgentManager) SetMessageBus(messageBus *bus.MessageBus) {
 	// 启动消息监听协程
 	m.wg.Add(1)
 	go m.listenMessages()
+}
+
+// SetTools 设置工具注册表
+func (m *AgentManager) SetTools(toolRegistry *tools.Registry) {
+	m.tools = toolRegistry
+	m.logger.Info("[AgentManager] 工具注册表已设置", "tool_count", toolRegistry.Count())
 }
 
 // listenMessages 监听消息总线并分发到 Agent
@@ -185,6 +193,11 @@ func (m *AgentManager) processMessage(ctx context.Context, msg bus.InboundMessag
 			"session_id", sessionID,
 		)
 		return
+	}
+
+	// 确保 Agent 有消息总线
+	if agent.GetBus() == nil && m.messageBus != nil {
+		agent.SetBus(m.messageBus)
 	}
 
 	// 更新 Agent 使用状态
@@ -264,6 +277,11 @@ func (m *AgentManager) createAgent(sessionID string) *Agent {
 		m.logger,
 		m.workspace,
 	)
+
+	// 设置工具注册表
+	if m.tools != nil {
+		agent.SetTools(m.tools)
+	}
 
 	// 记录 Agent 信息
 	m.agentInfos[sessionID] = &AgentInfo{

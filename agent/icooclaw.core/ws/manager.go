@@ -197,6 +197,11 @@ func (m *Manager) runOutboundHandler() {
 func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 	clientID, ok := msg.Metadata["client_id"].(string)
 	if !ok {
+		m.logger.Warn("[WebSocket] 出站消息缺少 client_id，无法广播",
+			"type", msg.Type,
+			"chat_id", msg.ChatID,
+			"metadata", msg.Metadata,
+		)
 		return
 	}
 
@@ -205,6 +210,11 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 	m.mu.RUnlock()
 
 	if !ok {
+		m.logger.Warn("[WebSocket] 未找到对应的 WebSocket 连接",
+			"client_id", clientID,
+			"type", msg.Type,
+			"active_connections", len(m.connections),
+		)
 		return
 	}
 
@@ -263,12 +273,17 @@ func (m *Manager) broadcastOutbound(msg bus.OutboundMessage) {
 			CreatedAt: time.Now(),
 		}
 	case bus.MessageTypeError:
+		// 优先使用 Content 字段（Agent 发布的错误信息在这里）
+		errorMsg := msg.Error
+		if errorMsg == "" {
+			errorMsg = msg.Content
+		}
 		wsMsg = &Message{
 			Type:      MessageTypeError,
 			SessionID: conn.SessionID(),
 			Error: &ErrorInfo{
 				Code:    500,
-				Message: msg.Error,
+				Message: errorMsg,
 			},
 			CreatedAt: time.Now(),
 		}
