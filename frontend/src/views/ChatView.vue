@@ -295,6 +295,8 @@ function handleNewChat() {
 }
 
 async function handleSelectSession(id) {
+    console.log('id =>', id);
+    
     await chatStore.switchSession(id);
     if (window.innerWidth < 768) {
         sidebarCollapsed.value = true;

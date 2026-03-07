@@ -111,7 +111,7 @@ export async function getMessagesPage(params = {}) {
     method: 'POST',
     body: JSON.stringify({
       ...createPageRequest(params.page, params.size),
-      session_id: Number(params.session_id) || 0,
+      session_id: params.session_id,
       role: params.role || '',
     }),
   });

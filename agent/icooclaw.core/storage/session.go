@@ -114,7 +114,7 @@ func (s *SessionStorage) Page(q *QuerySession) (*ResQuerySession, error) {
 	}
 
 	var sessions []Session
-	err := query.Order("created_at DESC").
+	err := query.
 		Offset((q.Page.Page - 1) * q.Page.Size).
 		Limit(q.Page.Size).
 		Find(&sessions).Error

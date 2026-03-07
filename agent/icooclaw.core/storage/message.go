@@ -122,7 +122,7 @@ func (s *MessageStorage) Update(msg *Message) error {
 func (s *MessageStorage) Page(q *QueryMessage) (*ResQueryMessage, error) {
 	var total int64
 	query := s.db.Model(&Message{})
-	if q.SessionID > 0 {
+	if q.SessionID != "" {
 		query = query.Where("session_id = ?", q.SessionID)
 	}
 	if q.Role != "" {
@@ -133,7 +133,7 @@ func (s *MessageStorage) Page(q *QueryMessage) (*ResQueryMessage, error) {
 	}
 
 	var messages []Message
-	err := query.Order("created_at DESC").
+	err := query.
 		Offset((q.Page.Page - 1) * q.Page.Size).
 		Limit(q.Page.Size).
 		Find(&messages).Error
@@ -148,7 +148,7 @@ func (s *MessageStorage) Page(q *QueryMessage) (*ResQueryMessage, error) {
 // QueryMessage 消息查询参数
 type QueryMessage struct {
 	Page      Page   `json:"page"`
-	SessionID uint   `json:"session_id"`
+	SessionID string `json:"session_id"`
 	Role      string `json:"role"`
 }
 

@@ -296,6 +296,10 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID string, msg bus.Inb
 
 	// 获取 Provider
 	provider := a.GetProvider()
+	if provider == nil {
+		a.logger.Error("[AI Agent] 获取默认模型失败，默认模型为空")
+		return
+	}
 
 	// 使用解耦的 LoopHooks
 	reactCfg := NewReActConfig()
@@ -353,6 +357,7 @@ func (a *Agent) handleMessage(ctx context.Context, sessionID string, msg bus.Inb
 	)
 }
 
+// GetProvider 获取 Provider
 func (a *Agent) GetProvider() provider.Provider {
 	// 重新从数据库中获取设置的默认AI模型
 	defaultModel := a.storage.ParamConfig().GetStringValue("agent.default_model", "")
@@ -361,7 +366,7 @@ func (a *Agent) GetProvider() provider.Provider {
 		return nil
 	}
 
-	a.logger.WithGroup("[AI Agent]").Info("设置的默认模型", "model", defaultModel)
+	a.logger.Info("[AI Agent] 设置的默认模型", "model", defaultModel)
 
 	// 分解默认模型为供应商和模型名称
 	parts := strings.SplitN(defaultModel, "/", 2)
@@ -385,7 +390,7 @@ func (a *Agent) GetProvider() provider.Provider {
 		return nil
 	}
 
-	a.logger.WithGroup("[AI Agent]").Info("使用模型", "provider", providerName, "model", modelName)
+	a.logger.Info("使用模型", "provider", providerName, "model", modelName)
 
 	// 根据不同类型获取
 	switch provider.ProviderType(providerConfig.Name) {
@@ -416,6 +421,7 @@ func (a *Agent) GetSystemPrompt() string {
 	return a.config.SystemPrompt
 }
 
+// ProcessMessage 处理消息
 func (a *Agent) ProcessMessage(ctx context.Context, content string) (string, string, error) {
 	session, err := a.storage.Session().GetOrCreateSession("cli", "cli-session", "cli-user")
 	if err != nil {

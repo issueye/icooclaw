@@ -144,11 +144,14 @@ const renderedContent = computed(() => {
 });
 
 const timeStr = computed(() => {
-    const d = new Date(props.message.timestamp);
-    return d.toLocaleTimeString("zh-CN", {
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+    console.log('props.message', props.message);
+    
+    const d = new Date(props.message.created_at);
+    // return d.toLocaleTimeString("zh-CN", {
+    //     hour: "2-digit",
+    //     minute: "2-digit",
+    // });
+    return d.toLocaleString();
 });
 
 const copied = ref(false);

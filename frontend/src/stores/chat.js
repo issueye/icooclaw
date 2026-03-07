@@ -77,7 +77,7 @@ export const useChatStore = defineStore("chat", () => {
           role: m.role,
           content: m.content,
           thinking: m.reasoning_content || "",
-          timestamp: new Date(m.timestamp).getTime(),
+          created_at: new Date(m.created_at).getTime(),
           streaming: false,
         }));
       }
@@ -94,6 +94,7 @@ export const useChatStore = defineStore("chat", () => {
       });
       // 后端返回格式: { code, message, data: { session_id, chat_id, user_id, key } }
       const data = response.data || response;
+      console.log('data =>', data);
       const session = {
         id: String(data.session_id),
         chatId: data.chat_id,
@@ -126,8 +127,8 @@ export const useChatStore = defineStore("chat", () => {
 
   async function switchSession(id) {
     currentSessionId.value = id;
-    const session = sessions.value.find((s) => s.id === id);
-    if (session && session.messages.length === 0) {
+    const session = sessions.value.find((s) => s.id === id);    
+    if (session) {
       await loadMessages(id);
     }
   }
