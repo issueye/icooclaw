@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  icooclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: icooclaw:latest
+    container_name: icooclaw
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./workspace:/app/workspace
+      - ./config.toml:/app/config.toml:ro
+    environment:
+      - ICOOCLAW_WORKSPACE=/app/workspace
+      - ICOOCLAW_MODEL=gpt-4
+      - ICOOCLAW_PROVIDER=openai
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: icooclaw-network

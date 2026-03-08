@@ -1,0 +1,26 @@
+# icooclaw Configuration Example
+# Copy this file to config.toml and modify as needed
+
+[agent]
+# Workspace directory for storing files
+workspace = "./workspace"
+# Default model to use
+default_model = "gpt-4"
+# Default provider to use
+default_provider = "openai"
+
+[database]
+# Path to SQLite database file
+path = "./data/icooclaw.db"
+
+[gateway]
+# Enable HTTP gateway
+enabled = true
+# HTTP gateway port
+port = 8080
+
+[logging]
+# Log level: debug, info, warn, error
+level = "info"
+# Log format: json, text
+format = "json"
