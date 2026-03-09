@@ -1,0 +1,21 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "icoo_chat",
+  "outputfilename": "icoo_chat",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "./frontend/src",
+  "author": {
+    "name": "icooclaw",
+    "email": "icooclaw@example.com"
+  },
+  "info": {
+    "companyName": "Icooclaw",
+    "productName": "Icooclaw AI Chat",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2024",
+    "comments": "AI Chat Application with ACP Protocol"
+  }
+}
