@@ -31,6 +31,9 @@
 
         <!-- 右侧操作 -->
         <div class="flex items-center gap-2">
+            <!-- 插槽：模式切换等自定义内容 -->
+            <slot name="actions"></slot>
+
             <!-- 新建对话 -->
             <button
                 @click="$emit('new-chat')"

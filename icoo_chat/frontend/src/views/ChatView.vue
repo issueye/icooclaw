@@ -1,33 +1,5 @@
 <template>
     <div class="flex w-full h-screen bg-bg-primary overflow-hidden">
-        <!-- 模式切换 -->
-        <div
-            class="fixed top-4 right-4 z-50 flex items-center gap-2 bg-bg-secondary rounded-lg p-1 border border-border"
-        >
-            <button
-                @click="chatMode = 'ws'"
-                class="px-3 py-1.5 rounded text-sm transition-colors"
-                :class="
-                    chatMode === 'ws'
-                        ? 'bg-accent text-white'
-                        : 'text-text-secondary hover:bg-bg-hover'
-                "
-            >
-                WebSocket
-            </button>
-            <button
-                @click="chatMode = 'acp'"
-                class="px-3 py-1.5 rounded text-sm transition-colors"
-                :class="
-                    chatMode === 'acp'
-                        ? 'bg-accent text-white'
-                        : 'text-text-secondary hover:bg-bg-hover'
-                "
-            >
-                ACP
-            </button>
-        </div>
-
         <!-- ACP 模式 -->
         <template v-if="chatMode === 'acp'">
             <!-- 左侧边栏 - Agent 列表 -->
@@ -127,15 +99,8 @@
                             会话中
                         </span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button
-                            v-if="acpStore.currentSession"
-                            @click="closeACPSession"
-                            class="px-3 py-1.5 text-text-secondary hover:bg-bg-hover rounded-lg text-sm"
-                        >
-                            结束会话
-                        </button>
-                    </div>
+                    <!-- 模式切换按钮 -->
+                    <ModeSwitch v-model="chatMode" />
                 </div>
 
                 <!-- 消息列表 -->
@@ -284,7 +249,12 @@
                     @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
                     @new-chat="handleNewChat"
                     @open-settings="router.push('/settings')"
-                />
+                >
+                    <!-- 模式切换按钮插槽 -->
+                    <template #actions>
+                        <ModeSwitch v-model="chatMode" />
+                    </template>
+                </ChatHeader>
 
                 <!-- 消息列表 -->
                 <div
@@ -382,6 +352,7 @@ import ChatHeader from "@/components/ChatHeader.vue";
 import ChatMessage from "@/components/ChatMessage.vue";
 import ChatInput from "@/components/ChatInput.vue";
 import ToolCallDisplay from "@/components/ToolCallDisplay.vue";
+import ModeSwitch from "@/components/ModeSwitch.vue";
 
 import { useChatStore } from "@/stores/chat";
 import { useACPStore } from "@/stores/acp";
