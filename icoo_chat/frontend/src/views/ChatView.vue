@@ -30,234 +30,231 @@
 
         <!-- ACP 模式 -->
         <template v-if="chatMode === 'acp'">
-            <!-- ACP 聊天界面 -->
-            <div class="flex w-full h-screen bg-bg-primary overflow-hidden">
-                <!-- 左侧边栏 - Agent 列表 -->
-                <div
-                    class="w-64 bg-bg-secondary border-r border-border flex flex-col"
-                    :class="sidebarCollapsed ? 'w-16' : ''"
-                >
-                    <div class="p-4 border-b border-border flex items-center justify-between">
-                        <h1 v-if="!sidebarCollapsed" class="text-lg font-semibold text-text-primary">
-                            Agent 列表
-                        </h1>
-                        <button
-                            @click="sidebarCollapsed = !sidebarCollapsed"
-                            class="p-1 rounded hover:bg-bg-hover text-text-secondary"
-                        >
-                            <ChevronLeftIcon v-if="!sidebarCollapsed" :size="20" />
-                            <ChevronRightIcon v-else :size="20" />
-                        </button>
-                    </div>
+            <!-- 左侧边栏 - Agent 列表 -->
+            <div
+                class="w-64 bg-bg-secondary border-r border-border flex flex-col"
+                :class="sidebarCollapsed ? 'w-16' : ''"
+            >
+                <div class="p-4 border-b border-border flex items-center justify-between">
+                    <h1 v-if="!sidebarCollapsed" class="text-lg font-semibold text-text-primary">
+                        Agent 列表
+                    </h1>
+                    <button
+                        @click="sidebarCollapsed = !sidebarCollapsed"
+                        class="p-1 rounded hover:bg-bg-hover text-text-secondary"
+                    >
+                        <ChevronLeftIcon v-if="!sidebarCollapsed" :size="20" />
+                        <ChevronRightIcon v-else :size="20" />
+                    </button>
+                </div>
 
-                    <!-- 连接状态 -->
-                    <div class="p-4 border-b border-border">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span
-                                class="w-2 h-2 rounded-full"
-                                :class="acpStore.connected ? 'bg-green-500' : 'bg-red-500'"
-                            ></span>
-                            <span class="text-sm text-text-secondary">
-                                {{ acpStore.connected ? '已连接' : '未连接' }}
-                            </span>
-                        </div>
-                        <button
-                            v-if="!acpStore.connected"
-                            @click="initACP"
-                            class="w-full px-3 py-2 bg-accent text-white rounded-lg text-sm hover:bg-accent/90"
-                        >
-                            连接 AP
-                        </button>
-                        <div v-else class="text-xs text-text-muted">
-                            {{ acpStore.config.endpoint }}
-                        </div>
+                <!-- 连接状态 -->
+                <div class="p-4 border-b border-border">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span
+                            class="w-2 h-2 rounded-full"
+                            :class="acpStore.connected ? 'bg-green-500' : 'bg-red-500'"
+                        ></span>
+                        <span class="text-sm text-text-secondary">
+                            {{ acpStore.connected ? '已连接' : '未连接' }}
+                        </span>
                     </div>
+                    <button
+                        v-if="!acpStore.connected"
+                        @click="initACP"
+                        class="w-full px-3 py-2 bg-accent text-white rounded-lg text-sm hover:bg-accent/90"
+                    >
+                        连接 AP
+                    </button>
+                    <div v-else class="text-xs text-text-muted">
+                        {{ acpStore.config.endpoint }}
+                    </div>
+                </div>
 
-                    <!-- Agent 列表 -->
-                    <div class="flex-1 overflow-y-auto p-2">
-                        <div
-                            v-for="agent in acpStore.agents"
-                            :key="agent.aid"
-                            @click="selectACPAgent(agent)"
-                            class="p-2 rounded-lg cursor-pointer mb-1 transition-colors"
-                            :class="
-                                acpStore.currentAgent?.aid === agent.aid
-                                    ? 'bg-accent/20 border border-accent/30'
-                                    : 'hover:bg-bg-hover'
-                            "
-                        >
-                            <div class="flex items-center gap-2">
-                                <BotIcon :size="16" class="text-accent" />
-                                <span class="text-sm text-text-primary truncate">{{
-                                    agent.profile?.name || agent.aid
-                                }}</span>
-                            </div>
+                <!-- Agent 列表 -->
+                <div class="flex-1 overflow-y-auto p-2">
+                    <div
+                        v-for="agent in acpStore.agents"
+                        :key="agent.aid"
+                        @click="selectACPAgent(agent)"
+                        class="p-2 rounded-lg cursor-pointer mb-1 transition-colors"
+                        :class="
+                            acpStore.currentAgent?.aid === agent.aid
+                                ? 'bg-accent/20 border border-accent/30'
+                                : 'hover:bg-bg-hover'
+                        "
+                    >
+                        <div class="flex items-center gap-2">
+                            <BotIcon :size="16" class="text-accent" />
+                            <span class="text-sm text-text-primary truncate">{{
+                                agent.profile?.name || agent.aid
+                            }}</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- 底部导航 -->
-                    <div class="p-2 border-t border-border">
-                        <button
-                            @click="router.push('/agents')"
-                            class="w-full p-2 rounded-lg flex items-center gap-2 hover:bg-bg-hover text-text-secondary"
+                <!-- 底部导航 -->
+                <div class="p-2 border-t border-border">
+                    <button
+                        @click="router.push('/agents')"
+                        class="w-full p-2 rounded-lg flex items-center gap-2 hover:bg-bg-hover text-text-secondary"
+                    >
+                        <UsersIcon :size="18" />
+                        <span v-if="!sidebarCollapsed" class="text-sm">管理 Agent</span>
+                    </button>
+                    <button
+                        @click="router.push('/settings')"
+                        class="w-full p-2 rounded-lg flex items-center gap-2 hover:bg-bg-hover text-text-secondary"
+                    >
+                        <SettingsIcon :size="18" />
+                        <span v-if="!sidebarCollapsed" class="text-sm">设置</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="flex flex-col flex-1 min-w-0 h-full">
+                <!-- 顶部 Header -->
+                <div class="h-14 px-4 border-b border-border flex items-center justify-between bg-bg-secondary">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-lg font-semibold text-text-primary">
+                            {{ acpStore.currentAgent?.profile?.name || '选择 Agent 开始对话' }}
+                        </h2>
+                        <span
+                            v-if="acpStore.currentSession"
+                            class="px-2 py-0.5 text-xs bg-green-500/20 text-green-500 rounded-full"
                         >
-                            <UsersIcon :size="18" />
-                            <span v-if="!sidebarCollapsed" class="text-sm">管理 Agent</span>
-                        </button>
+                            会话中
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
                         <button
-                            @click="router.push('/settings')"
-                            class="w-full p-2 rounded-lg flex items-center gap-2 hover:bg-bg-hover text-text-secondary"
+                            v-if="acpStore.currentSession"
+                            @click="closeACPSession"
+                            class="px-3 py-1.5 text-text-secondary hover:bg-bg-hover rounded-lg text-sm"
                         >
-                            <SettingsIcon :size="18" />
-                            <span v-if="!sidebarCollapsed" class="text-sm">设置</span>
+                            结束会话
                         </button>
                     </div>
                 </div>
 
-                <!-- 主内容区 -->
-                <div class="flex flex-col flex-1 min-w-0 h-full">
-                    <!-- 顶部 Header -->
-                    <div class="h-14 px-4 border-b border-border flex items-center justify-between bg-bg-secondary">
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-lg font-semibold text-text-primary">
-                                {{ acpStore.currentAgent?.profile?.name || '选择 Agent 开始对话' }}
-                            </h2>
-                            <span
-                                v-if="acpStore.currentSession"
-                                class="px-2 py-0.5 text-xs bg-green-500/20 text-green-500 rounded-full"
-                            >
-                                会话中
-                            </span>
+                <!-- 消息列表 -->
+                <div
+                    ref="messagesContainer"
+                    class="flex-1 overflow-y-auto py-2"
+                    :class="
+                        acpStore.messages.length === 0
+                            ? 'flex flex-col items-center justify-center'
+                            : ''
+                    "
+                >
+                    <!-- 欢迎空状态 -->
+                    <div
+                        v-if="acpStore.messages.length === 0"
+                        class="text-center px-4 max-w-2xl"
+                    >
+                        <div
+                            class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-linear-to-br from-accent to-[#5b4fcf] flex items-center justify-center shadow-xl shadow-[#7c6af7]/20"
+                        >
+                            <BotIcon :size="28" class="text-white" />
                         </div>
-                        <div class="flex items-center gap-2">
+                        <h2 class="text-2xl font-semibold text-text-primary mb-3">
+                            {{ acpStore.currentAgent ? '开始对话' : '选择 Agent' }}
+                        </h2>
+                        <p class="text-text-secondary text-sm leading-relaxed mb-8">
+                            {{
+                                acpStore.currentAgent
+                                    ? `与 ${acpStore.currentAgent.profile?.name} 开始对话`
+                                    : '请从左侧选择一个已连接的 Agent'
+                            }}
+                        </p>
+                        <div v-if="acpStore.currentAgent" class="grid grid-cols-1 gap-2 text-left">
                             <button
-                                v-if="acpStore.currentSession"
-                                @click="closeACPSession"
-                                class="px-3 py-1.5 text-text-secondary hover:bg-bg-hover rounded-lg text-sm"
+                                v-for="hint in hints"
+                                :key="hint"
+                                @click="sendACPMessage(hint)"
+                                class="px-4 py-3 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-accent/30 transition-all text-left"
                             >
-                                结束会话
+                                {{ hint }}
                             </button>
                         </div>
                     </div>
 
                     <!-- 消息列表 -->
-                    <div
-                        ref="messagesContainer"
-                        class="flex-1 overflow-y-auto py-2"
-                        :class="
-                            acpStore.messages.length === 0
-                                ? 'flex flex-col items-center justify-center'
-                                : ''
-                        "
-                    >
-                        <!-- 欢迎空状态 -->
+                    <div v-else class="w-full">
                         <div
-                            v-if="acpStore.messages.length === 0"
-                            class="text-center px-4 max-w-2xl"
+                            v-for="msg in acpStore.messages"
+                            :key="msg.id"
+                            class="mb-4"
                         >
-                            <div
-                                class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-linear-to-br from-accent to-[#5b4fcf] flex items-center justify-center shadow-xl shadow-[#7c6af7]/20"
-                            >
-                                <BotIcon :size="28" class="text-white" />
-                            </div>
-                            <h2 class="text-2xl font-semibold text-text-primary mb-3">
-                                {{ acpStore.currentAgent ? '开始对话' : '选择 Agent' }}
-                            </h2>
-                            <p class="text-text-secondary text-sm leading-relaxed mb-8">
-                                {{
-                                    acpStore.currentAgent
-                                        ? `与 ${acpStore.currentAgent.profile?.name} 开始对话`
-                                        : '请从左侧选择一个已连接的 Agent'
-                                }}
-                            </p>
-                            <div v-if="acpStore.currentAgent" class="grid grid-cols-1 gap-2 text-left">
-                                <button
-                                    v-for="hint in hints"
-                                    :key="hint"
-                                    @click="sendACPMessage(hint)"
-                                    class="px-4 py-3 rounded-xl bg-bg-tertiary border border-border text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-accent/30 transition-all text-left"
-                                >
-                                    {{ hint }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- 消息列表 -->
-                        <div v-else class="w-full">
-                            <div
-                                v-for="msg in acpStore.messages"
-                                :key="msg.id"
-                                class="mb-4"
-                            >
-                                <!-- 用户消息 -->
-                                <div v-if="msg.role === 'user'" class="flex justify-end px-4">
-                                    <div class="max-w-[70%] px-4 py-2 bg-accent text-white rounded-2xl">
-                                        {{ msg.content }}
-                                    </div>
+                            <!-- 用户消息 -->
+                            <div v-if="msg.role === 'user'" class="flex justify-end px-4">
+                                <div class="max-w-[70%] px-4 py-2 bg-accent text-white rounded-2xl">
+                                    {{ msg.content }}
                                 </div>
+                            </div>
 
-                                <!-- AI 消息 -->
-                                <div v-else class="px-4">
-                                    <div class="flex gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                                            <BotIcon :size="16" class="text-white" />
+                            <!-- AI 消息 -->
+                            <div v-else class="px-4">
+                                <div class="flex gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+                                        <BotIcon :size="16" class="text-white" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <!-- 思考过程 -->
+                                        <div
+                                            v-if="msg.thinking"
+                                            class="text-xs text-text-muted mb-2 italic"
+                                        >
+                                            {{ msg.thinking }}
                                         </div>
-                                        <div class="flex-1 min-w-0">
-                                            <!-- 思考过程 -->
-                                            <div
-                                                v-if="msg.thinking"
-                                                class="text-xs text-text-muted mb-2 italic"
-                                            >
-                                                {{ msg.thinking }}
-                                            </div>
-                                            <!-- 消息内容 -->
-                                            <div class="text-text-primary whitespace-pre-wrap">
-                                                {{ msg.content }}
-                                            </div>
-                                            <!-- 工具调用 -->
-                                            <ToolCallDisplay
-                                                v-if="msg.toolCalls?.length"
-                                                :tool-calls="msg.toolCalls"
-                                            />
+                                        <!-- 消息内容 -->
+                                        <div class="text-text-primary whitespace-pre-wrap">
+                                            {{ msg.content }}
                                         </div>
+                                        <!-- 工具调用 -->
+                                        <ToolCallDisplay
+                                            v-if="msg.toolCalls?.length"
+                                            :tool-calls="msg.toolCalls"
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- 输入区 -->
-                    <div class="w-full">
-                        <div class="flex gap-2 px-4 py-2">
-                            <input
-                                v-model="acpInput"
-                                @keyup.enter="sendACPMessage(acpInput)"
-                                :disabled="!acpStore.currentAgent || acpStore.loading"
-                                class="flex-1 px-4 py-2 bg-bg-tertiary border border-border rounded-lg text-text-primary placeholder-text-muted"
-                                placeholder="输入消息..."
-                            />
-                            <button
-                                @click="sendACPMessage(acpInput)"
-                                :disabled="!acpStore.currentAgent || acpStore.loading || !acpInput.trim()"
-                                class="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50"
-                            >
-                                <SendIcon :size="18" />
-                            </button>
-                        </div>
-                        <div class="flex items-center justify-between px-4 pb-2">
-                            <p class="text-xs text-text-muted">
-                                模式: ACP
-                                <span v-if="acpStore.currentAgent">
-                                    | Agent: {{ acpStore.currentAgent.profile?.name }}
-                                </span>
-                            </p>
-                            <p
-                                class="text-xs"
-                                :class="acpStore.connected ? 'text-green-500' : 'text-red-500'"
-                            >
-                                {{ acpStore.connected ? '已连接' : '未连接' }}
-                            </p>
-                        </div>
+                <!-- 输入区 -->
+                <div class="w-full">
+                    <div class="flex gap-2 px-4 py-2">
+                        <input
+                            v-model="acpInput"
+                            @keyup.enter="sendACPMessage(acpInput)"
+                            :disabled="!acpStore.currentAgent || acpStore.loading"
+                            class="flex-1 px-4 py-2 bg-bg-tertiary border border-border rounded-lg text-text-primary placeholder-text-muted"
+                            placeholder="输入消息..."
+                        />
+                        <button
+                            @click="sendACPMessage(acpInput)"
+                            :disabled="!acpStore.currentAgent || acpStore.loading || !acpInput.trim()"
+                            class="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50"
+                        >
+                            <SendIcon :size="18" />
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between px-4 pb-2">
+                        <p class="text-xs text-text-muted">
+                            模式: ACP
+                            <span v-if="acpStore.currentAgent">
+                                | Agent: {{ acpStore.currentAgent.profile?.name }}
+                            </span>
+                        </p>
+                        <p
+                            class="text-xs"
+                            :class="acpStore.connected ? 'text-green-500' : 'text-red-500'"
+                        >
+                            {{ acpStore.connected ? '已连接' : '未连接' }}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -265,7 +262,6 @@
 
         <!-- WebSocket 模式 -->
         <template v-else>
-            <!-- 原有 WebSocket 聊天界面 -->
             <!-- 左侧边栏 -->
             <ChatSidebar
                 :sessions="chatStore.sessions"
@@ -365,7 +361,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </template>
     </div>
 </template>
 
