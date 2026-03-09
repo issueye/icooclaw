@@ -9,11 +9,6 @@ const routes = [
     component: () => import('../views/ChatView.vue'),
   },
   {
-    path: '/agents',
-    name: 'Agents',
-    component: () => import('../views/AgentsView.vue'),
-  },
-  {
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/SettingsView.vue'),

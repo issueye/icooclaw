@@ -9,29 +9,16 @@
                     ? 'bg-accent text-white shadow-sm'
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
             "
+            title="WebSocket 模式"
         >
             <ZapIcon :size="14" />
             <span>WebSocket</span>
-        </button>
-        
-        <!-- ACP 模式 -->
-        <button
-            @click="$emit('update:modelValue', 'acp')"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200"
-            :class="
-                modelValue === 'acp'
-                    ? 'bg-accent text-white shadow-sm'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
-            "
-        >
-            <NetworkIcon :size="14" />
-            <span>ACP</span>
         </button>
     </div>
 </template>
 
 <script setup>
-import { ZapIcon, NetworkIcon } from 'lucide-vue-next';
+import { ZapIcon, PuzzleIcon } from 'lucide-vue-next';
 
 defineProps({
     modelValue: {
