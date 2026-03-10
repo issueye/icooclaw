@@ -1,0 +1,69 @@
+package storage
+
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
+	icooclawErrors "icooclaw/pkg/errors"
+)
+
+// Provider represents a provider configuration.
+type Provider struct {
+	Model
+	Name         string         `gorm:"column:name;type:varchar(100);not null;comment:提供商名称" json:"name"`
+	Type         string         `gorm:"column:type;type:varchar(50);not null;comment:提供商类型" json:"type"`
+	APIKey       string         `gorm:"column:api_key;type:varchar(255);comment:API密钥" json:"api_key"`
+	APIBase      string         `gorm:"column:api_base;type:varchar(255);comment:API基础URL" json:"api_base"`
+	DefaultModel string         `gorm:"column:default_model;type:varchar(100);comment:默认模型" json:"default_model"`
+	Models       []string       `gorm:"column:models;type:text;serializer:json;comment:支持的模型列表(JSON数组)" json:"models"` // JSON array
+	Config       string         `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                      // JSON object
+	Metadata     map[string]any `gorm:"column:metadata;type:text;serializer:json;comment:元数据(JSON格式)" json:"metadata"` // JSON object
+}
+
+// TableName returns the table name for Provider.
+func (Provider) TableName() string {
+	return tableNamePrefix + "providers"
+}
+
+// SaveProvider saves a provider configuration.
+func (s *Storage) SaveProvider(p *Provider) error {
+	result := s.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "name"}},
+		DoUpdates: clause.AssignmentColumns([]string{"type", "api_key", "api_base", "default_model", "models", "config", "updated_at"}),
+	}).Create(p)
+	return result.Error
+}
+
+// GetProvider gets a provider by name.
+func (s *Storage) GetProvider(name string) (*Provider, error) {
+	var p Provider
+	result := s.db.Where("name = ?", name).First(&p)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, icooclawErrors.ErrRecordNotFound
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get provider: %w", result.Error)
+	}
+	return &p, nil
+}
+
+// ListProviders lists all providers.
+func (s *Storage) ListProviders() ([]*Provider, error) {
+	var providers []*Provider
+	result := s.db.Order("name").Find(&providers)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to list providers: %w", result.Error)
+	}
+	return providers, nil
+}
+
+// DeleteProvider deletes a provider by name.
+func (s *Storage) DeleteProvider(name string) error {
+	result := s.db.Where("name = ?", name).Delete(&Provider{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete provider: %w", result.Error)
+	}
+	return nil
+}
