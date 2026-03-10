@@ -2,6 +2,8 @@ package storage
 
 import (
 	"fmt"
+
+	"gorm.io/gorm"
 )
 
 // Memory represents a memory entry.
@@ -18,13 +20,21 @@ func (Memory) TableName() string {
 	return tableNamePrefix + "memory"
 }
 
+type MemoryStorage struct {
+	db *gorm.DB
+}
+
+func NewMemoryStorage(db *gorm.DB) *MemoryStorage {
+	return &MemoryStorage{db: db}
+}
+
 // SaveMemory saves a memory entry.
-func (s *Storage) SaveMemory(m *Memory) error {
+func (s *MemoryStorage) SaveMemory(m *Memory) error {
 	return s.db.Create(m).Error
 }
 
 // GetMemory gets memory entries for a session.
-func (s *Storage) GetMemory(sessionID string, limit int) ([]*Memory, error) {
+func (s *MemoryStorage) GetMemory(sessionID string, limit int) ([]*Memory, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -40,7 +50,7 @@ func (s *Storage) GetMemory(sessionID string, limit int) ([]*Memory, error) {
 }
 
 // DeleteMemory deletes memory entries for a session.
-func (s *Storage) DeleteMemory(sessionID string) error {
+func (s *MemoryStorage) DeleteMemory(sessionID string) error {
 	result := s.db.Where("session_id = ?", sessionID).Delete(&Memory{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete memory: %w", result.Error)

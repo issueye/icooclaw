@@ -105,7 +105,7 @@ func (l *Loop) Run(ctx context.Context) error {
 // processMessage processes an inbound message.
 func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) {
 	// Get binding
-	binding, err := l.storage.GetBinding(msg.Channel, msg.ChatID)
+	binding, err := l.storage.Binding().GetBinding(msg.Channel, msg.ChatID)
 	if err != nil {
 		l.logger.Debug("no binding found", "channel", msg.Channel, "chat_id", msg.ChatID)
 		return

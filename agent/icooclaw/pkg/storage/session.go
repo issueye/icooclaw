@@ -27,8 +27,16 @@ func (Session) TableName() string {
 	return tableNamePrefix + "sessions"
 }
 
+type SessionStorage struct {
+	db *gorm.DB
+}
+
+func NewSessionStorage(db *gorm.DB) *SessionStorage {
+	return &SessionStorage{db: db}
+}
+
 // SaveSession saves a session.
-func (s *Storage) SaveSession(sess *Session) error {
+func (s *SessionStorage) SaveSession(sess *Session) error {
 	sess.LastActive = time.Now()
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "session_id"}},
@@ -38,7 +46,7 @@ func (s *Storage) SaveSession(sess *Session) error {
 }
 
 // GetSession gets a session by session ID.
-func (s *Storage) GetSession(sessionID string) (*Session, error) {
+func (s *SessionStorage) GetSession(sessionID string) (*Session, error) {
 	var sess Session
 	result := s.db.Where("session_id = ?", sessionID).First(&sess)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -51,7 +59,7 @@ func (s *Storage) GetSession(sessionID string) (*Session, error) {
 }
 
 // GetSessionByChat gets a session by channel and chat ID.
-func (s *Storage) GetSessionByChat(channel, chatID string) (*Session, error) {
+func (s *SessionStorage) GetSessionByChat(channel, chatID string) (*Session, error) {
 	var sess Session
 	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).First(&sess)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -64,7 +72,7 @@ func (s *Storage) GetSessionByChat(channel, chatID string) (*Session, error) {
 }
 
 // DeleteSession deletes a session.
-func (s *Storage) DeleteSession(sessionID string) error {
+func (s *SessionStorage) DeleteSession(sessionID string) error {
 	result := s.db.Where("session_id = ?", sessionID).Delete(&Session{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete session: %w", result.Error)

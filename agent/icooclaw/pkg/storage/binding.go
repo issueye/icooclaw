@@ -23,8 +23,16 @@ func (Binding) TableName() string {
 	return tableNamePrefix + "bindings"
 }
 
+type BindingStorage struct {
+	db *gorm.DB
+}
+
+func NewBindingStorage(db *gorm.DB) *BindingStorage {
+	return &BindingStorage{db: db}
+}
+
 // SaveBinding saves an agent binding.
-func (s *Storage) SaveBinding(b *Binding) error {
+func (s *BindingStorage) SaveBinding(b *Binding) error {
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "channel"}, {Name: "chat_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"agent_name", "enabled"}),
@@ -33,7 +41,7 @@ func (s *Storage) SaveBinding(b *Binding) error {
 }
 
 // GetBinding gets a binding by channel and chat ID.
-func (s *Storage) GetBinding(channel, chatID string) (*Binding, error) {
+func (s *BindingStorage) GetBinding(channel, chatID string) (*Binding, error) {
 	var b Binding
 	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).First(&b)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -46,7 +54,7 @@ func (s *Storage) GetBinding(channel, chatID string) (*Binding, error) {
 }
 
 // ListBindings lists all bindings.
-func (s *Storage) ListBindings() ([]*Binding, error) {
+func (s *BindingStorage) ListBindings() ([]*Binding, error) {
 	var bindings []*Binding
 	result := s.db.Order("channel, chat_id").Find(&bindings)
 	if result.Error != nil {
@@ -56,7 +64,7 @@ func (s *Storage) ListBindings() ([]*Binding, error) {
 }
 
 // DeleteBinding deletes a binding.
-func (s *Storage) DeleteBinding(channel, chatID string) error {
+func (s *BindingStorage) DeleteBinding(channel, chatID string) error {
 	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).Delete(&Binding{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete binding: %w", result.Error)

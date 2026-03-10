@@ -24,8 +24,16 @@ func (Tool) TableName() string {
 	return tableNamePrefix + "tools"
 }
 
+type ToolStorage struct {
+	db *gorm.DB
+}
+
+func NewToolStorage(db *gorm.DB) *ToolStorage {
+	return &ToolStorage{db: db}
+}
+
 // SaveTool saves a tool configuration.
-func (s *Storage) SaveTool(t *Tool) error {
+func (s *ToolStorage) SaveTool(t *Tool) error {
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{"type", "definition", "config", "enabled"}),
@@ -34,7 +42,7 @@ func (s *Storage) SaveTool(t *Tool) error {
 }
 
 // GetTool gets a tool by name.
-func (s *Storage) GetTool(name string) (*Tool, error) {
+func (s *ToolStorage) GetTool(name string) (*Tool, error) {
 	var t Tool
 	result := s.db.Where("name = ?", name).First(&t)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -47,7 +55,7 @@ func (s *Storage) GetTool(name string) (*Tool, error) {
 }
 
 // ListTools lists all tools.
-func (s *Storage) ListTools() ([]*Tool, error) {
+func (s *ToolStorage) ListTools() ([]*Tool, error) {
 	var tools []*Tool
 	result := s.db.Order("name").Find(&tools)
 	if result.Error != nil {
@@ -57,7 +65,7 @@ func (s *Storage) ListTools() ([]*Tool, error) {
 }
 
 // ListEnabledTools lists all enabled tools.
-func (s *Storage) ListEnabledTools() ([]*Tool, error) {
+func (s *ToolStorage) ListEnabledTools() ([]*Tool, error) {
 	var tools []*Tool
 	result := s.db.Where("enabled = ?", true).Order("name").Find(&tools)
 	if result.Error != nil {
@@ -67,7 +75,7 @@ func (s *Storage) ListEnabledTools() ([]*Tool, error) {
 }
 
 // DeleteTool deletes a tool by name.
-func (s *Storage) DeleteTool(name string) error {
+func (s *ToolStorage) DeleteTool(name string) error {
 	result := s.db.Where("name = ?", name).Delete(&Tool{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete tool: %w", result.Error)

@@ -1,5 +1,11 @@
 package storage
 
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+)
+
 // ParamConfig 运行时参数配置模型
 type ParamConfig struct {
 	Model
@@ -13,4 +19,59 @@ type ParamConfig struct {
 // TableName returns the table name for ParamConfig.
 func (ParamConfig) TableName() string {
 	return tableNamePrefix + "param_config"
+}
+
+type ParamStorage struct {
+	db *gorm.DB
+}
+
+func NewParamStorage(db *gorm.DB) *ParamStorage {
+	return &ParamStorage{db: db}
+}
+
+// Save saves a param configuration.
+func (s *ParamStorage) Save(p *ParamConfig) error {
+	return s.db.Create(p).Error
+}
+
+// Get gets a param by key.
+func (s *ParamStorage) Get(key string) (*ParamConfig, error) {
+	var p ParamConfig
+	result := s.db.Where("key = ?", key).First(&p)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get param: %w", result.Error)
+	}
+	return &p, nil
+}
+
+// List lists all param configurations.
+func (s *ParamStorage) List() ([]*ParamConfig, error) {
+	var params []*ParamConfig
+	result := s.db.Order("key").Find(&params)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to list params: %w", result.Error)
+	}
+	return params, nil
+}
+
+// ListByGroup lists all param configurations by group.
+func (s *ParamStorage) ListByGroup(group string) ([]*ParamConfig, error) {
+	var params []*ParamConfig
+	result := s.db.Where("group = ?", group).Order("key").Find(&params)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to list params by group: %w", result.Error)
+	}
+	return params, nil
+}
+
+// Delete deletes a param by key.
+func (s *ParamStorage) Delete(key string) error {
+	result := s.db.Where("key = ?", key).Delete(&ParamConfig{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete param: %w", result.Error)
+	}
+	return nil
 }

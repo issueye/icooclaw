@@ -27,8 +27,16 @@ func (Provider) TableName() string {
 	return tableNamePrefix + "providers"
 }
 
+type ProviderStorage struct {
+	db *gorm.DB
+}
+
+func NewProviderStorage(db *gorm.DB) *ProviderStorage {
+	return &ProviderStorage{db: db}
+}
+
 // SaveProvider saves a provider configuration.
-func (s *Storage) SaveProvider(p *Provider) error {
+func (s *ProviderStorage) SaveProvider(p *Provider) error {
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{"type", "api_key", "api_base", "default_model", "models", "config", "updated_at"}),
@@ -36,8 +44,8 @@ func (s *Storage) SaveProvider(p *Provider) error {
 	return result.Error
 }
 
-// GetProvider gets a provider by name.
-func (s *Storage) GetProvider(name string) (*Provider, error) {
+// GetByName gets a provider by name.
+func (s *ProviderStorage) GetByName(name string) (*Provider, error) {
 	var p Provider
 	result := s.db.Where("name = ?", name).First(&p)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -49,8 +57,8 @@ func (s *Storage) GetProvider(name string) (*Provider, error) {
 	return &p, nil
 }
 
-// ListProviders lists all providers.
-func (s *Storage) ListProviders() ([]*Provider, error) {
+// List lists all providers.
+func (s *ProviderStorage) List() ([]*Provider, error) {
 	var providers []*Provider
 	result := s.db.Order("name").Find(&providers)
 	if result.Error != nil {
@@ -59,8 +67,8 @@ func (s *Storage) ListProviders() ([]*Provider, error) {
 	return providers, nil
 }
 
-// DeleteProvider deletes a provider by name.
-func (s *Storage) DeleteProvider(name string) error {
+// Delete deletes a provider by name.
+func (s *ProviderStorage) Delete(name string) error {
 	result := s.db.Where("name = ?", name).Delete(&Provider{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete provider: %w", result.Error)

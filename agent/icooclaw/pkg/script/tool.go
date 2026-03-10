@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/dop251/goja"
 	"icooclaw/pkg/tools"
 )
 
@@ -71,7 +72,7 @@ func (t *ScriptTool) Execute(ctx context.Context, args map[string]any) *tools.Re
 
 	// Convert result to string
 	var result string
-	if value != nil && !value.IsUndefined() {
+	if value != nil && !goja.IsUndefined(value) {
 		result = value.String()
 	} else {
 		result = "undefined"
@@ -150,7 +151,7 @@ func (t *ScriptFileTool) Execute(ctx context.Context, args map[string]any) *tool
 
 	// Convert result to string
 	var result string
-	if value != nil && !value.IsUndefined() {
+	if value != nil && !goja.IsUndefined(value) {
 		result = value.String()
 	} else {
 		result = "undefined"

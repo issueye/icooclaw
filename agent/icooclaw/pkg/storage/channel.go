@@ -24,8 +24,16 @@ func (Channel) TableName() string {
 	return tableNamePrefix + "channels"
 }
 
+type ChannelStorage struct {
+	db *gorm.DB
+}
+
+func NewChannelStorage(db *gorm.DB) *ChannelStorage {
+	return &ChannelStorage{db: db}
+}
+
 // SaveChannel saves a channel configuration.
-func (s *Storage) SaveChannel(c *Channel) error {
+func (s *ChannelStorage) SaveChannel(c *Channel) error {
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{"type", "enabled", "config", "permissions", "updated_at"}),
@@ -34,7 +42,7 @@ func (s *Storage) SaveChannel(c *Channel) error {
 }
 
 // GetChannel gets a channel by name.
-func (s *Storage) GetChannel(name string) (*Channel, error) {
+func (s *ChannelStorage) GetChannel(name string) (*Channel, error) {
 	var c Channel
 	result := s.db.Where("name = ?", name).First(&c)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -47,7 +55,7 @@ func (s *Storage) GetChannel(name string) (*Channel, error) {
 }
 
 // ListChannels lists all channels.
-func (s *Storage) ListChannels() ([]*Channel, error) {
+func (s *ChannelStorage) ListChannels() ([]*Channel, error) {
 	var channels []*Channel
 	result := s.db.Order("name").Find(&channels)
 	if result.Error != nil {
@@ -57,7 +65,7 @@ func (s *Storage) ListChannels() ([]*Channel, error) {
 }
 
 // ListEnabledChannels lists all enabled channels.
-func (s *Storage) ListEnabledChannels() ([]*Channel, error) {
+func (s *ChannelStorage) ListEnabledChannels() ([]*Channel, error) {
 	var channels []*Channel
 	result := s.db.Where("enabled = ?", true).Order("name").Find(&channels)
 	if result.Error != nil {
@@ -67,7 +75,7 @@ func (s *Storage) ListEnabledChannels() ([]*Channel, error) {
 }
 
 // DeleteChannel deletes a channel by name.
-func (s *Storage) DeleteChannel(name string) error {
+func (s *ChannelStorage) DeleteChannel(name string) error {
 	result := s.db.Where("name = ?", name).Delete(&Channel{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete channel: %w", result.Error)

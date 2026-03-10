@@ -45,7 +45,7 @@ func (f *Factory) Get(name string) (Provider, error) {
 	f.mu.RUnlock()
 
 	// Try to load from database
-	cfg, err := f.storage.GetProvider(name)
+	cfg, err := f.storage.Provider().GetByName(name)
 	if err != nil {
 		return nil, fmt.Errorf("provider %s not found: %w", name, err)
 	}
@@ -80,7 +80,7 @@ func (f *Factory) GetByModel(model string) (Provider, error) {
 	f.mu.RUnlock()
 
 	// Search in database
-	providers, err := f.storage.ListProviders()
+	providers, err := f.storage.Provider().List()
 	if err != nil {
 		return nil, err
 	}

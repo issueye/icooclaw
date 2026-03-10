@@ -58,7 +58,7 @@ func (l *DefaultLoader) Load(ctx context.Context, name string) (*Skill, error) {
 	l.mu.RUnlock()
 
 	// Load from storage
-	sk, err := l.storage.GetSkill(name)
+	sk, err := l.storage.Skill().GetSkill(name)
 	if err != nil {
 		return nil, fmt.Errorf("skill %s not found: %w", name, err)
 	}
@@ -91,7 +91,7 @@ func (l *DefaultLoader) Load(ctx context.Context, name string) (*Skill, error) {
 
 // List lists all skills.
 func (l *DefaultLoader) List(ctx context.Context) ([]*Skill, error) {
-	skills, err := l.storage.ListEnabledSkills()
+	skills, err := l.storage.Skill().ListEnabledSkills()
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (m *Manager) CreateSkill(skill *Skill) error {
 	toolsJSON, _ := json.Marshal(skill.Tools)
 	configJSON, _ := json.Marshal(skill.Config)
 
-	return m.storage.SaveSkill(&storage.Skill{
+	return m.storage.Skill().SaveSkill(&storage.Skill{
 		Name:        skill.Name,
 		Description: skill.Description,
 		Prompt:      skill.Prompt,
@@ -231,27 +231,27 @@ func (m *Manager) UpdateSkill(skill *Skill) error {
 
 // DeleteSkill deletes a skill.
 func (m *Manager) DeleteSkill(name string) error {
-	return m.storage.DeleteSkill(name)
+	return m.storage.Skill().DeleteSkill(name)
 }
 
 // EnableSkill enables a skill.
 func (m *Manager) EnableSkill(name string) error {
-	skill, err := m.storage.GetSkill(name)
+	skill, err := m.storage.Skill().GetSkill(name)
 	if err != nil {
 		return err
 	}
 	skill.Enabled = true
-	return m.storage.SaveSkill(skill)
+	return m.storage.Skill().SaveSkill(skill)
 }
 
 // DisableSkill disables a skill.
 func (m *Manager) DisableSkill(name string) error {
-	skill, err := m.storage.GetSkill(name)
+	skill, err := m.storage.Skill().GetSkill(name)
 	if err != nil {
 		return err
 	}
 	skill.Enabled = false
-	return m.storage.SaveSkill(skill)
+	return m.storage.Skill().SaveSkill(skill)
 }
 
 // GetPrompt gets the prompt for a skill.

@@ -71,7 +71,7 @@ func NewManager(b *bus.MessageBus, s *storage.Storage, logger *slog.Logger) *Man
 
 // InitChannels initializes channels from database.
 func (m *Manager) InitChannels(ctx context.Context) error {
-	channels, err := m.storage.ListEnabledChannels()
+	channels, err := m.storage.Channel().ListEnabledChannels()
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,15 @@ func (m *Manager) processOutboundMedia(ctx context.Context, name string, w *chan
 
 	// Check if channel supports media
 	if ms, ok := w.channel.(MediaSender); ok {
-		if err := ms.SendMedia(ctx, msg); err != nil {
+		// Convert bus.OutboundMediaMessage to channels.OutboundMediaMessage
+		mediaMsg := OutboundMediaMessage{
+			Channel:  msg.Channel,
+			ChatID:   msg.ChatID,
+			Media:    msg.Media,
+			Caption:  msg.Caption,
+			Metadata: msg.Metadata,
+		}
+		if err := ms.SendMedia(ctx, mediaMsg); err != nil {
 			m.logger.Error("failed to send media", "channel", name, "error", err)
 		}
 	}
@@ -302,7 +310,17 @@ func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWork
 	var lastErr error
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		lastErr = w.channel.Send(ctx, msg)
+		// Convert bus.OutboundMessage to channels.OutboundMessage
+		chanMsg := OutboundMessage{
+			Channel:  msg.Channel,
+			ChatID:   msg.ChatID,
+			Text:     msg.Text,
+			Media:    msg.Media,
+			ReplyTo:  msg.ReplyTo,
+			EditID:   msg.EditID,
+			Metadata: msg.Metadata,
+		}
+		lastErr = w.channel.Send(ctx, chanMsg)
 		if lastErr == nil {
 			return
 		}

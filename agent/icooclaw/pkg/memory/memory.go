@@ -41,7 +41,7 @@ func NewLoader(s *storage.Storage, maxItems int, logger *slog.Logger) *DefaultLo
 
 // Load loads memory for a session.
 func (l *DefaultLoader) Load(ctx context.Context, sessionKey string) ([]providers.ChatMessage, error) {
-	memories, err := l.storage.GetMemory(sessionKey, l.maxItems)
+	memories, err := l.storage.Memory().GetMemory(sessionKey, l.maxItems)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (l *DefaultLoader) Load(ctx context.Context, sessionKey string) ([]provider
 
 // Save saves a memory entry.
 func (l *DefaultLoader) Save(ctx context.Context, sessionKey, role, content string) error {
-	return l.storage.SaveMemory(&storage.Memory{
+	return l.storage.Memory().SaveMemory(&storage.Memory{
 		SessionID: sessionKey,
 		Role:      role,
 		Content:   content,
@@ -70,7 +70,7 @@ func (l *DefaultLoader) Save(ctx context.Context, sessionKey, role, content stri
 
 // Clear clears memory for a session.
 func (l *DefaultLoader) Clear(ctx context.Context, sessionKey string) error {
-	return l.storage.DeleteMemory(sessionKey)
+	return l.storage.Memory().DeleteMemory(sessionKey)
 }
 
 // Summarizer generates summaries of conversations.
@@ -172,7 +172,7 @@ func (m *Manager) Clear(ctx context.Context, sessionKey string) error {
 // SummarizeAndCompress summarizes old messages and compresses memory.
 func (m *Manager) SummarizeAndCompress(ctx context.Context, sessionKey string) error {
 	// Load all messages
-	memories, err := m.storage.GetMemory(sessionKey, 0)
+	memories, err := m.storage.Memory().GetMemory(sessionKey, 0)
 	if err != nil {
 		return err
 	}
@@ -200,11 +200,13 @@ func (m *Manager) SummarizeAndCompress(ctx context.Context, sessionKey string) e
 
 	// Delete old messages
 	for _, mem := range toSummarize {
-		m.storage.DeleteMemory(mem.SessionID)
+		if err := m.storage.Memory().DeleteMemory(mem.SessionID); err != nil {
+			return err
+		}
 	}
 
 	// Save summary as system message
-	return m.storage.SaveMemory(&storage.Memory{
+	return m.storage.Memory().SaveMemory(&storage.Memory{
 		SessionID: sessionKey,
 		Role:      "system",
 		Content:   "Previous conversation summary: " + summary,
