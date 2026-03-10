@@ -583,23 +583,19 @@
       </div>
     </main>
 
-    <!-- Channel 编辑对话框 -->
-    <div
-      v-if="showChannelDialog"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click.self="closeChannelDialog"
+    <!-- Channel 编辑弹窗 -->
+    <ModalDialog
+      v-model:visible="channelDialogVisible"
+      :title="editingChannel ? '编辑渠道' : '添加渠道'"
+      size="lg"
+      :scrollable="true"
+      :loading="savingChannel"
+      :confirm-disabled="!channelForm.name || channelErrors.length > 0"
+      confirm-text="保存"
+      loading-text="保存中..."
+      @confirm="handleSaveChannel"
     >
-      <div
-        class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
-      >
-        <div
-          class="p-4 border-b border-border sticky top-0 bg-bg-secondary z-10"
-        >
-          <h2 class="text-lg font-medium">
-            {{ editingChannel ? "编辑渠道" : "添加渠道" }}
-          </h2>
-        </div>
-        <div class="p-4 space-y-4">
+      <div class="space-y-4">
           <div>
             <label class="block text-sm text-text-secondary mb-2"
               >渠道名称</label
@@ -937,43 +933,21 @@
             </div>
           </div>
         </div>
-        <div
-          class="p-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-bg-secondary"
-        >
-          <button
-            @click="closeChannelDialog"
-            class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
-          >
-            取消
-          </button>
-          <button
-            @click="handleSaveChannel"
-            :disabled="!channelForm.name || savingChannel"
-            class="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
-          >
-            {{ savingChannel ? "保存中..." : "保存" }}
-          </button>
-        </div>
-      </div>
-    </div>
+    </ModalDialog>
 
-    <!-- Provider 编辑对话框 -->
-    <div
-      v-if="showProviderDialog"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click.self="closeProviderDialog"
+    <!-- Provider 编辑弹窗 -->
+    <ModalDialog
+      v-model:visible="providerDialogVisible"
+      :title="editingProvider ? '编辑 Provider' : '添加 Provider'"
+      size="lg"
+      :scrollable="true"
+      :loading="savingProvider"
+      :confirm-disabled="!providerForm.name"
+      confirm-text="保存"
+      loading-text="保存中..."
+      @confirm="handleSaveProvider"
     >
-      <div
-        class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
-      >
-        <div
-          class="p-4 border-b border-border sticky top-0 bg-bg-secondary z-10"
-        >
-          <h2 class="text-lg font-medium">
-            {{ editingProvider ? "编辑 Provider" : "添加 Provider" }}
-          </h2>
-        </div>
-        <div class="p-4 space-y-4">
+      <div class="space-y-4">
           <div>
             <label class="block text-sm text-text-secondary mb-2"
               >Provider 名称</label
@@ -1087,41 +1061,19 @@
             </div>
           </div>
         </div>
-        <div
-          class="p-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-bg-secondary"
-        >
-          <button
-            @click="closeProviderDialog"
-            class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
-          >
-            取消
-          </button>
-          <button
-            @click="handleSaveProvider"
-            :disabled="!providerForm.name"
-            class="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
-          >
-            {{ savingProvider ? "保存中..." : "保存" }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+    </ModalDialog>
 
-  <!-- AI Agent 默认模型对话框 -->
-  <div
-    v-if="showAgentModelDialog"
-    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
-  >
-    <div
-      class="bg-bg-secondary rounded-2xl border border-border w-full max-w-md mx-4 overflow-hidden shadow-2xl"
+    <!-- AI Agent 默认模型弹窗 -->
+    <ModalDialog
+      v-model:visible="agentModelDialogVisible"
+      title="设置 AI Agent 默认模型"
+      size="md"
+      :loading="savingAgentModel"
+      confirm-text="保存"
+      loading-text="保存中..."
+      @confirm="handleSaveAgentModel"
     >
-      <div
-        class="p-4 border-b border-border sticky top-0 bg-bg-secondary z-10"
-      >
-        <h2 class="text-lg font-medium">设置 AI Agent 默认模型</h2>
-      </div>
-      <div class="p-4 space-y-4">
+      <div class="space-y-4">
         <div>
           <label class="block text-sm text-text-secondary mb-2">
             默认模型
@@ -1166,23 +1118,7 @@
           </div>
         </div>
       </div>
-      <div
-        class="p-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-bg-secondary"
-      >
-        <button
-          @click="closeAgentModelDialog"
-          class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
-        >
-          取消
-        </button>
-        <button
-          @click="handleSaveAgentModel"
-          class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors"
-        >
-          {{ savingAgentModel ? "保存中..." : "保存" }}
-        </button>
-      </div>
-    </div>
+    </ModalDialog>
   </div>
 </template>
 
@@ -1219,6 +1155,7 @@ import { useWebSocket } from "@/composables/useWebSocket";
 import { useThemeStore } from "@/stores/theme";
 import { useSkillStore } from "@/stores/skill";
 import api from "@/services/api";
+import ModalDialog from "@/components/ModalDialog.vue";
 
 const router = useRouter();
 const emit = defineEmits(["connect-ws", "disconnect-ws"]);
@@ -1275,6 +1212,14 @@ const agentModelForm = reactive({
   providers: [],
 });
 
+// AI Agent 模型弹窗显示控制
+const agentModelDialogVisible = computed({
+  get: () => showAgentModelDialog.value,
+  set: (val) => {
+    if (!val) closeAgentModelDialog();
+  }
+});
+
 // Provider 对话框
 const showProviderDialog = ref(false);
 const editingProvider = ref(null);
@@ -1288,6 +1233,14 @@ const providerForm = reactive({
   models: [], // { name: string, alias: string }
 });
 
+// Provider 弹窗显示控制
+const providerDialogVisible = computed({
+  get: () => showProviderDialog.value || !!editingProvider.value,
+  set: (val) => {
+    if (!val) closeProviderDialog();
+  }
+});
+
 // 渠道数据
 const channels = ref([]);
 const loadingChannels = ref(false);
@@ -1295,6 +1248,14 @@ const showChannelDialog = ref(false);
 const editingChannel = ref(null);
 const savingChannel = ref(false);
 const channelErrors = ref([]);
+
+// Channel 弹窗显示控制
+const channelDialogVisible = computed({
+  get: () => showChannelDialog.value || !!editingChannel.value,
+  set: (val) => {
+    if (!val) closeChannelDialog();
+  }
+});
 const channelForm = reactive({
   name: "",
   type: "feishu",

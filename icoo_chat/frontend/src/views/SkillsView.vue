@@ -188,91 +188,70 @@
         </main>
 
         <!-- 添加/编辑技能对话框 -->
-        <div
-            v-if="showAddDialog || editingSkill"
-            class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            @click.self="closeDialog"
+        <ModalDialog
+            v-model:visible="dialogVisible"
+            :title="editingSkill ? '编辑技能' : '添加技能'"
+            size="lg"
+            :confirm-text="editingSkill ? '保存' : '添加'"
+            :confirm-disabled="!formData.name || !formData.content"
+            @confirm="handleSubmit"
         >
-            <div
-                class="bg-bg-secondary rounded-xl border border-border w-full max-w-lg mx-4"
-            >
-                <div class="p-4 border-b border-border">
-                    <h2 class="text-lg font-medium">
-                        {{ editingSkill ? "编辑技能" : "添加技能" }}
-                    </h2>
-                </div>
-                <div class="p-4 space-y-4">
-                    <div>
-                        <label class="block text-sm text-text-secondary mb-2"
-                            >技能名称</label
-                        >
-                        <input
-                            v-model="formData.name"
-                            type="text"
-                            placeholder="例如: code_review"
-                            :disabled="!!editingSkill"
-                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors disabled:opacity-50"
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm text-text-secondary mb-2"
-                            >描述</label
-                        >
-                        <input
-                            v-model="formData.description"
-                            type="text"
-                            placeholder="技能功能描述"
-                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm text-text-secondary mb-2"
-                            >技能内容 (Markdown)</label
-                        >
-                        <textarea
-                            v-model="formData.content"
-                            placeholder="## 技能名称&#10;技能描述和指令..."
-                            rows="8"
-                            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors font-mono text-sm"
-                        ></textarea>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input
-                            v-model="formData.always_load"
-                            type="checkbox"
-                            id="always_load"
-                            class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-[#7c6af7]"
-                        />
-                        <label
-                            for="always_load"
-                            class="text-sm text-text-secondary"
-                        >
-                            始终加载此技能
-                        </label>
-                    </div>
-                </div>
-                <div class="p-4 border-t border-border flex justify-end gap-3">
-                    <button
-                        @click="closeDialog"
-                        class="px-4 py-2 rounded-lg border border-border hover:bg-bg-tertiary transition-colors"
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-text-secondary mb-2"
+                        >技能名称</label
                     >
-                        取消
-                    </button>
-                    <button
-                        @click="handleSubmit"
-                        :disabled="!formData.name || !formData.content"
-                        class="px-4 py-2 bg-accent hover:bg-[#6b5ce7] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+                    <input
+                        v-model="formData.name"
+                        type="text"
+                        placeholder="例如: code_review"
+                        :disabled="!!editingSkill"
+                        class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors disabled:opacity-50"
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm text-text-secondary mb-2"
+                        >描述</label
                     >
-                        {{ editingSkill ? "保存" : "添加" }}
-                    </button>
+                    <input
+                        v-model="formData.description"
+                        type="text"
+                        placeholder="技能功能描述"
+                        class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors"
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm text-text-secondary mb-2"
+                        >技能内容 (Markdown)</label
+                    >
+                    <textarea
+                        v-model="formData.content"
+                        placeholder="## 技能名称&#10;技能描述和指令..."
+                        rows="8"
+                        class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-[#7c6af7] transition-colors font-mono text-sm"
+                    ></textarea>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input
+                        v-model="formData.always_load"
+                        type="checkbox"
+                        id="always_load"
+                        class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-[#7c6af7]"
+                    />
+                    <label
+                        for="always_load"
+                        class="text-sm text-text-secondary"
+                    >
+                        始终加载此技能
+                    </label>
                 </div>
             </div>
-        </div>
+        </ModalDialog>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from "vue";
+import { ref, onMounted, reactive, computed } from "vue";
 import { useRouter } from "vue-router";
 import {
     ArrowLeft as ArrowLeftIcon,
@@ -283,6 +262,7 @@ import {
 } from "lucide-vue-next";
 
 import { useSkillStore } from "@/stores/skill";
+import ModalDialog from "@/components/ModalDialog.vue";
 
 const router = useRouter();
 const skillStore = useSkillStore();
@@ -290,6 +270,14 @@ const skillStore = useSkillStore();
 // 对话框状态
 const showAddDialog = ref(false);
 const editingSkill = ref(null);
+
+// 计算属性：控制弹窗显示
+const dialogVisible = computed({
+    get: () => showAddDialog.value || !!editingSkill.value,
+    set: (val) => {
+        if (!val) closeDialog();
+    }
+});
 
 // 表单数据
 const formData = reactive({

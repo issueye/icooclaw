@@ -7,7 +7,7 @@
           <p class="text-text-secondary text-sm mt-1">管理定时执行的任务</p>
         </div>
         <button
-          @click="showAddDialog = true"
+          @click="openAddDialog"
           class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
         >
           <PlusIcon :size="16" />
@@ -76,88 +76,72 @@
       </div>
     </div>
 
-    <!-- 新建/编辑对话框 -->
-    <div v-if="showAddDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeDialog">
-      <div class="bg-bg-secondary rounded-xl border border-border p-6 w-full max-w-md">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-lg font-semibold">{{ editingTask ? '编辑任务' : '新建任务' }}</h2>
-          <button @click="closeDialog" class="text-text-muted hover:text-text-primary">
-            <XIcon :size="20" />
-          </button>
+    <!-- 新建/编辑任务弹窗 -->
+    <ModalDialog
+      v-model:visible="dialogVisible"
+      :title="editingTask ? '编辑任务' : '新建任务'"
+      size="md"
+      :loading="saving"
+      :confirm-disabled="!taskForm.name || !taskForm.cron || !taskForm.content"
+      confirm-text="保存"
+      loading-text="保存中..."
+      @confirm="saveTask"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-text-secondary mb-2">任务名称</label>
+          <input
+            v-model="taskForm.name"
+            type="text"
+            placeholder="请输入任务名称"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+          />
         </div>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-text-secondary mb-2">任务名称</label>
-            <input
-              v-model="taskForm.name"
-              type="text"
-              placeholder="请输入任务名称"
-              class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm text-text-secondary mb-2">Cron 表达式</label>
-            <input
-              v-model="taskForm.cron"
-              type="text"
-              placeholder="* * * * * (分 时 日 月 周)"
-              class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors font-mono"
-            />
-            <p class="text-xs text-text-muted mt-1">示例: */5 * * * * (每5分钟执行一次)</p>
-          </div>
-
-          <div>
-            <label class="block text-sm text-text-secondary mb-2">执行内容</label>
-            <textarea
-              v-model="taskForm.content"
-              rows="4"
-              placeholder="请输入要执行的命令或内容"
-              class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors font-mono resize-none"
-            ></textarea>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <input
-              v-model="taskForm.enabled"
-              type="checkbox"
-              id="enabled"
-              class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
-            />
-            <label for="enabled" class="text-sm text-text-secondary">创建后立即启用</label>
-          </div>
+        <div>
+          <label class="block text-sm text-text-secondary mb-2">Cron 表达式</label>
+          <input
+            v-model="taskForm.cron"
+            type="text"
+            placeholder="* * * * * (分 时 日 月 周)"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors font-mono"
+          />
+          <p class="text-xs text-text-muted mt-1">示例: */5 * * * * (每5分钟执行一次)</p>
         </div>
 
-        <div class="flex justify-end gap-3 mt-6">
-          <button
-            @click="closeDialog"
-            class="px-4 py-2 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
-          >
-            取消
-          </button>
-          <button
-            @click="saveTask"
-            :disabled="saving"
-            class="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 rounded-lg font-medium transition-colors"
-          >
-            {{ saving ? '保存中...' : '保存' }}
-          </button>
+        <div>
+          <label class="block text-sm text-text-secondary mb-2">执行内容</label>
+          <textarea
+            v-model="taskForm.content"
+            rows="4"
+            placeholder="请输入要执行的命令或内容"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors font-mono resize-none"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input
+            v-model="taskForm.enabled"
+            type="checkbox"
+            id="enabled"
+            class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
+          />
+          <label for="enabled" class="text-sm text-text-secondary">创建后立即启用</label>
         </div>
       </div>
-    </div>
+    </ModalDialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import { 
   Clock, 
   Plus as PlusIcon, 
   Edit as EditIcon, 
   Trash as TrashIcon,
-  X as XIcon 
 } from "lucide-vue-next";
+import ModalDialog from "@/components/ModalDialog.vue";
 
 const loading = ref(true);
 const tasks = ref([]);
@@ -170,6 +154,14 @@ const taskForm = reactive({
   cron: "",
   content: "",
   enabled: true,
+});
+
+// 计算属性：控制弹窗显示
+const dialogVisible = computed({
+  get: () => showAddDialog.value || !!editingTask.value,
+  set: (val) => {
+    if (!val) closeDialog();
+  }
 });
 
 onMounted(() => {
@@ -196,6 +188,12 @@ function saveTasksToStorage() {
   localStorage.setItem("icooclaw_tasks", JSON.stringify(tasks.value));
 }
 
+function openAddDialog() {
+  editingTask.value = null;
+  resetForm();
+  showAddDialog.value = true;
+}
+
 function editTask(task) {
   editingTask.value = task;
   taskForm.name = task.name;
@@ -203,6 +201,13 @@ function editTask(task) {
   taskForm.content = task.content;
   taskForm.enabled = task.enabled;
   showAddDialog.value = true;
+}
+
+function resetForm() {
+  taskForm.name = "";
+  taskForm.cron = "";
+  taskForm.content = "";
+  taskForm.enabled = true;
 }
 
 function toggleTask(task) {
@@ -220,10 +225,7 @@ function deleteTask(id) {
 function closeDialog() {
   showAddDialog.value = false;
   editingTask.value = null;
-  taskForm.name = "";
-  taskForm.cron = "";
-  taskForm.content = "";
-  taskForm.enabled = true;
+  resetForm();
 }
 
 async function saveTask() {
