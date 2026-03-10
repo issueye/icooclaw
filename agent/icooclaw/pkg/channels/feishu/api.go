@@ -7,6 +7,8 @@ import (
 	"os"
 
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
+
+	"icooclaw/pkg/channels"
 )
 
 // SendText sends a text message to a chat.
@@ -162,38 +164,6 @@ func (c *Channel) SendFile(ctx context.Context, chatID string, filePath string, 
 		return fmt.Errorf("feishu file send api error (code=%d msg=%s)", resp.Code, resp.Msg)
 	}
 	return nil
-}
-
-// GetUserInfo gets user information by user ID.
-func (c *Channel) GetUserInfo(ctx context.Context, userID string) (*UserInfo, error) {
-	// Use open_id to get user info
-	req := larkim.NewGetUserReqBuilder().
-		UserIdType("open_id").
-		UserId(userID).
-		Build()
-
-	resp, err := c.client.Im.V1.User.Get(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("get user info: %w", err)
-	}
-	if !resp.Success() {
-		return nil, fmt.Errorf("get user api error (code=%d msg=%s)", resp.Code, resp.Msg)
-	}
-
-	info := &UserInfo{}
-	if resp.Data != nil && resp.Data.User != nil {
-		if resp.Data.User.Name != nil {
-			info.Name = *resp.Data.User.Name
-		}
-		if resp.Data.User.OpenId != nil {
-			info.OpenID = *resp.Data.User.OpenId
-		}
-		if resp.Data.User.UnionId != nil {
-			info.UnionID = *resp.Data.User.UnionId
-		}
-	}
-
-	return info, nil
 }
 
 // UserInfo contains user information.
