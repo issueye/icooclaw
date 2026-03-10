@@ -279,6 +279,65 @@ export async function deleteSkill(id) {
   });
 }
 
+// 批量删除技能
+export async function batchDeleteSkills(ids) {
+  return request('/api/v1/skills/batch-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+// 批量更新启用状态
+export async function batchUpdateSkillsEnabled(ids, enabled) {
+  return request('/api/v1/skills/batch-enabled', {
+    method: 'POST',
+    body: JSON.stringify({ ids, enabled }),
+  });
+}
+
+// 批量更新始终加载状态
+export async function batchUpdateSkillsAlwaysLoad(ids, alwaysLoad) {
+  return request('/api/v1/skills/batch-always-load', {
+    method: 'POST',
+    body: JSON.stringify({ ids, always_load: alwaysLoad }),
+  });
+}
+
+// 获取技能标签列表
+export async function getSkillTags() {
+  return request('/api/v1/skills/tags');
+}
+
+// 根据标签获取技能
+export async function getSkillsByTag(tag) {
+  return request(`/api/v1/skills/by-tag?tag=${encodeURIComponent(tag)}`);
+}
+
+// 导出技能
+export async function exportSkills() {
+  const base = getApiBase();
+  const url = `${base}/api/v1/skills/export`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  
+  return response.blob();
+}
+
+// 导入技能
+export async function importSkills(data, overwrite = false) {
+  return request('/api/v1/skills/import', {
+    method: 'POST',
+    body: JSON.stringify({ data, overwrite }),
+  });
+}
+
 // ===== MCP API =====
 
 export async function getMCPPage(params = {}) {
@@ -668,7 +727,14 @@ export default {
   updateSkill,
   upsertSkill,
   deleteSkill,
-  
+  batchDeleteSkills,
+  batchUpdateSkillsEnabled,
+  batchUpdateSkillsAlwaysLoad,
+  getSkillTags,
+  getSkillsByTag,
+  exportSkills,
+  importSkills,
+
   // MCP
   getMCPPage,
   getMCPs,
