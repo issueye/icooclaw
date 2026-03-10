@@ -27,6 +27,8 @@
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
+
+  --header-height: 36px;
 }
 
 [data-theme="light"] {
@@ -138,18 +140,28 @@
   box-sizing: border-box;
 }
 
+html, body {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   margin: 0;
   padding: 0;
-  height: 100vh;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
 #app {
-  height: 100vh;
+  height: 100%;
+  width: 100%;
   display: flex;
 }
 

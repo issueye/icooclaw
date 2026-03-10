@@ -1,5 +1,5 @@
 <template>
-    <div class="flex w-full h-screen bg-bg-primary overflow-hidden">
+    <div class="flex w-full h-full bg-bg-primary overflow-hidden">
         <!-- 左侧边栏 -->
         <ChatSidebar :sessions="chatStore.sessions" :current-session-id="chatStore.currentSessionId"
             :ws-status="wsStatus" :collapsed="sidebarCollapsed" @new="handleNewChat" @select="handleSelectSession"

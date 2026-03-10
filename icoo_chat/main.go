@@ -7,16 +7,15 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
 	app := services.NewApp()
 
-	// Create application with options
 	err := wails.Run(&options.App{
 		Title:  "icoo_chat",
 		Width:  1024,
@@ -28,6 +27,12 @@ func main() {
 		OnStartup:        app.Startup,
 		Bind: []interface{}{
 			app,
+		},
+		Frameless: true,
+		Windows: &windows.Options{
+			DisableFramelessWindowDecorations: true,
+			WebviewIsTransparent:              true,
+			WindowIsTranslucent:               true,
 		},
 	})
 

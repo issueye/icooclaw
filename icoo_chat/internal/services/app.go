@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -25,4 +27,14 @@ func (a *App) Startup(ctx context.Context) {
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, It's show time!", name)
+}
+
+// MinimizeWindow 将窗口最小化
+func (a *App) MinimizeWindow() {
+	runtime.WindowMinimise(a.ctx)
+}
+
+// CloseWindow 关闭应用程序
+func (a *App) CloseWindow() {
+	runtime.Quit(a.ctx)
 }
