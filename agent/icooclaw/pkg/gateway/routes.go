@@ -7,7 +7,6 @@ import (
 	"icooclaw/pkg/storage"
 
 	"github.com/go-chi/chi/v5"
-	"icooclaw.core/ws"
 )
 
 // Handlers 封装所有处理器
@@ -21,13 +20,11 @@ type Handlers struct {
 	Provider *handlers.ProviderHandler
 	Skill    *handlers.SkillHandler
 	Channel  *handlers.ChannelHandler
-	Config   *handlers.ConfigHandler
-	Chat     *handlers.ChatHandler
 	Param    *handlers.ParamHandler
 }
 
 // NewHandlers 创建所有处理器
-func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Manager) *Handlers {
+func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 	return &Handlers{
 		Common:   handlers.NewCommonHandler(logger),
 		Session:  handlers.NewSessionHandler(logger, storage),
@@ -38,8 +35,6 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage, wsManager *ws.Ma
 		Provider: handlers.NewProviderHandler(logger, storage),
 		Skill:    handlers.NewSkillHandler(logger, storage),
 		Channel:  handlers.NewChannelHandler(logger, storage),
-		Config:   handlers.NewConfigHandler(logger),
-		Chat:     handlers.NewChatHandler(logger, wsManager, agentManager),
 		Param:    handlers.NewParamHandler(logger, storage),
 	}
 }
@@ -84,10 +79,6 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Post("/update", h.Memory.Update)
 		r.Post("/delete", h.Memory.Delete)
 		r.Post("/get", h.Memory.GetByID)
-		r.Post("/pin", h.Memory.Pin)
-		r.Post("/unpin", h.Memory.Unpin)
-		r.Post("/soft-delete", h.Memory.SoftDelete)
-		r.Post("/restore", h.Memory.Restore)
 		r.Post("/search", h.Memory.Search)
 	})
 
@@ -136,30 +127,6 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Post("/get", h.Channel.GetByID)
 		r.Get("/all", h.Channel.GetAll)
 		r.Get("/enabled", h.Channel.GetEnabled)
-	})
-
-	// Config 路由
-	r.Route("/api/v1/config", func(r chi.Router) {
-		r.Get("/", h.Config.GetConfig)                 // 获取配置
-		r.Post("/update", h.Config.UpdateConfig)       // 更新配置
-		r.Post("/overwrite", h.Config.OverwriteConfig) // 覆盖配置文件
-		r.Get("/file", h.Config.GetConfigFileContent)  // 获取配置文件内容
-		r.Get("/json", h.Config.GetConfigJSON)         // 获取 JSON 格式配置
-	})
-
-	// WebSocket 聊天路由
-	r.Get("/ws/chat", h.Chat.HandleWebSocket) // WebSocket 连接
-
-	// 队列管理路由
-	r.Route("/api/v1/queue", func(r chi.Router) {
-		r.Get("/status", h.Chat.GetQueueStatus)            // 获取队列状态
-		r.Post("/max-concurrent", h.Chat.SetMaxConcurrent) // 设置最大并发数
-	})
-
-	// Agent 管理路由
-	r.Route("/api/v1/agents", func(r chi.Router) {
-		r.Get("/status", h.Chat.GetAgentStatus)    // 获取 Agent 状态
-		r.Post("/max-agents", h.Chat.SetMaxAgents) // 设置最大 Agent 数量
 	})
 
 	// 参数配置路由

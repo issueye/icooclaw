@@ -21,6 +21,8 @@ type Storage struct {
 	provider *ProviderStorage
 	mcp      *MCPStorage
 	channel  *ChannelStorage
+	param    *ParamStorage
+	task     *TaskStorage
 }
 
 func (s *Storage) Skill() *SkillStorage {
@@ -59,6 +61,14 @@ func (s *Storage) Message() *MessageStorage {
 	return s.message
 }
 
+func (s *Storage) Param() *ParamStorage {
+	return s.param
+}
+
+func (s *Storage) Task() *TaskStorage {
+	return s.task
+}
+
 // New creates a new Storage instance.
 func New(path string) (*Storage, error) {
 	db, err := gorm.Open(sqlite.Open(path+"?_journal_mode=WAL&_busy_timeout=5000"), &gorm.Config{})
@@ -86,6 +96,8 @@ func New(path string) (*Storage, error) {
 		provider: NewProviderStorage(db),
 		mcp:      NewMCPStorage(db),
 		channel:  NewChannelStorage(db),
+		param:    NewParamStorage(db),
+		task:     NewTaskStorage(db),
 	}
 
 	if err := s.autoMigrate(); err != nil {
@@ -103,8 +115,12 @@ func (s *Storage) autoMigrate() error {
 		&Session{},
 		&Binding{},
 		&Memory{},
+		&Message{},
 		&Tool{},
 		&Skill{},
+		&MCPConfig{},
+		&ParamConfig{},
+		&Task{},
 	)
 }
 

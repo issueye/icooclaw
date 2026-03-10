@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"icooclaw.core/storage"
-	"icooclaw.gateway/models"
+	"icooclaw/pkg/gateway/models"
+	"icooclaw/pkg/storage"
 )
 
 type ProviderHandler struct {
@@ -18,44 +18,43 @@ func NewProviderHandler(logger *slog.Logger, storage *storage.Storage) *Provider
 }
 
 func (h *ProviderHandler) Page(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[*storage.QueryProviderConfig](r)
+	req, err := models.Bind[*storage.QueryProvider](r)
 	if err != nil {
 		h.logger.Error("绑定分页请求失败", "error", err)
 		http.Error(w, "绑定分页请求失败", http.StatusBadRequest)
 		return
 	}
 
-	configs, err := h.storage.ProviderConfig().Page(req)
+	configs, err := h.storage.Provider().Page(req)
 	if err != nil {
 		h.logger.Error("获取Provider配置列表失败", "error", err)
 		http.Error(w, "获取Provider配置列表失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[*storage.ResQueryProviderConfig]{
+	models.WriteData(w, models.BaseResponse[*storage.ResQueryProvider]{
 		Code:    http.StatusOK,
 		Message: "Provider配置列表获取成功",
 		Data:    configs,
 	})
 }
 
-// Save 保存Provider配置
 func (h *ProviderHandler) Save(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[*storage.ProviderConfig](r)
+	req, err := models.Bind[*storage.Provider](r)
 	if err != nil {
 		h.logger.Error("绑定保存Provider配置请求失败", "error", err)
 		http.Error(w, "绑定保存Provider配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.ProviderConfig().CreateOrUpdate(req)
+	err = h.storage.Provider().Save(req)
 	if err != nil {
 		h.logger.Error("保存Provider配置失败", "error", err)
 		http.Error(w, "保存Provider配置失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[*storage.ProviderConfig]{
+	models.WriteData(w, models.BaseResponse[*storage.Provider]{
 		Code:    http.StatusOK,
 		Message: "Provider配置保存成功",
 		Data:    req,
@@ -63,21 +62,21 @@ func (h *ProviderHandler) Save(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[*storage.ProviderConfig](r)
+	req, err := models.Bind[*storage.Provider](r)
 	if err != nil {
 		h.logger.Error("绑定创建Provider配置请求失败", "error", err)
 		http.Error(w, "绑定创建Provider配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.ProviderConfig().Create(req)
+	err = h.storage.Provider().Save(req)
 	if err != nil {
 		h.logger.Error("创建Provider配置失败", "error", err)
 		http.Error(w, "创建Provider配置失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[*storage.ProviderConfig]{
+	models.WriteData(w, models.BaseResponse[*storage.Provider]{
 		Code:    http.StatusOK,
 		Message: "Provider配置创建成功",
 		Data:    req,
@@ -85,21 +84,21 @@ func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) Update(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[*storage.ProviderConfig](r)
+	req, err := models.Bind[*storage.Provider](r)
 	if err != nil {
 		h.logger.Error("绑定更新Provider配置请求失败", "error", err)
 		http.Error(w, "绑定更新Provider配置请求失败", http.StatusBadRequest)
 		return
 	}
 
-	err = h.storage.ProviderConfig().Update(req)
+	err = h.storage.Provider().Save(req)
 	if err != nil {
 		h.logger.Error("更新Provider配置失败", "error", err)
 		http.Error(w, "更新Provider配置失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[*storage.ProviderConfig]{
+	models.WriteData(w, models.BaseResponse[*storage.Provider]{
 		Code:    http.StatusOK,
 		Message: "Provider配置更新成功",
 		Data:    req,
@@ -114,7 +113,7 @@ func (h *ProviderHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.ProviderConfig().Delete(id)
+	err = h.storage.Provider().Delete(id)
 	if err != nil {
 		h.logger.Error("删除Provider配置失败", "error", err)
 		http.Error(w, "删除Provider配置失败", http.StatusInternalServerError)
@@ -135,14 +134,14 @@ func (h *ProviderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config, err := h.storage.ProviderConfig().GetByID(id)
+	config, err := h.storage.Provider().GetByName(id)
 	if err != nil {
 		h.logger.Error("获取Provider配置失败", "error", err)
 		http.Error(w, "获取Provider配置失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[*storage.ProviderConfig]{
+	models.WriteData(w, models.BaseResponse[*storage.Provider]{
 		Code:    http.StatusOK,
 		Message: "Provider配置获取成功",
 		Data:    config,
@@ -150,14 +149,14 @@ func (h *ProviderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	configs, err := h.storage.ProviderConfig().GetAll()
+	configs, err := h.storage.Provider().List()
 	if err != nil {
 		h.logger.Error("获取所有Provider配置失败", "error", err)
 		http.Error(w, "获取所有Provider配置失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[[]storage.ProviderConfig]{
+	models.WriteData(w, models.BaseResponse[[]*storage.Provider]{
 		Code:    http.StatusOK,
 		Message: "Provider配置列表获取成功",
 		Data:    configs,
@@ -165,14 +164,14 @@ func (h *ProviderHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) GetEnabled(w http.ResponseWriter, r *http.Request) {
-	configs, err := h.storage.ProviderConfig().GetEnabled()
+	configs, err := h.storage.Provider().List()
 	if err != nil {
 		h.logger.Error("获取启用Provider配置失败", "error", err)
 		http.Error(w, "获取启用Provider配置失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[[]storage.ProviderConfig]{
+	models.WriteData(w, models.BaseResponse[[]*storage.Provider]{
 		Code:    http.StatusOK,
 		Message: "启用Provider配置列表获取成功",
 		Data:    configs,

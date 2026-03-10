@@ -136,14 +136,14 @@ func (h *MemoryHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	memories, err := h.storage.Memory().Search(&storage.QueryMemory{Query: req.Query})
+	memories, err := h.storage.Memory().Page(&storage.QueryMemory{Query: req.Query})
 	if err != nil {
 		h.logger.Error("搜索记忆失败", "error", err)
 		http.Error(w, "搜索记忆失败", http.StatusInternalServerError)
 		return
 	}
 
-	models.WriteData(w, models.BaseResponse[[]*storage.Memory]{
+	models.WriteData(w, models.BaseResponse[*storage.ResQueryMemory]{
 		Code:    http.StatusOK,
 		Message: "记忆搜索成功",
 		Data:    memories,

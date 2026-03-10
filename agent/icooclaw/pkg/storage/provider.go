@@ -35,8 +35,8 @@ func NewProviderStorage(db *gorm.DB) *ProviderStorage {
 	return &ProviderStorage{db: db}
 }
 
-// SaveProvider saves a provider configuration.
-func (s *ProviderStorage) SaveProvider(p *Provider) error {
+// Save saves a provider configuration.
+func (s *ProviderStorage) Save(p *Provider) error {
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "name"}},
 		DoUpdates: clause.AssignmentColumns([]string{"type", "api_key", "api_base", "default_model", "models", "config", "updated_at"}),
@@ -83,7 +83,7 @@ type QueryProvider struct {
 }
 
 type ResQueryProvider struct {
-	Page    Page      `json:"page"`
+	Page    Page       `json:"page"`
 	Records []Provider `json:"records"`
 }
 
