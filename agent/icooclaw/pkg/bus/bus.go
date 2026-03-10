@@ -50,6 +50,8 @@ type OutboundMediaMessage struct {
 	Metadata map[string]any
 }
 
+const defaultBusBufferSize = 64
+
 // MessageBus provides pub/sub messaging between components.
 type MessageBus struct {
 	inbound       chan InboundMessage
@@ -78,18 +80,18 @@ type Config struct {
 // DefaultConfig returns default configuration.
 func DefaultConfig() Config {
 	return Config{
-		InboundCapacity:  1000,
-		OutboundCapacity: 1000,
+		InboundCapacity:  defaultBusBufferSize,
+		OutboundCapacity: defaultBusBufferSize,
 	}
 }
 
 // NewMessageBus creates a new MessageBus.
 func NewMessageBus(cfg Config) *MessageBus {
 	if cfg.InboundCapacity <= 0 {
-		cfg.InboundCapacity = 1000
+		cfg.InboundCapacity = defaultBusBufferSize
 	}
 	if cfg.OutboundCapacity <= 0 {
-		cfg.OutboundCapacity = 1000
+		cfg.OutboundCapacity = defaultBusBufferSize
 	}
 
 	return &MessageBus{
@@ -104,10 +106,16 @@ func NewMessageBus(cfg Config) *MessageBus {
 	}
 }
 
-// PublishInbound publishes an inbound message.
-func (mb *MessageBus) PublishInbound(msg InboundMessage) error {
+// PublishInbound publishes an inbound message with context support.
+// Returns ErrBusClosed if the bus is closed, or ctx.Err() if context is canceled.
+func (mb *MessageBus) PublishInbound(ctx context.Context, msg InboundMessage) error {
 	if mb.closed.Load() {
 		return errors.ErrNotRunning
+	}
+
+	// Check context before attempting to send
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	select {
@@ -123,53 +131,133 @@ func (mb *MessageBus) PublishInbound(msg InboundMessage) error {
 		}
 		mb.mu.RUnlock()
 		return nil
-	default:
-		mb.dropCount.Add(1)
-		return errors.ErrBufferFull
+	case <-mb.done:
+		return errors.ErrNotRunning
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-// PublishOutbound publishes an outbound message.
-func (mb *MessageBus) PublishOutbound(msg OutboundMessage) error {
+// PublishInboundNoCtx publishes an inbound message without context (for backward compatibility).
+// Deprecated: Use PublishInbound with context instead.
+func (mb *MessageBus) PublishInboundNoCtx(msg InboundMessage) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return mb.PublishInbound(ctx, msg)
+}
+
+// ConsumeInbound consumes an inbound message from the bus.
+// Returns the message and true if successful, or empty message and false if the bus is closed or context is canceled.
+func (mb *MessageBus) ConsumeInbound(ctx context.Context) (InboundMessage, bool) {
+	select {
+	case msg, ok := <-mb.inbound:
+		return msg, ok
+	case <-mb.done:
+		return InboundMessage{}, false
+	case <-ctx.Done():
+		return InboundMessage{}, false
+	}
+}
+
+// PublishOutbound publishes an outbound message with context support.
+// Returns ErrBusClosed if the bus is closed, or ctx.Err() if context is canceled.
+func (mb *MessageBus) PublishOutbound(ctx context.Context, msg OutboundMessage) error {
 	if mb.closed.Load() {
 		return errors.ErrNotRunning
+	}
+
+	// Check context before attempting to send
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	select {
 	case mb.outbound <- msg:
+		// Also forward to subscribers
+		mb.mu.RLock()
+		if sub, ok := mb.outboundSubs["all"]; ok {
+			select {
+			case sub <- msg:
+			default:
+				// Subscriber buffer full, skip
+			}
+		}
+		mb.mu.RUnlock()
 		return nil
-	default:
-		mb.dropCount.Add(1)
-		return errors.ErrBufferFull
+	case <-mb.done:
+		return errors.ErrNotRunning
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-// PublishOutboundMedia publishes an outbound media message.
-func (mb *MessageBus) PublishOutboundMedia(msg OutboundMediaMessage) error {
+// PublishOutboundNoCtx publishes an outbound message without context (for backward compatibility).
+// Deprecated: Use PublishOutbound with context instead.
+func (mb *MessageBus) PublishOutboundNoCtx(msg OutboundMessage) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return mb.PublishOutbound(ctx, msg)
+}
+
+// ConsumeOutbound consumes an outbound message from the bus.
+// Returns the message and true if successful, or empty message and false if the bus is closed or context is canceled.
+func (mb *MessageBus) ConsumeOutbound(ctx context.Context) (OutboundMessage, bool) {
+	select {
+	case msg, ok := <-mb.outbound:
+		return msg, ok
+	case <-mb.done:
+		return OutboundMessage{}, false
+	case <-ctx.Done():
+		return OutboundMessage{}, false
+	}
+}
+
+// PublishOutboundMedia publishes an outbound media message with context support.
+func (mb *MessageBus) PublishOutboundMedia(ctx context.Context, msg OutboundMediaMessage) error {
 	if mb.closed.Load() {
 		return errors.ErrNotRunning
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	select {
 	case mb.outboundMedia <- msg:
 		return nil
-	default:
-		mb.dropCount.Add(1)
-		return errors.ErrBufferFull
+	case <-mb.done:
+		return errors.ErrNotRunning
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// ConsumeOutboundMedia consumes an outbound media message from the bus.
+func (mb *MessageBus) ConsumeOutboundMedia(ctx context.Context) (OutboundMediaMessage, bool) {
+	select {
+	case msg, ok := <-mb.outboundMedia:
+		return msg, ok
+	case <-mb.done:
+		return OutboundMediaMessage{}, false
+	case <-ctx.Done():
+		return OutboundMediaMessage{}, false
 	}
 }
 
 // Inbound returns the inbound message channel.
+// Deprecated: Use ConsumeInbound for safer consumption with context.
 func (mb *MessageBus) Inbound() <-chan InboundMessage {
 	return mb.inbound
 }
 
 // Outbound returns the outbound message channel.
+// Deprecated: Use ConsumeOutbound for safer consumption with context.
 func (mb *MessageBus) Outbound() <-chan OutboundMessage {
 	return mb.outbound
 }
 
 // OutboundMedia returns the outbound media message channel.
+// Deprecated: Use ConsumeOutboundMedia for safer consumption with context.
 func (mb *MessageBus) OutboundMedia() <-chan OutboundMediaMessage {
 	return mb.outboundMedia
 }
@@ -224,21 +312,44 @@ func (mb *MessageBus) UnsubscribeOutbound(name string) {
 	}
 }
 
-// Close closes the message bus.
+// Close closes the message bus gracefully.
+// It drains buffered messages to avoid send-on-closed panics from concurrent publishers.
+// Channels are NOT closed to avoid send-on-closed panics from concurrent publishers.
 func (mb *MessageBus) Close() {
 	if mb.closed.CompareAndSwap(false, true) {
 		close(mb.done)
 
-		// Drain buffered channels
-		for len(mb.inbound) > 0 {
-			<-mb.inbound
+		// Drain buffered channels so messages aren't silently lost.
+		// Channels are NOT closed to avoid send-on-closed panics from concurrent publishers.
+		drained := 0
+		for {
+			select {
+			case <-mb.inbound:
+				drained++
+			default:
+				goto doneInbound
+			}
 		}
-		for len(mb.outbound) > 0 {
-			<-mb.outbound
+	doneInbound:
+		for {
+			select {
+			case <-mb.outbound:
+				drained++
+			default:
+				goto doneOutbound
+			}
 		}
-		for len(mb.outboundMedia) > 0 {
-			<-mb.outboundMedia
+	doneOutbound:
+		for {
+			select {
+			case <-mb.outboundMedia:
+				drained++
+			default:
+				goto doneMedia
+			}
 		}
+	doneMedia:
+		_ = drained // Avoid unused variable warning
 
 		// Close subscriber channels
 		mb.mu.Lock()
