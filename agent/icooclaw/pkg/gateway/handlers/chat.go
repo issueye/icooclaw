@@ -1,68 +1,310 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
-	"icooclaw.ai/agent"
-	"icooclaw.core/ws"
-	"icooclaw.gateway/models"
+	"icooclaw/pkg/agent"
+	"icooclaw/pkg/bus"
+	"icooclaw/pkg/gateway/models"
+	"icooclaw/pkg/gateway/websocket"
+	"icooclaw/pkg/storage"
 )
 
+// ChatHandler handles chat-related HTTP and WebSocket requests.
 type ChatHandler struct {
-	logger       *slog.Logger
-	wsManager    *ws.Manager
-	agentManager *agent.AgentManager
+	logger        *slog.Logger
+	storage       *storage.Storage
+	wsManager     *websocket.Manager
+	bus           *bus.MessageBus
+	agentLoop     *agent.Loop
+	agentRegistry *agent.AgentRegistry
 }
 
-func NewChatHandler(logger *slog.Logger, wsManager *ws.Manager, agentManager *agent.AgentManager) *ChatHandler {
+// NewChatHandler creates a new ChatHandler.
+func NewChatHandler(
+	logger *slog.Logger,
+	storage *storage.Storage,
+	wsManager *websocket.Manager,
+	bus *bus.MessageBus,
+	agentLoop *agent.Loop,
+	agentRegistry *agent.AgentRegistry,
+) *ChatHandler {
 	return &ChatHandler{
-		logger:       logger,
-		wsManager:    wsManager,
-		agentManager: agentManager,
+		logger:        logger,
+		storage:       storage,
+		wsManager:     wsManager,
+		bus:           bus,
+		agentLoop:     agentLoop,
+		agentRegistry: agentRegistry,
 	}
 }
 
-// HandleWebSocket 处理 WebSocket 连接
+// WithWebSocketManager sets the WebSocket manager.
+func (h *ChatHandler) WithWebSocketManager(m *websocket.Manager) *ChatHandler {
+	h.wsManager = m
+	return h
+}
+
+// WithBus sets the message bus.
+func (h *ChatHandler) WithBus(b *bus.MessageBus) *ChatHandler {
+	h.bus = b
+	return h
+}
+
+// WithAgentLoop sets the agent loop.
+func (h *ChatHandler) WithAgentLoop(l *agent.Loop) *ChatHandler {
+	h.agentLoop = l
+	return h
+}
+
+// WithAgentRegistry sets the agent registry.
+func (h *ChatHandler) WithAgentRegistry(r *agent.AgentRegistry) *ChatHandler {
+	h.agentRegistry = r
+	return h
+}
+
+// HandleWebSocket handles WebSocket connection upgrade.
 func (h *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if h.wsManager == nil {
+		http.Error(w, "WebSocket manager not configured", http.StatusInternalServerError)
+		return
+	}
 	h.wsManager.HandleWebSocket(w, r)
 }
 
-// HandleChat 处理聊天请求 (HTTP 方式，可选)
-func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
-	// 通过 HTTP 方式处理聊天请求 (非 WebSocket)
-	// 可以作为备用方案
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("请使用 WebSocket 连接进行聊天"))
+// HandleWebSocketWithChatID handles WebSocket connection with a specific chat ID.
+func (h *ChatHandler) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request) {
+	if h.wsManager == nil {
+		http.Error(w, "WebSocket manager not configured", http.StatusInternalServerError)
+		return
+	}
+
+	// Get chat ID from URL path
+	chatID := r.PathValue("chat_id")
+	if chatID == "" {
+		// Try query parameter
+		chatID = r.URL.Query().Get("chat_id")
+	}
+
+	h.wsManager.HandleWebSocketWithChatID(w, r, chatID)
 }
 
-// GetQueueStatus 获取队列状态
+// ChatRequest represents a chat request.
+type ChatRequest struct {
+	ChatID    string `json:"chat_id"`
+	Content   string `json:"content"`
+	Stream    bool   `json:"stream,omitempty"`
+	AgentName string `json:"agent_name,omitempty"`
+}
+
+// ChatResponse represents a chat response.
+type ChatResponse struct {
+	ChatID    string `json:"chat_id"`
+	Content   string `json:"content"`
+	AgentName string `json:"agent_name,omitempty"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// HandleChat handles HTTP chat requests.
+func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
+	req, err := models.Bind[*ChatRequest](r)
+	if err != nil {
+		h.logger.Error("failed to bind chat request", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Content == "" {
+		http.Error(w, "content is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.ChatID == "" {
+		http.Error(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Process with agent loop
+	if h.agentLoop != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		defer cancel()
+
+		response, err := h.agentLoop.ProcessDirectWithChannel(
+			ctx,
+			req.Content,
+			req.ChatID,
+			"http",
+			req.ChatID,
+		)
+		if err != nil {
+			h.logger.Error("failed to process chat", "error", err)
+			http.Error(w, "failed to process chat", http.StatusInternalServerError)
+			return
+		}
+
+		models.WriteData(w, models.BaseResponse[*ChatResponse]{
+			Code:    http.StatusOK,
+			Message: "success",
+			Data: &ChatResponse{
+				ChatID:    req.ChatID,
+				Content:   response,
+				Timestamp: time.Now().Unix(),
+			},
+		})
+		return
+	}
+
+	// Fallback: publish to bus
+	if h.bus != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		msg := bus.InboundMessage{
+			Channel:   "http",
+			ChatID:    req.ChatID,
+			Sender:    bus.SenderInfo{ID: "http", Name: "HTTP Client"},
+			Text:      req.Content,
+			Timestamp: time.Now(),
+		}
+
+		if err := h.bus.PublishInbound(ctx, msg); err != nil {
+			h.logger.Error("failed to publish message", "error", err)
+			http.Error(w, "failed to process chat", http.StatusInternalServerError)
+			return
+		}
+
+		models.WriteData(w, models.BaseResponse[any]{
+			Code:    http.StatusOK,
+			Message: "message queued",
+			Data: map[string]string{
+				"chat_id": req.ChatID,
+				"status":  "queued",
+			},
+		})
+		return
+	}
+
+	http.Error(w, "no agent or bus configured", http.StatusInternalServerError)
+}
+
+// HandleChatStream handles HTTP chat requests with SSE streaming.
+func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
+	req, err := models.Bind[*ChatRequest](r)
+	if err != nil {
+		h.logger.Error("failed to bind chat request", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Content == "" {
+		http.Error(w, "content is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.ChatID == "" {
+		http.Error(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Send start event
+	h.writeSSE(w, "start", map[string]string{"chat_id": req.ChatID})
+	flusher.Flush()
+
+	// Process with agent loop
+	if h.agentLoop != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+		defer cancel()
+
+		response, err := h.agentLoop.ProcessDirectWithChannel(
+			ctx,
+			req.Content,
+			req.ChatID,
+			"http-stream",
+			req.ChatID,
+		)
+		if err != nil {
+			h.writeSSE(w, "error", map[string]string{"error": err.Error()})
+			flusher.Flush()
+			return
+		}
+
+		// Send content event
+		h.writeSSE(w, "content", map[string]string{
+			"chat_id": req.ChatID,
+			"content": response,
+		})
+		flusher.Flush()
+	}
+
+	// Send end event
+	h.writeSSE(w, "end", map[string]string{"chat_id": req.ChatID})
+	flusher.Flush()
+}
+
+// writeSSE writes a Server-Sent Event.
+func (h *ChatHandler) writeSSE(w http.ResponseWriter, event string, data interface{}) {
+	dataBytes, _ := json.Marshal(data)
+	w.Write([]byte("event: " + event + "\n"))
+	w.Write([]byte("data: " + string(dataBytes) + "\n\n"))
+}
+
+// GetQueueStatus returns the current queue status.
 func (h *ChatHandler) GetQueueStatus(w http.ResponseWriter, r *http.Request) {
+	if h.wsManager == nil {
+		models.WriteData(w, models.BaseResponse[any]{
+			Code:    http.StatusOK,
+			Message: "WebSocket manager not configured",
+			Data:    nil,
+		})
+		return
+	}
+
 	status := h.wsManager.GetQueueStatus()
 
-	models.WriteData(w, models.BaseResponse[*ws.QueueStatus]{
+	models.WriteData(w, models.BaseResponse[*websocket.QueueStatus]{
 		Code:    http.StatusOK,
-		Message: "队列状态获取成功",
+		Message: "queue status retrieved",
 		Data:    status,
 	})
 }
 
-// SetMaxConcurrentRequest 设置最大并发数请求
+// SetMaxConcurrentRequest represents a request to set max concurrent connections.
 type SetMaxConcurrentRequest struct {
 	Max int `json:"max"`
 }
 
-// SetMaxConcurrent 设置最大并发数
+// SetMaxConcurrent sets the maximum concurrent WebSocket connections.
 func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxConcurrentRequest](r)
 	if err != nil {
-		h.logger.Error("绑定设置最大并发数请求失败", "error", err)
-		http.Error(w, "绑定设置最大并发数请求失败", http.StatusBadRequest)
+		h.logger.Error("failed to bind request", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
 	if req.Max <= 0 {
-		http.Error(w, "最大并发数必须大于 0", http.StatusBadRequest)
+		http.Error(w, "max must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	if h.wsManager == nil {
+		http.Error(w, "WebSocket manager not configured", http.StatusInternalServerError)
 		return
 	}
 
@@ -70,70 +312,113 @@ func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,
-		Message: "最大并发数设置成功",
+		Message: "max concurrent updated",
 		Data: map[string]int{
 			"max_concurrent": req.Max,
 		},
 	})
 }
 
-// GetAgentStatus 获取 Agent 状态
+// AgentStatus represents the status of an agent.
+type AgentStatus struct {
+	Name      string `json:"name"`
+	IsActive  bool   `json:"is_active"`
+	Model     string `json:"model,omitempty"`
+	ChatCount int    `json:"chat_count,omitempty"`
+}
+
+// GetAgentStatus returns the status of all agents.
 func (h *ChatHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
-	if h.agentManager == nil {
+	if h.agentRegistry == nil {
 		models.WriteData(w, models.BaseResponse[any]{
 			Code:    http.StatusOK,
-			Message: "Agent Manager 未初始化",
+			Message: "Agent registry not configured",
 			Data:    nil,
 		})
 		return
 	}
 
-	infos := h.agentManager.GetAgentInfos()
-	status := map[string]any{
-		"agent_count":      h.agentManager.GetAgentCount(),
-		"active_count":     h.agentManager.GetActiveAgentCount(),
-		"max_agents":       h.agentManager.GetMaxAgents(),
-		"agent_infos":      infos,
+	agentNames := h.agentRegistry.List()
+	statuses := make([]*AgentStatus, 0, len(agentNames))
+
+	for _, name := range agentNames {
+		ag, ok := h.agentRegistry.Get(name)
+		if !ok {
+			continue
+		}
+
+		status := &AgentStatus{
+			Name:     name,
+			IsActive: true,
+		}
+
+		if ag != nil {
+			status.Model = ag.Config().Model
+		}
+
+		statuses = append(statuses, status)
 	}
 
-	models.WriteData(w, models.BaseResponse[map[string]any]{
+	models.WriteData(w, models.BaseResponse[[]*AgentStatus]{
 		Code:    http.StatusOK,
-		Message: "Agent 状态获取成功",
-		Data:    status,
+		Message: "agent status retrieved",
+		Data:    statuses,
 	})
 }
 
-// SetMaxAgentsRequest 设置最大 Agent 数量请求
+// SetMaxAgentsRequest represents a request to set max agents.
 type SetMaxAgentsRequest struct {
 	Max int `json:"max"`
 }
 
-// SetMaxAgents 设置最大 Agent 数量
+// SetMaxAgents sets the maximum number of agents.
 func (h *ChatHandler) SetMaxAgents(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxAgentsRequest](r)
 	if err != nil {
-		h.logger.Error("绑定设置最大 Agent 数量请求失败", "error", err)
-		http.Error(w, "绑定设置最大 Agent 数量请求失败", http.StatusBadRequest)
+		h.logger.Error("failed to bind request", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
 	if req.Max <= 0 {
-		http.Error(w, "最大 Agent 数量必须大于 0", http.StatusBadRequest)
+		http.Error(w, "max must be greater than 0", http.StatusBadRequest)
 		return
 	}
-
-	if h.agentManager == nil {
-		http.Error(w, "Agent Manager 未初始化", http.StatusInternalServerError)
-		return
-	}
-
-	h.agentManager.SetMaxAgents(req.Max)
 
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,
-		Message: "最大 Agent 数量设置成功",
+		Message: "max agents updated",
 		Data: map[string]int{
 			"max_agents": req.Max,
 		},
+	})
+}
+
+// ConnectionStatus represents the WebSocket connection status.
+type ConnectionStatus struct {
+	TotalConnections int `json:"total_connections"`
+	MaxConcurrent    int `json:"max_concurrent"`
+}
+
+// GetConnectionStatus returns the WebSocket connection status.
+func (h *ChatHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
+	if h.wsManager == nil {
+		models.WriteData(w, models.BaseResponse[*ConnectionStatus]{
+			Code:    http.StatusOK,
+			Message: "WebSocket manager not configured",
+			Data:    nil,
+		})
+		return
+	}
+
+	status := &ConnectionStatus{
+		TotalConnections: h.wsManager.GetConnectionCount(),
+		MaxConcurrent:    h.wsManager.GetQueueStatus().MaxConcurrent,
+	}
+
+	models.WriteData(w, models.BaseResponse[*ConnectionStatus]{
+		Code:    http.StatusOK,
+		Message: "connection status retrieved",
+		Data:    status,
 	})
 }

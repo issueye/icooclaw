@@ -3,7 +3,10 @@ package gateway
 import (
 	"log/slog"
 
+	"icooclaw/pkg/agent"
+	"icooclaw/pkg/bus"
 	"icooclaw/pkg/gateway/handlers"
+	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/storage"
 
 	"github.com/go-chi/chi/v5"
@@ -23,6 +26,7 @@ type Handlers struct {
 	Param    *handlers.ParamHandler
 	Tool     *handlers.ToolHandler
 	Binding  *handlers.BindingHandler
+	Chat     *handlers.ChatHandler
 }
 
 // NewHandlers 创建所有处理器
@@ -40,6 +44,33 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 		Param:    handlers.NewParamHandler(logger, storage),
 		Tool:     handlers.NewToolHandler(logger, storage),
 		Binding:  handlers.NewBindingHandler(logger, storage),
+		Chat:     handlers.NewChatHandler(logger, storage, nil, nil, nil, nil),
+	}
+}
+
+// NewHandlersWithComponents creates handlers with all components.
+func NewHandlersWithComponents(
+	logger *slog.Logger,
+	storage *storage.Storage,
+	wsManager *websocket.Manager,
+	bus *bus.MessageBus,
+	agentLoop *agent.Loop,
+	agentRegistry *agent.AgentRegistry,
+) *Handlers {
+	return &Handlers{
+		Common:   handlers.NewCommonHandler(logger),
+		Session:  handlers.NewSessionHandler(logger, storage),
+		Message:  handlers.NewMessageHandler(logger, storage),
+		MCP:      handlers.NewMCPHandler(logger, storage),
+		Memory:   handlers.NewMemoryHandler(logger, storage),
+		Task:     handlers.NewTaskHandler(logger, storage),
+		Provider: handlers.NewProviderHandler(logger, storage),
+		Skill:    handlers.NewSkillHandler(logger, storage),
+		Channel:  handlers.NewChannelHandler(logger, storage),
+		Param:    handlers.NewParamHandler(logger, storage),
+		Tool:     handlers.NewToolHandler(logger, storage),
+		Binding:  handlers.NewBindingHandler(logger, storage),
+		Chat:     handlers.NewChatHandler(logger, storage, wsManager, bus, agentLoop, agentRegistry),
 	}
 }
 
@@ -47,6 +78,17 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 func RegisterRoutes(r chi.Router, h *Handlers) {
 	// 健康检查
 	r.Get("/api/v1/health", h.Common.HealthCheck)
+
+	// Chat 路由
+	r.Route("/api/v1/chat", func(r chi.Router) {
+		r.Post("/", h.Chat.HandleChat)                    // HTTP 聊天
+		r.Post("/stream", h.Chat.HandleChatStream)        // SSE 流式聊天
+		r.Get("/status", h.Chat.GetConnectionStatus)      // 连接状态
+		r.Get("/queue", h.Chat.GetQueueStatus)            // 队列状态
+		r.Post("/queue/max", h.Chat.SetMaxConcurrent)     // 设置最大并发
+		r.Get("/agents", h.Chat.GetAgentStatus)           // Agent 状态
+		r.Post("/agents/max", h.Chat.SetMaxAgents)        // 设置最大 Agent 数
+	})
 
 	// Session 路由
 	r.Route("/api/v1/sessions", func(r chi.Router) {
@@ -64,6 +106,7 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Post("/update", h.Message.Update)
 		r.Post("/delete", h.Message.Delete)
 		r.Post("/get", h.Message.GetByID)
+		r.Post("/by-session", h.Message.GetBySessionID)
 	})
 
 	// MCP 路由

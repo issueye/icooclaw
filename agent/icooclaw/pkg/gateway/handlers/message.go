@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"icooclaw/pkg/storage"
 	"log/slog"
 	"net/http"
 
-	"icooclaw.gateway/models"
+	"icooclaw/pkg/gateway/models"
+	"icooclaw/pkg/storage"
 )
 
 type MessageHandler struct {
