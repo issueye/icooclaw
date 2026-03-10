@@ -9,30 +9,38 @@ import (
 	"net/http"
 )
 
-// DeepSeekProvider implements Provider for DeepSeek.
-type DeepSeekProvider struct {
+// QwenProvider implements Provider for Alibaba Qwen (通义千问).
+type QwenProvider struct {
 	*BaseProvider
 }
 
-// NewDeepSeekProvider creates a new DeepSeek provider.
-func NewDeepSeekProvider(cfg *storage.Provider) Provider {
-	providerName := consts.ProviderDeepSeek
+// NewQwenProvider creates a new Qwen provider.
+func NewQwenProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderQwen
 	apiBase := cfg.APIBase
+	// 处理默认值
 	if apiBase == "" {
-		apiBase = "https://api.deepseek.com/v1"
-	}
-	defaultModel := cfg.DefaultModel
-	if defaultModel == "" {
-		defaultModel = "deepseek-chat"
+		apiBase = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 	}
 
-	return &DeepSeekProvider{
+	// 处理编码计划
+	if cfg.Type == consts.ProviderQwenCodingPlan {
+		apiBase = "https://coding.dashscope.aliyuncs.com/v1"
+		providerName = consts.ProviderQwenCodingPlan
+	}
+
+	defaultModel := cfg.DefaultModel
+	if defaultModel == "" {
+		defaultModel = "qwen-plus"
+	}
+
+	return &QwenProvider{
 		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 
-// Chat sends a chat request to DeepSeek.
-func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+// Chat sends a chat request to Qwen.
+func (p *QwenProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	req.Stream = false
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {
@@ -77,8 +85,8 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 	}, nil
 }
 
-// ChatStream sends a streaming chat request to DeepSeek.
-func (p *DeepSeekProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+// ChatStream sends a streaming chat request to Qwen.
+func (p *QwenProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
 	req.Stream = true
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {

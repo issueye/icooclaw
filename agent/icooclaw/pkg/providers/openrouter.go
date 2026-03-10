@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 	"net/http"
 )
@@ -17,6 +18,7 @@ type OpenRouterProvider struct {
 
 // NewOpenRouterProvider creates a new OpenRouter provider.
 func NewOpenRouterProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderOpenRouter
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://openrouter.ai/api/v1"
@@ -27,7 +29,7 @@ func NewOpenRouterProvider(cfg *storage.Provider) Provider {
 	}
 
 	return &OpenRouterProvider{
-		BaseProvider: NewBaseProvider("openrouter", cfg.APIKey, apiBase, defaultModel),
+		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 

@@ -6,27 +6,8 @@ import (
 	"log/slog"
 	"sync"
 
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
-)
-
-// ProviderType represents a provider type.
-type ProviderType string
-
-const (
-	ProviderOpenAI      ProviderType = "openai"
-	ProviderAnthropic   ProviderType = "anthropic"
-	ProviderDeepSeek    ProviderType = "deepseek"
-	ProviderOpenRouter  ProviderType = "openrouter"
-	ProviderGemini      ProviderType = "gemini"
-	ProviderMistral     ProviderType = "mistral"
-	ProviderGroq        ProviderType = "groq"
-	ProviderAzure       ProviderType = "azure"
-	ProviderOllama      ProviderType = "ollama"
-	ProviderMoonshot    ProviderType = "moonshot"
-	ProviderZhipu       ProviderType = "zhipu"
-	ProviderQwen        ProviderType = "qwen"
-	ProviderSiliconFlow ProviderType = "siliconflow"
-	ProviderGrok        ProviderType = "grok"
 )
 
 // ProviderFactory creates a provider from configuration.
@@ -34,7 +15,7 @@ type ProviderFactory func(cfg *storage.Provider) Provider
 
 // Registry manages provider factories and instances.
 type Registry struct {
-	factories map[ProviderType]ProviderFactory
+	factories map[consts.ProviderType]ProviderFactory
 	providers map[string]Provider
 	logger    *slog.Logger
 	mu        sync.RWMutex
@@ -43,7 +24,7 @@ type Registry struct {
 // NewRegistry creates a new provider registry.
 func NewRegistry(logger *slog.Logger) *Registry {
 	r := &Registry{
-		factories: make(map[ProviderType]ProviderFactory),
+		factories: make(map[consts.ProviderType]ProviderFactory),
 		providers: make(map[string]Provider),
 		logger:    logger,
 	}
@@ -56,24 +37,24 @@ func NewRegistry(logger *slog.Logger) *Registry {
 
 // RegisterBuiltins registers all built-in provider factories.
 func (r *Registry) RegisterBuiltins() {
-	r.RegisterFactory(ProviderOpenAI, NewOpenAIProvider)
-	r.RegisterFactory(ProviderAnthropic, NewAnthropicProvider)
-	r.RegisterFactory(ProviderDeepSeek, NewDeepSeekProvider)
-	r.RegisterFactory(ProviderOpenRouter, NewOpenRouterProvider)
-	r.RegisterFactory(ProviderGemini, NewGeminiProvider)
-	r.RegisterFactory(ProviderMistral, NewMistralProvider)
-	r.RegisterFactory(ProviderGroq, NewGroqProvider)
-	r.RegisterFactory(ProviderAzure, NewAzureOpenAIProvider)
-	r.RegisterFactory(ProviderOllama, NewOllamaProvider)
-	r.RegisterFactory(ProviderMoonshot, NewMoonshotProvider)
-	r.RegisterFactory(ProviderZhipu, NewZhipuProvider)
-	r.RegisterFactory(ProviderQwen, NewQwenProvider)
-	r.RegisterFactory(ProviderSiliconFlow, NewSiliconFlowProvider)
-	r.RegisterFactory(ProviderGrok, NewGrokProvider)
+	r.RegisterFactory(consts.ProviderOpenAI, NewOpenAIProvider)
+	r.RegisterFactory(consts.ProviderAnthropic, NewAnthropicProvider)
+	r.RegisterFactory(consts.ProviderDeepSeek, NewDeepSeekProvider)
+	r.RegisterFactory(consts.ProviderOpenRouter, NewOpenRouterProvider)
+	r.RegisterFactory(consts.ProviderGemini, NewGeminiProvider)
+	r.RegisterFactory(consts.ProviderMistral, NewMistralProvider)
+	r.RegisterFactory(consts.ProviderGroq, NewGroqProvider)
+	r.RegisterFactory(consts.ProviderAzure, NewAzureOpenAIProvider)
+	r.RegisterFactory(consts.ProviderOllama, NewOllamaProvider)
+	r.RegisterFactory(consts.ProviderMoonshot, NewMoonshotProvider)
+	r.RegisterFactory(consts.ProviderZhipu, NewZhipuProvider)
+	r.RegisterFactory(consts.ProviderQwen, NewQwenProvider)
+	r.RegisterFactory(consts.ProviderSiliconFlow, NewSiliconFlowProvider)
+	r.RegisterFactory(consts.ProviderGrok, NewGrokProvider)
 }
 
 // RegisterFactory registers a provider factory.
-func (r *Registry) RegisterFactory(providerType ProviderType, factory ProviderFactory) {
+func (r *Registry) RegisterFactory(providerType consts.ProviderType, factory ProviderFactory) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -84,7 +65,7 @@ func (r *Registry) RegisterFactory(providerType ProviderType, factory ProviderFa
 // CreateProvider creates a provider from configuration.
 func (r *Registry) CreateProvider(cfg *storage.Provider) (Provider, error) {
 	r.mu.RLock()
-	factory, ok := r.factories[ProviderType(cfg.Type)]
+	factory, ok := r.factories[consts.ProviderType(cfg.Type)]
 	r.mu.RUnlock()
 
 	if !ok {
@@ -155,10 +136,10 @@ func (r *Registry) GetDefaultModel(name string) (string, error) {
 
 // ProviderInfo contains information about a provider.
 type ProviderInfo struct {
-	Name         string       `json:"name"`
-	Type         ProviderType `json:"type"`
-	DefaultModel string       `json:"default_model"`
-	Models       []string     `json:"models,omitempty"`
+	Name         string              `json:"name"`
+	Type         consts.ProviderType `json:"type"`
+	DefaultModel string              `json:"default_model"`
+	Models       []string            `json:"models,omitempty"`
 }
 
 // GetInfo returns information about a provider.
@@ -170,7 +151,7 @@ func (r *Registry) GetInfo(name string) (*ProviderInfo, error) {
 
 	return &ProviderInfo{
 		Name:         name,
-		Type:         ProviderType(provider.GetName()),
+		Type:         consts.ProviderType(provider.GetName()),
 		DefaultModel: provider.GetDefaultModel(),
 	}, nil
 }
@@ -184,7 +165,7 @@ func (r *Registry) ListInfo() []*ProviderInfo {
 	for name, provider := range r.providers {
 		infos = append(infos, &ProviderInfo{
 			Name:         name,
-			Type:         ProviderType(provider.GetName()),
+			Type:         consts.ProviderType(provider.GetName()),
 			DefaultModel: provider.GetDefaultModel(),
 		})
 	}

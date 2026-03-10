@@ -9,30 +9,30 @@ import (
 	"net/http"
 )
 
-// DeepSeekProvider implements Provider for DeepSeek.
-type DeepSeekProvider struct {
+// MoonshotProvider implements Provider for Moonshot (月之暗面).
+type MoonshotProvider struct {
 	*BaseProvider
 }
 
-// NewDeepSeekProvider creates a new DeepSeek provider.
-func NewDeepSeekProvider(cfg *storage.Provider) Provider {
-	providerName := consts.ProviderDeepSeek
+// NewMoonshotProvider creates a new Moonshot provider.
+func NewMoonshotProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderMoonshot
 	apiBase := cfg.APIBase
 	if apiBase == "" {
-		apiBase = "https://api.deepseek.com/v1"
+		apiBase = "https://api.moonshot.cn/v1"
 	}
 	defaultModel := cfg.DefaultModel
 	if defaultModel == "" {
-		defaultModel = "deepseek-chat"
+		defaultModel = "moonshot-v1-8k"
 	}
 
-	return &DeepSeekProvider{
+	return &MoonshotProvider{
 		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 
-// Chat sends a chat request to DeepSeek.
-func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+// Chat sends a chat request to Moonshot.
+func (p *MoonshotProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	req.Stream = false
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {
@@ -49,10 +49,8 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 		Model   string `json:"model"`
 		Choices []struct {
 			Message struct {
-				Role      string     `json:"role"`
-				Content   string     `json:"content"`
-				Reasoning string     `json:"reasoning_content"`
-				ToolCalls []ToolCall `json:"tool_calls"`
+				Role    string `json:"role"`
+				Content string `json:"content"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -68,17 +66,15 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 	}
 
 	return &ChatResponse{
-		ID:        result.ID,
-		Model:     result.Model,
-		Content:   result.Choices[0].Message.Content,
-		Reasoning: result.Choices[0].Message.Reasoning,
-		ToolCalls: result.Choices[0].Message.ToolCalls,
-		Usage:     result.Usage,
+		ID:      result.ID,
+		Model:   result.Model,
+		Content: result.Choices[0].Message.Content,
+		Usage:   result.Usage,
 	}, nil
 }
 
-// ChatStream sends a streaming chat request to DeepSeek.
-func (p *DeepSeekProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+// ChatStream sends a streaming chat request to Moonshot.
+func (p *MoonshotProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
 	req.Stream = true
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {

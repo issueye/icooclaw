@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ type AzureOpenAIProvider struct {
 
 // NewAzureOpenAIProvider creates a new Azure OpenAI provider.
 func NewAzureOpenAIProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderAzure
 	apiVersion := "2024-02-15-preview"
 	v, ok := cfg.Metadata["api_version"].(string)
 	if ok && v != "" {
@@ -31,7 +33,7 @@ func NewAzureOpenAIProvider(cfg *storage.Provider) Provider {
 	}
 
 	return &AzureOpenAIProvider{
-		BaseProvider: NewBaseProvider("azure", cfg.APIKey, cfg.APIBase, deployment),
+		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, cfg.APIBase, deployment),
 		apiVersion:   apiVersion,
 		deployment:   deployment,
 	}

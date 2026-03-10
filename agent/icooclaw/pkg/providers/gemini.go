@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 )
 
@@ -23,6 +24,7 @@ type GeminiProvider struct {
 
 // NewGeminiProvider creates a new Gemini provider.
 func NewGeminiProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderGemini
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://generativelanguage.googleapis.com/v1beta"
@@ -33,7 +35,7 @@ func NewGeminiProvider(cfg *storage.Provider) Provider {
 	}
 
 	return &GeminiProvider{
-		BaseProvider: NewBaseProvider("gemini", cfg.APIKey, apiBase, defaultModel),
+		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 
@@ -285,84 +287,4 @@ func (p *GeminiProvider) ChatStream(ctx context.Context, req ChatRequest, callba
 	}
 
 	return scanner.Err()
-}
-
-// MistralProvider implements Provider for Mistral AI.
-type MistralProvider struct {
-	*BaseProvider
-}
-
-// NewMistralProvider creates a new Mistral provider.
-func NewMistralProvider(cfg *storage.Provider) Provider {
-	apiBase := cfg.APIBase
-	if apiBase == "" {
-		apiBase = "https://api.mistral.ai/v1"
-	}
-	defaultModel := cfg.DefaultModel
-	if defaultModel == "" {
-		defaultModel = "mistral-large-latest"
-	}
-
-	return &MistralProvider{
-		BaseProvider: NewBaseProvider("mistral", cfg.APIKey, apiBase, defaultModel),
-	}
-}
-
-// Chat sends a chat request to Mistral.
-func (p *MistralProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
-	req.Stream = false
-	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, p.handleError(resp)
-	}
-
-	var result struct {
-		ID      string `json:"id"`
-		Model   string `json:"model"`
-		Choices []struct {
-			Message struct {
-				Role      string     `json:"role"`
-				Content   string     `json:"content"`
-				ToolCalls []ToolCall `json:"tool_calls"`
-			} `json:"message"`
-			FinishReason string `json:"finish_reason"`
-		} `json:"choices"`
-		Usage Usage `json:"usage"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if len(result.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in response")
-	}
-
-	return &ChatResponse{
-		ID:        result.ID,
-		Model:     result.Model,
-		Content:   result.Choices[0].Message.Content,
-		ToolCalls: result.Choices[0].Message.ToolCalls,
-		Usage:     result.Usage,
-	}, nil
-}
-
-// ChatStream sends a streaming chat request to Mistral.
-func (p *MistralProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
-	req.Stream = true
-	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return p.handleError(resp)
-	}
-
-	return p.streamResponse(resp, callback)
 }

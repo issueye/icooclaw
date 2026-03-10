@@ -21,6 +21,8 @@ type Handlers struct {
 	Skill    *handlers.SkillHandler
 	Channel  *handlers.ChannelHandler
 	Param    *handlers.ParamHandler
+	Tool     *handlers.ToolHandler
+	Binding  *handlers.BindingHandler
 }
 
 // NewHandlers 创建所有处理器
@@ -36,6 +38,8 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 		Skill:    handlers.NewSkillHandler(logger, storage),
 		Channel:  handlers.NewChannelHandler(logger, storage),
 		Param:    handlers.NewParamHandler(logger, storage),
+		Tool:     handlers.NewToolHandler(logger, storage),
+		Binding:  handlers.NewBindingHandler(logger, storage),
 	}
 }
 
@@ -143,6 +147,27 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		// 便捷接口
 		r.Post("/default-model/set", h.Param.SetDefaultModel) // 设置默认模型
 		r.Get("/default-model/get", h.Param.GetDefaultModel)  // 获取默认模型
+	})
+
+	// Tool 路由
+	r.Route("/api/v1/tools", func(r chi.Router) {
+		r.Post("/page", h.Tool.Page)
+		r.Post("/create", h.Tool.Create)
+		r.Post("/update", h.Tool.Update)
+		r.Post("/delete", h.Tool.Delete)
+		r.Post("/get", h.Tool.GetByID)
+		r.Get("/all", h.Tool.GetAll)
+		r.Get("/enabled", h.Tool.GetEnabled)
+	})
+
+	// Binding 路由
+	r.Route("/api/v1/bindings", func(r chi.Router) {
+		r.Post("/page", h.Binding.Page)
+		r.Post("/create", h.Binding.Create)
+		r.Post("/update", h.Binding.Update)
+		r.Post("/delete", h.Binding.Delete)
+		r.Post("/get", h.Binding.GetByID)
+		r.Get("/all", h.Binding.GetAll)
 	})
 }
 

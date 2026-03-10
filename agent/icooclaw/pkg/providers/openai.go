@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 	"net/http"
 )
@@ -15,6 +16,7 @@ type OpenAIProvider struct {
 
 // NewOpenAIProvider creates a new OpenAI provider.
 func NewOpenAIProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderOpenAI
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.openai.com/v1"
@@ -25,7 +27,7 @@ func NewOpenAIProvider(cfg *storage.Provider) Provider {
 	}
 
 	return &OpenAIProvider{
-		BaseProvider: NewBaseProvider("openai", cfg.APIKey, apiBase, defaultModel),
+		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 

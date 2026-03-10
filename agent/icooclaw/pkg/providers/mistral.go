@@ -9,30 +9,30 @@ import (
 	"net/http"
 )
 
-// DeepSeekProvider implements Provider for DeepSeek.
-type DeepSeekProvider struct {
+// MistralProvider implements Provider for Mistral AI.
+type MistralProvider struct {
 	*BaseProvider
 }
 
-// NewDeepSeekProvider creates a new DeepSeek provider.
-func NewDeepSeekProvider(cfg *storage.Provider) Provider {
-	providerName := consts.ProviderDeepSeek
+// NewMistralProvider creates a new Mistral provider.
+func NewMistralProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderMistral
 	apiBase := cfg.APIBase
 	if apiBase == "" {
-		apiBase = "https://api.deepseek.com/v1"
+		apiBase = "https://api.mistral.ai/v1"
 	}
 	defaultModel := cfg.DefaultModel
 	if defaultModel == "" {
-		defaultModel = "deepseek-chat"
+		defaultModel = "mistral-large-latest"
 	}
 
-	return &DeepSeekProvider{
+	return &MistralProvider{
 		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 
-// Chat sends a chat request to DeepSeek.
-func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+// Chat sends a chat request to Mistral.
+func (p *MistralProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	req.Stream = false
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {
@@ -51,7 +51,6 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 			Message struct {
 				Role      string     `json:"role"`
 				Content   string     `json:"content"`
-				Reasoning string     `json:"reasoning_content"`
 				ToolCalls []ToolCall `json:"tool_calls"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
@@ -71,14 +70,13 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 		ID:        result.ID,
 		Model:     result.Model,
 		Content:   result.Choices[0].Message.Content,
-		Reasoning: result.Choices[0].Message.Reasoning,
 		ToolCalls: result.Choices[0].Message.ToolCalls,
 		Usage:     result.Usage,
 	}, nil
 }
 
-// ChatStream sends a streaming chat request to DeepSeek.
-func (p *DeepSeekProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+// ChatStream sends a streaming chat request to Mistral.
+func (p *MistralProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
 	req.Stream = true
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {

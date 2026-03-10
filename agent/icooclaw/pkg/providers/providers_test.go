@@ -4,6 +4,7 @@ package providers
 import (
 	"testing"
 
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 )
 
@@ -94,17 +95,18 @@ func TestRegistry_RegisterFactory(t *testing.T) {
 	registry := NewRegistry(nil)
 
 	// Check built-in factories
-	factories := []ProviderType{
-		ProviderOpenAI,
-		ProviderAnthropic,
-		ProviderDeepSeek,
-		ProviderGemini,
-		ProviderMistral,
-		ProviderGroq,
-		ProviderOllama,
-		ProviderQwen,
-		ProviderZhipu,
-		ProviderMoonshot,
+	factories := []consts.ProviderType{
+		consts.ProviderOpenAI,
+		consts.ProviderAnthropic,
+		consts.ProviderDeepSeek,
+		consts.ProviderOpenRouter,
+		consts.ProviderGemini,
+		consts.ProviderMistral,
+		consts.ProviderGroq,
+		consts.ProviderOllama,
+		consts.ProviderMoonshot,
+		consts.ProviderQwen,
+		consts.ProviderSiliconFlow,
 	}
 
 	for _, ft := range factories {
@@ -131,7 +133,7 @@ func TestRegistry_CreateProvider(t *testing.T) {
 		t.Run(tt.providerType, func(t *testing.T) {
 			cfg := &storage.Provider{
 				Name:         "test",
-				Type:         tt.providerType,
+				Type:         consts.ToProviderType(tt.providerType),
 				APIKey:       "test-key",
 				DefaultModel: "test-model",
 			}

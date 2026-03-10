@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"icooclaw/pkg/consts"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,17 +15,17 @@ import (
 // Only basic configuration is stored in config file.
 // Dynamic configuration is stored in SQLite database.
 type Config struct {
-	Agent   AgentConfig   `mapstructure:"agent"`
+	Agent    AgentConfig    `mapstructure:"agent"`
 	Database DatabaseConfig `mapstructure:"database"`
-	Gateway GatewayConfig `mapstructure:"gateway"`
-	Logging LoggingConfig `mapstructure:"logging"`
+	Gateway  GatewayConfig  `mapstructure:"gateway"`
+	Logging  LoggingConfig  `mapstructure:"logging"`
 }
 
 // AgentConfig contains basic agent configuration.
 type AgentConfig struct {
-	Workspace       string `mapstructure:"workspace"`
-	DefaultModel    string `mapstructure:"default_model"`
-	DefaultProvider string `mapstructure:"default_provider"`
+	Workspace       string              `mapstructure:"workspace"`
+	DefaultModel    string              `mapstructure:"default_model"`
+	DefaultProvider consts.ProviderType `mapstructure:"default_provider"`
 }
 
 // DatabaseConfig contains database configuration.
@@ -50,7 +51,7 @@ func DefaultConfig() *Config {
 		Agent: AgentConfig{
 			Workspace:       "./workspace",
 			DefaultModel:    "gpt-4",
-			DefaultProvider: "openai",
+			DefaultProvider: consts.ProviderQwen,
 		},
 		Database: DatabaseConfig{
 			Path: "./data/icooclaw.db",

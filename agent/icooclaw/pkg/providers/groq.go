@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 	"net/http"
 )
@@ -15,6 +16,7 @@ type GroqProvider struct {
 
 // NewGroqProvider creates a new Groq provider.
 func NewGroqProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderGroq
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.groq.com/openai/v1"
@@ -25,7 +27,7 @@ func NewGroqProvider(cfg *storage.Provider) Provider {
 	}
 
 	return &GroqProvider{
-		BaseProvider: NewBaseProvider("groq", cfg.APIKey, apiBase, defaultModel),
+		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 

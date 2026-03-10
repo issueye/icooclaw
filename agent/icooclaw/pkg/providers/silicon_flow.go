@@ -9,30 +9,30 @@ import (
 	"net/http"
 )
 
-// DeepSeekProvider implements Provider for DeepSeek.
-type DeepSeekProvider struct {
+// SiliconFlowProvider implements Provider for SiliconFlow.
+type SiliconFlowProvider struct {
 	*BaseProvider
 }
 
-// NewDeepSeekProvider creates a new DeepSeek provider.
-func NewDeepSeekProvider(cfg *storage.Provider) Provider {
-	providerName := consts.ProviderDeepSeek
+// NewSiliconFlowProvider creates a new SiliconFlow provider.
+func NewSiliconFlowProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderSiliconFlow
 	apiBase := cfg.APIBase
 	if apiBase == "" {
-		apiBase = "https://api.deepseek.com/v1"
+		apiBase = "https://api.siliconflow.cn/v1"
 	}
 	defaultModel := cfg.DefaultModel
 	if defaultModel == "" {
-		defaultModel = "deepseek-chat"
+		defaultModel = "Qwen/Qwen2.5-7B-Instruct"
 	}
 
-	return &DeepSeekProvider{
+	return &SiliconFlowProvider{
 		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 
-// Chat sends a chat request to DeepSeek.
-func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+// Chat sends a chat request to SiliconFlow.
+func (p *SiliconFlowProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	req.Stream = false
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {
@@ -51,7 +51,6 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 			Message struct {
 				Role      string     `json:"role"`
 				Content   string     `json:"content"`
-				Reasoning string     `json:"reasoning_content"`
 				ToolCalls []ToolCall `json:"tool_calls"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
@@ -71,14 +70,13 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 		ID:        result.ID,
 		Model:     result.Model,
 		Content:   result.Choices[0].Message.Content,
-		Reasoning: result.Choices[0].Message.Reasoning,
 		ToolCalls: result.Choices[0].Message.ToolCalls,
 		Usage:     result.Usage,
 	}, nil
 }
 
-// ChatStream sends a streaming chat request to DeepSeek.
-func (p *DeepSeekProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
+// ChatStream sends a streaming chat request to SiliconFlow.
+func (p *SiliconFlowProvider) ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error {
 	req.Stream = true
 	resp, err := p.doRequest(ctx, "POST", "/chat/completions", req)
 	if err != nil {

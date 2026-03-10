@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/storage"
 	"net/http"
 	"strings"
@@ -17,7 +18,9 @@ type AnthropicProvider struct {
 
 // NewAnthropicProvider creates a new Anthropic provider.
 func NewAnthropicProvider(cfg *storage.Provider) Provider {
+	providerName := consts.ProviderAnthropic
 	apiBase := cfg.APIBase
+	// 处理默认值
 	if apiBase == "" {
 		apiBase = "https://api.anthropic.com/v1"
 	}
@@ -27,7 +30,7 @@ func NewAnthropicProvider(cfg *storage.Provider) Provider {
 	}
 
 	return &AnthropicProvider{
-		BaseProvider: NewBaseProvider("anthropic", cfg.APIKey, apiBase, defaultModel),
+		BaseProvider: NewBaseProvider(providerName.ToString(), cfg.APIKey, apiBase, defaultModel),
 	}
 }
 

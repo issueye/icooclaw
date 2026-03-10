@@ -6,20 +6,21 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"icooclaw/pkg/consts"
 	icooclawErrors "icooclaw/pkg/errors"
 )
 
 // Provider represents a provider configuration.
 type Provider struct {
 	Model
-	Name         string         `gorm:"column:name;type:varchar(100);not null;comment:提供商名称" json:"name"`
-	Type         string         `gorm:"column:type;type:varchar(50);not null;comment:提供商类型" json:"type"`
-	APIKey       string         `gorm:"column:api_key;type:varchar(255);comment:API密钥" json:"api_key"`
-	APIBase      string         `gorm:"column:api_base;type:varchar(255);comment:API基础URL" json:"api_base"`
-	DefaultModel string         `gorm:"column:default_model;type:varchar(100);comment:默认模型" json:"default_model"`
-	Models       []string       `gorm:"column:models;type:text;serializer:json;comment:支持的模型列表(JSON数组)" json:"models"` // JSON array
-	Config       string         `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                      // JSON object
-	Metadata     map[string]any `gorm:"column:metadata;type:text;serializer:json;comment:元数据(JSON格式)" json:"metadata"` // JSON object
+	Name         string              `gorm:"column:name;type:varchar(100);not null;comment:提供商名称" json:"name"`
+	Type         consts.ProviderType `gorm:"column:type;type:varchar(50);not null;comment:提供商类型" json:"type"`
+	APIKey       string              `gorm:"column:api_key;type:varchar(255);comment:API密钥" json:"api_key"`
+	APIBase      string              `gorm:"column:api_base;type:varchar(255);comment:API基础URL" json:"api_base"`
+	DefaultModel string              `gorm:"column:default_model;type:varchar(100);comment:默认模型" json:"default_model"`
+	Models       []string            `gorm:"column:models;type:text;serializer:json;comment:支持的模型列表(JSON数组)" json:"models"` // JSON array
+	Config       string              `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                      // JSON object
+	Metadata     map[string]any      `gorm:"column:metadata;type:text;serializer:json;comment:元数据(JSON格式)" json:"metadata"` // JSON object
 }
 
 // TableName returns the table name for Provider.
