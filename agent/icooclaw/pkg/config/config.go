@@ -19,6 +19,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Gateway  GatewayConfig  `mapstructure:"gateway"`
 	Logging  LoggingConfig  `mapstructure:"logging"`
+	Channels ChannelsConfig `mapstructure:"channels"`
 }
 
 // AgentConfig contains basic agent configuration.
@@ -43,6 +44,33 @@ type GatewayConfig struct {
 type LoggingConfig struct {
 	Level  string `mapstructure:"level"`
 	Format string `mapstructure:"format"`
+}
+
+// ChannelsConfig contains channel-specific configurations.
+type ChannelsConfig struct {
+	Feishu   FeishuConfig   `mapstructure:"feishu"`
+	DingTalk DingTalkConfig `mapstructure:"dingtalk"`
+}
+
+// FeishuConfig contains Feishu/Lark channel configuration.
+type FeishuConfig struct {
+	Enabled           bool     `mapstructure:"enabled"`
+	AppID             string   `mapstructure:"app_id"`
+	AppSecret         string   `mapstructure:"app_secret"`
+	EncryptKey        string   `mapstructure:"encrypt_key"`
+	VerificationToken string   `mapstructure:"verification_token"`
+	AllowFrom         []string `mapstructure:"allow_from"`
+	ReasoningChatID   string   `mapstructure:"reasoning_chat_id"`
+}
+
+// DingTalkConfig contains DingTalk channel configuration.
+type DingTalkConfig struct {
+	Enabled         bool     `mapstructure:"enabled"`
+	ClientID        string   `mapstructure:"client_id"`
+	ClientSecret    string   `mapstructure:"client_secret"`
+	AgentID         int64    `mapstructure:"agent_id"`
+	AllowFrom       []string `mapstructure:"allow_from"`
+	ReasoningChatID string   `mapstructure:"reasoning_chat_id"`
 }
 
 // DefaultConfig returns the default configuration.

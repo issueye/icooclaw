@@ -3,6 +3,7 @@ package dingtalk
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -37,9 +38,9 @@ type ImageMessage struct {
 
 // FileMessage represents a file message.
 type FileMessage struct {
-	MediaID   string `json:"media_id"`
-	FileName  string `json:"file_name,omitempty"`
-	FileType  string `json:"file_type,omitempty"`
+	MediaID  string `json:"media_id"`
+	FileName string `json:"file_name,omitempty"`
+	FileType string `json:"file_type,omitempty"`
 }
 
 // LinkMessage represents a link message.
@@ -88,7 +89,7 @@ func ParseMarkdownContent(content string) (*MarkdownMessage, error) {
 // FormatMarkdownForDingTalk formats markdown content for DingTalk.
 // DingTalk markdown has some limitations compared to standard markdown.
 func FormatMarkdownForDingTalk(content string) string {
-	// DingTalk markdown doesn't support all standard markdown features
+	// DingTalk doesn't support all standard markdown features
 	// We need to convert some syntax
 
 	// Convert code blocks with language to simple code blocks
@@ -158,6 +159,17 @@ func ensureLineBreaks(content string) string {
 	return content
 }
 
+// Regex patterns for markdown extraction
+var (
+	codeBlockRegex  = regexp.MustCompile("(?s)```.*?```")
+	inlineCodeRegex = regexp.MustCompile("`([^`]+)`")
+	linkRegex       = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	imageRegex      = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
+	headerRegex     = regexp.MustCompile(`^#{1,6}\s+(.+)$`)
+	boldRegex       = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	italicRegex     = regexp.MustCompile(`\*([^*]+)\*`)
+)
+
 // ExtractTextFromMarkdown extracts plain text from markdown content.
 func ExtractTextFromMarkdown(markdown string) string {
 	// Remove code blocks
@@ -183,21 +195,4 @@ func ExtractTextFromMarkdown(markdown string) string {
 	result = strings.TrimSpace(result)
 
 	return result
-}
-
-var (
-	codeBlockRegex  = regexpCompile("(?s)```.*?```")
-	inlineCodeRegex = regexpCompile("`([^`]+)`")
-	linkRegex       = regexpCompile(`\[([^\]]+)\]\([^)]+\)`)
-	imageRegex      = regexpCompile(`!\[([^\]]*)\]\([^)]+\)`)
-	headerRegex     = regexpCompile(`^#{1,6}\s+(.+)$`)
-	boldRegex       = regexpCompile(`\*\*([^*]+)\*\*`)
-	italicRegex     = regexpCompile(`\*([^*]+)\*`)
-)
-
-// regexpCompile compiles a regex pattern.
-func regexpCompile(pattern string) interface {
-	ReplaceAllString(src, repl string) string
-} {
-	return strings.NewReplacer() // placeholder, actual implementation needs regexp
 }

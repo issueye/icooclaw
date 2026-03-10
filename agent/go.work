@@ -2,8 +2,5 @@ go 1.24.11
 
 use (
 	./icooclaw
-	./icooclaw.ai
-	./icooclaw.cmd
 	./icooclaw.core
-	./icooclaw.gateway
 )
