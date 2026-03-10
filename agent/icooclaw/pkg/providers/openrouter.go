@@ -16,7 +16,7 @@ type OpenRouterProvider struct {
 }
 
 // NewOpenRouterProvider creates a new OpenRouter provider.
-func NewOpenRouterProvider(cfg *storage.Provider) *OpenRouterProvider {
+func NewOpenRouterProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://openrouter.ai/api/v1"

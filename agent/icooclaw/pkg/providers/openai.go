@@ -14,7 +14,7 @@ type OpenAIProvider struct {
 }
 
 // NewOpenAIProvider creates a new OpenAI provider.
-func NewOpenAIProvider(cfg *storage.Provider) *OpenAIProvider {
+func NewOpenAIProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.openai.com/v1"

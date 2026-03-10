@@ -158,92 +158,6 @@
           </div>
         </section>
 
-        <!-- 工作区设置 -->
-        <section v-if="activeSection === 'workspace'" class="space-y-6">
-          <div>
-            <h2 class="text-xl font-semibold mb-1">工作区设置</h2>
-            <p class="text-text-secondary text-sm">配置工作目录路径</p>
-          </div>
-
-          <div
-            class="bg-bg-secondary rounded-xl border border-border p-6 space-y-4"
-          >
-            <div>
-              <label class="block text-sm text-text-secondary mb-2">
-                工作区路径
-              </label>
-              <div class="flex gap-2">
-                <input
-                  v-model="workspace"
-                  type="text"
-                  placeholder="./workspace"
-                  class="flex-1 px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
-                />
-                <button
-                  @click="handleSetWorkspace"
-                  :disabled="savingWorkspace"
-                  class="px-4 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-                >
-                  {{ savingWorkspace ? "保存中..." : "保存" }}
-                </button>
-              </div>
-              <p class="text-xs text-text-secondary mt-2">
-                修改工作区后需要重启服务才能生效
-              </p>
-            </div>
-          </div>
-
-          <!-- 配置文件 -->
-          <div class="bg-bg-secondary rounded-xl border border-border p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-medium">配置文件</h3>
-              <button
-                @click="loadConfigFile"
-                class="text-xs text-accent hover:text-accent-hover transition-colors"
-              >
-                刷新
-              </button>
-            </div>
-
-            <div class="mb-3">
-              <label class="block text-xs text-text-secondary mb-1"
-                >文件路径</label
-              >
-              <div class="text-sm text-text-secondary">
-                {{ configPath || "-" }}
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs text-text-secondary mb-2"
-                >配置内容 (TOML)</label
-              >
-              <textarea
-                v-model="configContent"
-                rows="12"
-                class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm font-mono focus:outline-none focus:border-accent transition-colors resize-none"
-                placeholder="加载配置文件..."
-              ></textarea>
-            </div>
-
-            <div class="flex justify-end gap-2 mt-3">
-              <button
-                @click="loadConfigFile"
-                class="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
-              >
-                重置
-              </button>
-              <button
-                @click="handleOverwriteConfig"
-                :disabled="savingConfig"
-                class="px-3 py-1.5 text-sm bg-accent hover:bg-accent-hover disabled:opacity-50 rounded-lg transition-colors"
-              >
-                {{ savingConfig ? "保存中..." : "保存配置" }}
-              </button>
-            </div>
-          </div>
-        </section>
-
         <!-- Provider 设置 -->
         <section v-if="activeSection === 'provider'" class="space-y-6">
           <div class="flex items-center justify-between">
@@ -1136,7 +1050,6 @@ import {
   ChevronRight as ChevronRightIcon,
   Moon as MoonIcon,
   Sun as SunIcon,
-  Folder as FolderIcon,
   Palette as PaletteIcon,
   Info as InfoIcon,
   Wifi as ConnectionIcon,
@@ -1167,7 +1080,6 @@ const { status: wsStatus } = useWebSocket();
 // 菜单项
 const menuItems = [
   { key: "connection", label: "连接设置", icon: ConnectionIcon },
-  { key: "workspace", label: "工作区", icon: FolderIcon },
   { key: "provider", label: "LLM Provider", icon: BotIcon },
   { key: "skill", label: "技能管理", icon: SparklesIcon },
   { key: "channel", label: "渠道管理", icon: ChannelIcon },
@@ -1188,10 +1100,6 @@ const userId = ref(chatStore.userId);
 // 连接状态
 const wsConnected = ref(chatStore.wsConnected);
 const connecting = ref(false);
-
-// 工作区
-const workspace = ref("");
-const savingWorkspace = ref(false);
 
 // 配置文件
 const configPath = ref("");
@@ -1637,31 +1545,6 @@ async function checkHealth() {
   }
 }
 
-// 加载工作区
-async function loadWorkspace() {
-  try {
-    const response = await api.getWorkspace();
-    workspace.value = response.data?.workspace || "";
-  } catch (error) {
-    console.error("获取工作区失败:", error);
-  }
-}
-
-// 设置工作区
-async function handleSetWorkspace() {
-  if (!workspace.value) return;
-
-  savingWorkspace.value = true;
-  try {
-    await api.setWorkspace(workspace.value);
-    alert("工作区已设置，需要重启服务才能生效");
-  } catch (error) {
-    console.error("设置工作区失败:", error);
-    alert("设置工作区失败: " + error.message);
-  }
-  savingWorkspace.value = false;
-}
-
 // 加载配置文件
 async function loadConfigFile() {
   try {
@@ -1883,9 +1766,7 @@ function handleDisconnect() {
 
 // 监听菜单切换，重新加载对应数据
 watch(activeSection, (newVal) => {
-  if (newVal === "workspace") {
-    loadConfigFile();
-  } else if (newVal === "provider") {
+  if (newVal === "provider") {
     loadProviders();
   } else if (newVal === "skill") {
     skillStore.fetchSkills();
@@ -1897,7 +1778,6 @@ watch(activeSection, (newVal) => {
 onMounted(() => {
   loadProviders();
   checkHealth();
-  loadWorkspace();
   skillStore.fetchSkills();
 });
 </script>

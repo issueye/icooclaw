@@ -19,7 +19,7 @@ type OllamaProvider struct {
 }
 
 // NewOllamaProvider creates a new Ollama provider.
-func NewOllamaProvider(cfg *storage.Provider) *OllamaProvider {
+func NewOllamaProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "http://localhost:11434"
@@ -209,7 +209,7 @@ type MoonshotProvider struct {
 }
 
 // NewMoonshotProvider creates a new Moonshot provider.
-func NewMoonshotProvider(cfg *storage.Provider) *MoonshotProvider {
+func NewMoonshotProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.moonshot.cn/v1"
@@ -287,7 +287,7 @@ type ZhipuProvider struct {
 }
 
 // NewZhipuProvider creates a new Zhipu provider.
-func NewZhipuProvider(cfg *storage.Provider) *ZhipuProvider {
+func NewZhipuProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://open.bigmodel.cn/api/paas/v4"
@@ -367,7 +367,7 @@ type QwenProvider struct {
 }
 
 // NewQwenProvider creates a new Qwen provider.
-func NewQwenProvider(cfg *storage.Provider) *QwenProvider {
+func NewQwenProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -449,7 +449,7 @@ type SiliconFlowProvider struct {
 }
 
 // NewSiliconFlowProvider creates a new SiliconFlow provider.
-func NewSiliconFlowProvider(cfg *storage.Provider) *SiliconFlowProvider {
+func NewSiliconFlowProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.siliconflow.cn/v1"
@@ -529,7 +529,7 @@ type GrokProvider struct {
 }
 
 // NewGrokProvider creates a new Grok provider.
-func NewGrokProvider(cfg *storage.Provider) *GrokProvider {
+func NewGrokProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.x.ai/v1"

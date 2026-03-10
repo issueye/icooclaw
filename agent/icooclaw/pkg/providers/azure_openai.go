@@ -18,7 +18,7 @@ type AzureOpenAIProvider struct {
 }
 
 // NewAzureOpenAIProvider creates a new Azure OpenAI provider.
-func NewAzureOpenAIProvider(cfg *storage.Provider) *AzureOpenAIProvider {
+func NewAzureOpenAIProvider(cfg *storage.Provider) Provider {
 	apiVersion := "2024-02-15-preview"
 	v, ok := cfg.Metadata["api_version"].(string)
 	if ok && v != "" {

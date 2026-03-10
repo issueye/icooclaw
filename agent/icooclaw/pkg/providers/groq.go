@@ -14,7 +14,7 @@ type GroqProvider struct {
 }
 
 // NewGroqProvider creates a new Groq provider.
-func NewGroqProvider(cfg *storage.Provider) *GroqProvider {
+func NewGroqProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.groq.com/openai/v1"

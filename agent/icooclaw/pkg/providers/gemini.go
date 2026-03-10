@@ -22,7 +22,7 @@ type GeminiProvider struct {
 }
 
 // NewGeminiProvider creates a new Gemini provider.
-func NewGeminiProvider(cfg *storage.Provider) *GeminiProvider {
+func NewGeminiProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://generativelanguage.googleapis.com/v1beta"
@@ -293,7 +293,7 @@ type MistralProvider struct {
 }
 
 // NewMistralProvider creates a new Mistral provider.
-func NewMistralProvider(cfg *storage.Provider) *MistralProvider {
+func NewMistralProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.mistral.ai/v1"

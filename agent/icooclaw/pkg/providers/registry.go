@@ -56,7 +56,7 @@ func NewRegistry(logger *slog.Logger) *Registry {
 
 // RegisterBuiltins registers all built-in provider factories.
 func (r *Registry) RegisterBuiltins() {
-	r.RegisterFactory(ProviderOpenAI, NewOpenAIProvider(nil))
+	r.RegisterFactory(ProviderOpenAI, NewOpenAIProvider)
 	r.RegisterFactory(ProviderAnthropic, NewAnthropicProvider)
 	r.RegisterFactory(ProviderDeepSeek, NewDeepSeekProvider)
 	r.RegisterFactory(ProviderOpenRouter, NewOpenRouterProvider)

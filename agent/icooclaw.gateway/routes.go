@@ -140,17 +140,11 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 
 	// Config 路由
 	r.Route("/api/v1/config", func(r chi.Router) {
-		r.Get("/", h.Config.GetConfig)              // 获取配置
-		r.Post("/update", h.Config.UpdateConfig)    // 更新配置
+		r.Get("/", h.Config.GetConfig)                 // 获取配置
+		r.Post("/update", h.Config.UpdateConfig)       // 更新配置
 		r.Post("/overwrite", h.Config.OverwriteConfig) // 覆盖配置文件
 		r.Get("/file", h.Config.GetConfigFileContent)  // 获取配置文件内容
 		r.Get("/json", h.Config.GetConfigJSON)         // 获取 JSON 格式配置
-	})
-
-	// Workspace 路由
-	r.Route("/api/v1/workspace", func(r chi.Router) {
-		r.Get("/", h.Config.GetWorkspace)    // 获取工作区
-		r.Post("/set", h.Config.SetWorkspace) // 设置工作区
 	})
 
 	// WebSocket 聊天路由
@@ -158,14 +152,14 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 
 	// 队列管理路由
 	r.Route("/api/v1/queue", func(r chi.Router) {
-		r.Get("/status", h.Chat.GetQueueStatus)       // 获取队列状态
+		r.Get("/status", h.Chat.GetQueueStatus)            // 获取队列状态
 		r.Post("/max-concurrent", h.Chat.SetMaxConcurrent) // 设置最大并发数
 	})
 
 	// Agent 管理路由
 	r.Route("/api/v1/agents", func(r chi.Router) {
-		r.Get("/status", h.Chat.GetAgentStatus)       // 获取 Agent 状态
-		r.Post("/max-agents", h.Chat.SetMaxAgents)    // 设置最大 Agent 数量
+		r.Get("/status", h.Chat.GetAgentStatus)    // 获取 Agent 状态
+		r.Post("/max-agents", h.Chat.SetMaxAgents) // 设置最大 Agent 数量
 	})
 
 	// 参数配置路由
@@ -180,8 +174,8 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Post("/by-group", h.Param.GetByGroup) // 按分组获取
 
 		// 便捷接口
-		r.Post("/default-model/set", h.Param.SetDefaultModel)   // 设置默认模型
-		r.Get("/default-model/get", h.Param.GetDefaultModel)    // 获取默认模型
+		r.Post("/default-model/set", h.Param.SetDefaultModel) // 设置默认模型
+		r.Get("/default-model/get", h.Param.GetDefaultModel)  // 获取默认模型
 	})
 }
 

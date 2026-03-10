@@ -593,19 +593,6 @@ export async function getConfigJSON() {
   return request('/api/v1/config/json');
 }
 
-// ===== Workspace API =====
-
-export async function getWorkspace() {
-  return request('/api/v1/workspace/');
-}
-
-export async function setWorkspace(workspace) {
-  return request('/api/v1/workspace/set', {
-    method: 'POST',
-    body: JSON.stringify({ workspace }),
-  });
-}
-
 // ===== Chat API (WebSocket 流式) =====
 
 export async function sendChatMessage(content, chatId, userId) {
@@ -780,10 +767,6 @@ export default {
   overwriteConfig,
   getConfigFile,
   getConfigJSON,
-  
-  // Workspace
-  getWorkspace,
-  setWorkspace,
   
   // Chat
   sendChatMessage,

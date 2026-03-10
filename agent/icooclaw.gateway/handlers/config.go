@@ -35,62 +35,6 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetWorkspace 获取工作区路径
-func (h *ConfigHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspace := viper.GetString("workspace")
-	if workspace == "" {
-		workspace = "./workspace"
-	}
-
-	models.WriteData(w, models.BaseResponse[map[string]string]{
-		Code:    http.StatusOK,
-		Message: "获取工作区成功",
-		Data: map[string]string{
-			"workspace": workspace,
-		},
-	})
-}
-
-// SetWorkspaceRequest 设置工作区请求
-type SetWorkspaceRequest struct {
-	Workspace string `json:"workspace"`
-}
-
-// SetWorkspace 设置工作区路径
-func (h *ConfigHandler) SetWorkspace(w http.ResponseWriter, r *http.Request) {
-	req, err := models.Bind[*SetWorkspaceRequest](r)
-	if err != nil {
-		h.logger.Error("绑定设置工作区请求失败", "error", err)
-		http.Error(w, "无效的请求参数", http.StatusBadRequest)
-		return
-	}
-
-	if req.Workspace == "" {
-		http.Error(w, "工作区路径不能为空", http.StatusBadRequest)
-		return
-	}
-
-	// 设置工作区
-	viper.Set("workspace", req.Workspace)
-
-	// 写入配置文件
-	if err := writeConfigFile(); err != nil {
-		h.logger.Error("保存配置文件失败", "error", err)
-		http.Error(w, "保存配置文件失败: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("工作区已更新", "workspace", req.Workspace)
-
-	models.WriteData(w, models.BaseResponse[map[string]string]{
-		Code:    http.StatusOK,
-		Message: "工作区设置成功",
-		Data: map[string]string{
-			"workspace": req.Workspace,
-		},
-	})
-}
-
 // UpdateConfigRequest 更新配置请求
 type UpdateConfigRequest struct {
 	Config map[string]interface{} `json:"config"`

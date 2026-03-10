@@ -14,7 +14,7 @@ type DeepSeekProvider struct {
 }
 
 // NewDeepSeekProvider creates a new DeepSeek provider.
-func NewDeepSeekProvider(cfg *storage.Provider) *DeepSeekProvider {
+func NewDeepSeekProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.deepseek.com/v1"

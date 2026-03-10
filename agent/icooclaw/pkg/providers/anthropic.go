@@ -16,7 +16,7 @@ type AnthropicProvider struct {
 }
 
 // NewAnthropicProvider creates a new Anthropic provider.
-func NewAnthropicProvider(cfg *storage.Provider) *AnthropicProvider {
+func NewAnthropicProvider(cfg *storage.Provider) Provider {
 	apiBase := cfg.APIBase
 	if apiBase == "" {
 		apiBase = "https://api.anthropic.com/v1"
