@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/providers"
 	"icooclaw/pkg/storage"
 )
@@ -41,7 +42,7 @@ func NewLoader(s *storage.Storage, maxItems int, logger *slog.Logger) *DefaultLo
 
 // Load loads memory for a session.
 func (l *DefaultLoader) Load(ctx context.Context, sessionKey string) ([]providers.ChatMessage, error) {
-	memories, err := l.storage.Memory().GetMemory(sessionKey, l.maxItems)
+	memories, err := l.storage.Message().Get(sessionKey, l.maxItems)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,7 @@ func (l *DefaultLoader) Load(ctx context.Context, sessionKey string) ([]provider
 	for i := len(memories) - 1; i >= 0; i-- {
 		m := memories[i]
 		messages = append(messages, providers.ChatMessage{
-			Role:    m.Role,
+			Role:    m.Role.ToString(),
 			Content: m.Content,
 		})
 	}
@@ -61,16 +62,16 @@ func (l *DefaultLoader) Load(ctx context.Context, sessionKey string) ([]provider
 
 // Save saves a memory entry.
 func (l *DefaultLoader) Save(ctx context.Context, sessionKey, role, content string) error {
-	return l.storage.Memory().SaveMemory(&storage.Memory{
+	return l.storage.Message().Save(&storage.Message{
 		SessionID: sessionKey,
-		Role:      role,
+		Role:      consts.ToRole(role),
 		Content:   content,
 	})
 }
 
 // Clear clears memory for a session.
 func (l *DefaultLoader) Clear(ctx context.Context, sessionKey string) error {
-	return l.storage.Memory().DeleteMemory(sessionKey)
+	return l.storage.Message().Delete(sessionKey)
 }
 
 // Summarizer generates summaries of conversations.
@@ -109,12 +110,12 @@ func (s *DefaultSummarizer) Summarize(ctx context.Context, messages []providers.
 		Model: s.model,
 		Messages: []providers.ChatMessage{
 			{
-				Role: "system",
+				Role: consts.RoleSystem.ToString(),
 				Content: "You are a helpful assistant that summarizes conversations. " +
 					"Provide a concise summary of the key points discussed.",
 			},
 			{
-				Role:    "user",
+				Role:    consts.RoleUser.ToString(),
 				Content: "Please summarize this conversation:\n\n" + content,
 			},
 		},
@@ -170,9 +171,9 @@ func (m *Manager) Clear(ctx context.Context, sessionKey string) error {
 }
 
 // SummarizeAndCompress summarizes old messages and compresses memory.
-func (m *Manager) SummarizeAndCompress(ctx context.Context, sessionKey string) error {
+func (m *Manager) SummarizeAndCompress(ctx context.Context, sessionID string) error {
 	// Load all messages
-	memories, err := m.storage.Memory().GetMemory(sessionKey, 0)
+	memories, err := m.storage.Message().Get(sessionID, 0)
 	if err != nil {
 		return err
 	}
@@ -187,7 +188,7 @@ func (m *Manager) SummarizeAndCompress(ctx context.Context, sessionKey string) e
 	for i := len(toSummarize) - 1; i >= 0; i-- {
 		mem := toSummarize[i]
 		messages = append(messages, providers.ChatMessage{
-			Role:    mem.Role,
+			Role:    mem.Role.ToString(),
 			Content: mem.Content,
 		})
 	}
@@ -200,15 +201,15 @@ func (m *Manager) SummarizeAndCompress(ctx context.Context, sessionKey string) e
 
 	// Delete old messages
 	for _, mem := range toSummarize {
-		if err := m.storage.Memory().DeleteMemory(mem.SessionID); err != nil {
+		if err := m.storage.Message().Delete(mem.ID); err != nil {
 			return err
 		}
 	}
 
 	// Save summary as system message
-	return m.storage.Memory().SaveMemory(&storage.Memory{
-		SessionID: sessionKey,
-		Role:      "system",
+	return m.storage.Message().Save(&storage.Message{
+		SessionID: sessionID,
+		Role:      consts.RoleSystem,
 		Content:   "Previous conversation summary: " + summary,
 		Metadata:  mustMarshalJSON(map[string]any{"type": "summary"}),
 	})

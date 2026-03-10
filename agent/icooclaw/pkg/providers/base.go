@@ -30,9 +30,9 @@ type Tool struct {
 
 // Function represents a function definition.
 type Function struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Parameters  map[string]any         `json:"parameters"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters"`
 }
 
 // ToolCall represents a tool call in a response.
@@ -47,12 +47,12 @@ type ToolCall struct {
 
 // ChatResponse represents a chat response.
 type ChatResponse struct {
-	ID      string `json:"id"`
-	Model   string `json:"model"`
-	Content string `json:"content,omitempty"`
-	Reasoning string `json:"reasoning,omitempty"`
+	ID        string     `json:"id"`
+	Model     string     `json:"model"`
+	Content   string     `json:"content,omitempty"`
+	Reasoning string     `json:"reasoning,omitempty"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
-	Usage   Usage  `json:"usage,omitempty"`
+	Usage     Usage      `json:"usage,omitempty"`
 }
 
 // Usage represents token usage.

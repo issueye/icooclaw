@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,10 +21,10 @@ func (mcpType MCPType) String() string {
 
 type MCPConfig struct {
 	Model                   // 嵌入 Model 结构体
-	Name        string      `gorm:"column:name;type:varchar(100);uniqueIndex;not null;comment:MCP名称" json:"name"`                                      // MCP 名称
-	Description string      `gorm:"column:description;type:varchar(255);comment:MCP描述" json:"description"`                                            // MCP 描述
-	Type        MCPType     `gorm:"column:type;type:varchar(100);not null;comment:MCP类型(stdio/Streamable HTTP)" json:"type"`                          // MCP 类型
-	Args        StringArray `gorm:"column:args;type:text;serializer:json;comment:MCP参数(JSON数组)" json:"args"`                                          // MCP 参数
+	Name        string      `gorm:"column:name;type:varchar(100);uniqueIndex;not null;comment:MCP名称" json:"name"`            // MCP 名称
+	Description string      `gorm:"column:description;type:varchar(255);comment:MCP描述" json:"description"`                   // MCP 描述
+	Type        MCPType     `gorm:"column:type;type:varchar(100);not null;comment:MCP类型(stdio/Streamable HTTP)" json:"type"` // MCP 类型
+	Args        StringArray `gorm:"column:args;type:text;serializer:json;comment:MCP参数(JSON数组)" json:"args"`                 // MCP 参数
 }
 
 func (table *MCPConfig) IsStdio() bool {
@@ -85,4 +86,51 @@ func (s *MCPStorage) List() ([]*MCPConfig, error) {
 func (s *MCPStorage) Delete(name string) error {
 	result := s.db.Where("name = ?", name).Delete(&MCPConfig{})
 	return result.Error
+}
+
+type QueryMCP struct {
+	Page    Page    `json:"page"`
+	KeyWord string  `json:"key_word"`
+	Type    MCPType `json:"type"`
+}
+
+type ResQueryMCP struct {
+	Page    Page        `json:"page"`
+	Records []MCPConfig `json:"records"`
+}
+
+// Page gets MCP configurations with pagination.
+func (s *MCPStorage) Page(query *QueryMCP) (*ResQueryMCP, error) {
+	var res ResQueryMCP
+
+	qry := s.db.Model(&MCPConfig{})
+
+	if query.KeyWord != "" {
+		qry = qry.Where("name LIKE ? OR description LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+	}
+
+	if query.Type != "" {
+		qry = qry.Where("type = ?", query.Type)
+	}
+
+	qry = qry.Order("name")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count mcp configs: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get mcp configs: %w", result.Error)
+	}
+
+	return &res, nil
 }

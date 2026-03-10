@@ -75,3 +75,55 @@ func (s *ParamStorage) Delete(key string) error {
 	}
 	return nil
 }
+
+type QueryParam struct {
+	Page    Page   `json:"page"`
+	KeyWord string `json:"key_word"`
+	Group   string `json:"group"`
+	Enabled *bool  `json:"enabled"`
+}
+
+type ResQueryParam struct {
+	Page    Page         `json:"page"`
+	Records []ParamConfig `json:"records"`
+}
+
+// Page gets param configurations with pagination.
+func (s *ParamStorage) Page(query *QueryParam) (*ResQueryParam, error) {
+	var res ResQueryParam
+
+	qry := s.db.Model(&ParamConfig{})
+
+	if query.KeyWord != "" {
+		qry = qry.Where("key LIKE ? OR description LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+	}
+
+	if query.Group != "" {
+		qry = qry.Where("group = ?", query.Group)
+	}
+
+	if query.Enabled != nil {
+		qry = qry.Where("enabled = ?", *query.Enabled)
+	}
+
+	qry = qry.Order("key")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count params: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get params: %w", result.Error)
+	}
+
+	return &res, nil
+}

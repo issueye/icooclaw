@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	icooclawErrors "icooclaw/pkg/errors"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-
-	icooclawErrors "icooclaw/pkg/errors"
 )
 
 // Session represents a chat session.
@@ -27,6 +27,18 @@ func (Session) TableName() string {
 	return tableNamePrefix + "sessions"
 }
 
+type QuerySession struct {
+	Page    Page   `json:"page"`
+	KeyWord string `json:"key_word"`
+	Channel string `json:"channel"`
+	UserID  string `json:"user_id"`
+}
+
+type ResQuerySession struct {
+	Page    Page      `json:"page"`
+	Records []Session `json:"records"`
+}
+
 type SessionStorage struct {
 	db *gorm.DB
 }
@@ -35,8 +47,8 @@ func NewSessionStorage(db *gorm.DB) *SessionStorage {
 	return &SessionStorage{db: db}
 }
 
-// SaveSession saves a session.
-func (s *SessionStorage) SaveSession(sess *Session) error {
+// Save saves a session.
+func (s *SessionStorage) Save(sess *Session) error {
 	sess.LastActive = time.Now()
 	result := s.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "session_id"}},
@@ -45,8 +57,8 @@ func (s *SessionStorage) SaveSession(sess *Session) error {
 	return result.Error
 }
 
-// GetSession gets a session by session ID.
-func (s *SessionStorage) GetSession(sessionID string) (*Session, error) {
+// Get gets a session by session ID.
+func (s *SessionStorage) Get(sessionID string) (*Session, error) {
 	var sess Session
 	result := s.db.Where("session_id = ?", sessionID).First(&sess)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -58,8 +70,8 @@ func (s *SessionStorage) GetSession(sessionID string) (*Session, error) {
 	return &sess, nil
 }
 
-// GetSessionByChat gets a session by channel and chat ID.
-func (s *SessionStorage) GetSessionByChat(channel, chatID string) (*Session, error) {
+// GetByChat gets a session by channel and chat ID.
+func (s *SessionStorage) GetByChat(channel, chatID string) (*Session, error) {
 	var sess Session
 	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).First(&sess)
 	if result.Error == gorm.ErrRecordNotFound {
@@ -71,11 +83,41 @@ func (s *SessionStorage) GetSessionByChat(channel, chatID string) (*Session, err
 	return &sess, nil
 }
 
-// DeleteSession deletes a session.
-func (s *SessionStorage) DeleteSession(sessionID string) error {
+// Delete deletes a session.
+func (s *SessionStorage) Delete(sessionID string) error {
 	result := s.db.Where("session_id = ?", sessionID).Delete(&Session{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete session: %w", result.Error)
 	}
 	return nil
+}
+
+// Page gets sessions with pagination.
+func (s *SessionStorage) Page(query *QuerySession) (*ResQuerySession, error) {
+	var res ResQuerySession
+
+	qry := s.db.Model(&Session{}).
+		Where("channel = ? AND (agent_name LIKE ? OR chat_id LIKE ?)",
+			query.Channel, "%"+query.KeyWord+"%", "%"+query.KeyWord+"%").
+		Order("last_active DESC")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count sessions: %w", result.Error)
+	}
+
+	// 分页查询
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get sessions: %w", result.Error)
+	}
+
+	return &res, nil
 }

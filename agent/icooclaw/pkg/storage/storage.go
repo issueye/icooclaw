@@ -15,6 +15,7 @@ type Storage struct {
 	skill    *SkillStorage
 	binding  *BindingStorage
 	session  *SessionStorage
+	message  *MessageStorage
 	memory   *MemoryStorage
 	tool     *ToolStorage
 	provider *ProviderStorage
@@ -54,6 +55,10 @@ func (s *Storage) Channel() *ChannelStorage {
 	return s.channel
 }
 
+func (s *Storage) Message() *MessageStorage {
+	return s.message
+}
+
 // New creates a new Storage instance.
 func New(path string) (*Storage, error) {
 	db, err := gorm.Open(sqlite.Open(path+"?_journal_mode=WAL&_busy_timeout=5000"), &gorm.Config{})
@@ -75,6 +80,7 @@ func New(path string) (*Storage, error) {
 		skill:    NewSkillStorage(db),
 		binding:  NewBindingStorage(db),
 		session:  NewSessionStorage(db),
+		message:  NewMessageStorage(db),
 		memory:   NewMemoryStorage(db),
 		tool:     NewToolStorage(db),
 		provider: NewProviderStorage(db),

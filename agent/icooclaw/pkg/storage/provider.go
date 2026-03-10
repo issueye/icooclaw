@@ -75,3 +75,50 @@ func (s *ProviderStorage) Delete(name string) error {
 	}
 	return nil
 }
+
+type QueryProvider struct {
+	Page    Page   `json:"page"`
+	KeyWord string `json:"key_word"`
+	Type    string `json:"type"`
+}
+
+type ResQueryProvider struct {
+	Page    Page      `json:"page"`
+	Records []Provider `json:"records"`
+}
+
+// Page gets providers with pagination.
+func (s *ProviderStorage) Page(query *QueryProvider) (*ResQueryProvider, error) {
+	var res ResQueryProvider
+
+	qry := s.db.Model(&Provider{})
+
+	if query.KeyWord != "" {
+		qry = qry.Where("name LIKE ? OR type LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+	}
+
+	if query.Type != "" {
+		qry = qry.Where("type = ?", query.Type)
+	}
+
+	qry = qry.Order("name")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count providers: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get providers: %w", result.Error)
+	}
+
+	return &res, nil
+}

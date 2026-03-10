@@ -71,3 +71,60 @@ func (s *BindingStorage) DeleteBinding(channel, chatID string) error {
 	}
 	return nil
 }
+
+type QueryBinding struct {
+	Page       Page   `json:"page"`
+	KeyWord    string `json:"key_word"`
+	Channel    string `json:"channel"`
+	AgentName  string `json:"agent_name"`
+	Enabled    *bool  `json:"enabled"`
+}
+
+type ResQueryBinding struct {
+	Page    Page     `json:"page"`
+	Records []Binding `json:"records"`
+}
+
+// Page gets bindings with pagination.
+func (s *BindingStorage) Page(query *QueryBinding) (*ResQueryBinding, error) {
+	var res ResQueryBinding
+
+	qry := s.db.Model(&Binding{})
+
+	if query.KeyWord != "" {
+		qry = qry.Where("agent_name LIKE ? OR chat_id LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+	}
+
+	if query.Channel != "" {
+		qry = qry.Where("channel = ?", query.Channel)
+	}
+
+	if query.AgentName != "" {
+		qry = qry.Where("agent_name = ?", query.AgentName)
+	}
+
+	if query.Enabled != nil {
+		qry = qry.Where("enabled = ?", *query.Enabled)
+	}
+
+	qry = qry.Order("channel, chat_id")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count bindings: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get bindings: %w", result.Error)
+	}
+
+	return &res, nil
+}

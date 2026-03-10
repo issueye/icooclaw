@@ -82,3 +82,55 @@ func (s *ToolStorage) DeleteTool(name string) error {
 	}
 	return nil
 }
+
+type QueryTool struct {
+	Page    Page   `json:"page"`
+	KeyWord string `json:"key_word"`
+	Type    string `json:"type"`
+	Enabled *bool  `json:"enabled"`
+}
+
+type ResQueryTool struct {
+	Page    Page  `json:"page"`
+	Records []Tool `json:"records"`
+}
+
+// Page gets tools with pagination.
+func (s *ToolStorage) Page(query *QueryTool) (*ResQueryTool, error) {
+	var res ResQueryTool
+
+	qry := s.db.Model(&Tool{})
+
+	if query.KeyWord != "" {
+		qry = qry.Where("name LIKE ? OR type LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+	}
+
+	if query.Type != "" {
+		qry = qry.Where("type = ?", query.Type)
+	}
+
+	if query.Enabled != nil {
+		qry = qry.Where("enabled = ?", *query.Enabled)
+	}
+
+	qry = qry.Order("name")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count tools: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get tools: %w", result.Error)
+	}
+
+	return &res, nil
+}

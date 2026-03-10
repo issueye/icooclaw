@@ -20,6 +20,18 @@ func (Memory) TableName() string {
 	return tableNamePrefix + "memory"
 }
 
+type QueryMemory struct {
+	Page      Page   `json:"page"`
+	SessionID string `json:"session_id"`
+	Role      string `json:"role"`
+	Query     string `json:"query"`
+}
+
+type ResQueryMemory struct {
+	Page    Page     `json:"page"`
+	Records []Memory `json:"records"`
+}
+
 type MemoryStorage struct {
 	db *gorm.DB
 }
@@ -28,13 +40,13 @@ func NewMemoryStorage(db *gorm.DB) *MemoryStorage {
 	return &MemoryStorage{db: db}
 }
 
-// SaveMemory saves a memory entry.
-func (s *MemoryStorage) SaveMemory(m *Memory) error {
+// Save saves a memory entry.
+func (s *MemoryStorage) Save(m *Memory) error {
 	return s.db.Create(m).Error
 }
 
-// GetMemory gets memory entries for a session.
-func (s *MemoryStorage) GetMemory(sessionID string, limit int) ([]*Memory, error) {
+// Get gets memory entries for a session.
+func (s *MemoryStorage) Get(sessionID string, limit int) ([]*Memory, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -49,11 +61,81 @@ func (s *MemoryStorage) GetMemory(sessionID string, limit int) ([]*Memory, error
 	return memories, nil
 }
 
-// DeleteMemory deletes memory entries for a session.
-func (s *MemoryStorage) DeleteMemory(sessionID string) error {
+// Delete deletes memory entries for a session.
+func (s *MemoryStorage) Delete(sessionID string) error {
 	result := s.db.Where("session_id = ?", sessionID).Delete(&Memory{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete memory: %w", result.Error)
 	}
 	return nil
+}
+
+// Page gets memories with pagination.
+func (s *MemoryStorage) Page(query *QueryMemory) (*ResQueryMemory, error) {
+	var res ResQueryMemory
+
+	qry := s.db.Model(&Memory{})
+
+	if query.SessionID != "" {
+		qry = qry.Where("session_id = ?", query.SessionID)
+	}
+
+	if query.Role != "" {
+		qry = qry.Where("role = ?", query.Role)
+	}
+
+	qry = qry.Order("created_at DESC")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count memories: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get memories: %w", result.Error)
+	}
+
+	return &res, nil
+}
+
+// Search searches for memories.
+func (s *MemoryStorage) Search(query *QueryMemory) ([]*Memory, error) {
+	var memories []*Memory
+
+	qry := s.db.Model(&Memory{})
+
+	if query.SessionID != "" {
+		qry = qry.Where("session_id = ?", query.SessionID)
+	}
+
+	if query.Role != "" {
+		qry = qry.Where("role = ?", query.Role)
+	}
+
+	if query.Query != "" {
+		qry = qry.Where("content LIKE ?", "%"+query.Query+"%")
+	}
+
+	var result *gorm.DB
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&memories)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&memories)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to search memories: %w", result.Error)
+	}
+
+	return memories, nil
 }

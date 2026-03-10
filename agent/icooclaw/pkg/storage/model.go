@@ -12,9 +12,9 @@ import (
 const tableNamePrefix = "icooclaw_"
 
 type Model struct {
-	ID        string    `gorm:"column:id;type:char(36);primaryKey;comment:主键UUID" json:"id"`           // 主键 uuid
-	CreatedAt time.Time `gorm:"column:created_at;type:datetime;comment:创建时间" json:"created_at"`       // 创建时间
-	UpdatedAt time.Time `gorm:"column:updated_at;type:datetime;comment:更新时间" json:"updated_at"`       // 更新时间
+	ID        string    `gorm:"column:id;type:char(36);primaryKey;comment:主键UUID" json:"id"`    // 主键 uuid
+	CreatedAt time.Time `gorm:"column:created_at;type:datetime;comment:创建时间" json:"created_at"` // 创建时间
+	UpdatedAt time.Time `gorm:"column:updated_at;type:datetime;comment:更新时间" json:"updated_at"` // 更新时间
 }
 
 func (c *Model) BeforeCreate(tx *gorm.DB) error {
@@ -58,7 +58,7 @@ func (s StringArray) String() string {
 }
 
 type Page struct {
-	Size  int `json:"size"`
-	Page  int `json:"page"`
-	Total int `json:"total"`
+	Size  int   `json:"size"`
+	Page  int   `json:"page"`
+	Total int64 `json:"total"`
 }

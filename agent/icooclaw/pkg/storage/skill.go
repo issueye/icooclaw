@@ -83,3 +83,50 @@ func (s *SkillStorage) DeleteSkill(name string) error {
 	}
 	return nil
 }
+
+type QuerySkill struct {
+	Page    Page   `json:"page"`
+	KeyWord string `json:"key_word"`
+	Enabled *bool  `json:"enabled"`
+}
+
+type ResQuerySkill struct {
+	Page    Page   `json:"page"`
+	Records []Skill `json:"records"`
+}
+
+// Page gets skills with pagination.
+func (s *SkillStorage) Page(query *QuerySkill) (*ResQuerySkill, error) {
+	var res ResQuerySkill
+
+	qry := s.db.Model(&Skill{})
+
+	if query.KeyWord != "" {
+		qry = qry.Where("name LIKE ? OR description LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+	}
+
+	if query.Enabled != nil {
+		qry = qry.Where("enabled = ?", *query.Enabled)
+	}
+
+	qry = qry.Order("name")
+
+	result := qry.Count(&res.Page.Total)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to count skills: %w", result.Error)
+	}
+
+	if query.Page.Page == 0 || query.Page.Size == 0 {
+		result = qry.Find(&res.Records)
+	} else {
+		result = qry.Limit(query.Page.Size).
+			Offset((query.Page.Page - 1) * query.Page.Size).
+			Find(&res.Records)
+	}
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get skills: %w", result.Error)
+	}
+
+	return &res, nil
+}
