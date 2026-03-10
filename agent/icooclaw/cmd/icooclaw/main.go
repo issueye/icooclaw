@@ -112,7 +112,7 @@ func runStart(cmd *cobra.Command, args []string) {
 	)
 
 	// Get default provider
-	defaultProvider, err := providerFactory.Get(cfg.Agent.DefaultProvider)
+	defaultProvider, err := providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
 	if err != nil {
 		slog.Warn("default provider not found, will need to configure", "provider", cfg.Agent.DefaultProvider)
 	} else {
