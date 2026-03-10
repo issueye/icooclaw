@@ -26,7 +26,8 @@ const (
 // Loop represents the main agent processing loop.
 type Loop struct {
 	bus            *bus.MessageBus
-	provider       *providers.FallbackChain
+	provider       providers.Provider
+	fallbackChain  *providers.FallbackChain
 	tools          *tools.Registry
 	memory         memory.Loader
 	skills         skill.Loader
@@ -66,9 +67,14 @@ func WithLoopBus(b *bus.MessageBus) LoopOption {
 	return func(l *Loop) { l.bus = b }
 }
 
-// WithLoopProvider sets the provider chain.
-func WithLoopProvider(p *providers.FallbackChain) LoopOption {
+// WithLoopProvider sets the provider.
+func WithLoopProvider(p providers.Provider) LoopOption {
 	return func(l *Loop) { l.provider = p }
+}
+
+// WithLoopFallbackChain sets the fallback chain.
+func WithLoopFallbackChain(fc *providers.FallbackChain) LoopOption {
+	return func(l *Loop) { l.fallbackChain = fc }
 }
 
 // WithLoopTools sets the tools registry.

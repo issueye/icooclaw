@@ -35,15 +35,15 @@ func (t *SchedulerTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *SchedulerTool) Parameters() map[string]tools.Parameter {
-	return map[string]tools.Parameter{
-		"action": {
-			Type:        "string",
-			Description: "Action to perform: list, run, enable, disable",
+func (t *SchedulerTool) Parameters() map[string]any {
+	return map[string]any{
+		"action": map[string]any{
+			"type":        "string",
+			"description": "Action to perform: list, run, enable, disable",
 		},
-		"task_id": {
-			Type:        "string",
-			Description: "Task ID for run/enable/disable actions",
+		"task_id": map[string]any{
+			"type":        "string",
+			"description": "Task ID for run/enable/disable actions",
 		},
 	}
 }

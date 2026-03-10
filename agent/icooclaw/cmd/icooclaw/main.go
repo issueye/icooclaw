@@ -102,29 +102,50 @@ func runStart(cmd *cobra.Command, args []string) {
 	// Initialize memory loader
 	memLoader := memory.NewLoader(store, 100, slog.Default())
 
-	// Initialize agent
-	ag := agent.New("default",
-		agent.WithBus(messageBus),
-		agent.WithStorage(store),
-		agent.WithTools(toolRegistry),
-		agent.WithMemory(memLoader),
-		agent.WithLogger(slog.Default()),
-	)
-
 	// Get default provider
-	defaultProvider, err := providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
+	var defaultProvider providers.Provider
+	defaultProvider, err = providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
 	if err != nil {
 		slog.Warn("default provider not found, will need to configure", "provider", cfg.Agent.DefaultProvider)
-	} else {
-		ag = agent.New("default",
-			agent.WithBus(messageBus),
-			agent.WithStorage(store),
-			agent.WithTools(toolRegistry),
-			agent.WithMemory(memLoader),
-			agent.WithProvider(defaultProvider),
-			agent.WithLogger(slog.Default()),
+	}
+
+	// Initialize agent instance
+	agentInstance := agent.NewAgentInstance(agent.AgentConfig{
+		Name:              "default",
+		Model:             cfg.Agent.DefaultModel,
+		MaxToolIterations: 20,
+	},
+		agent.WithAgentBus(messageBus),
+		agent.WithAgentStorage(store),
+		agent.WithAgentTools(toolRegistry),
+		agent.WithAgentMemory(memLoader),
+		agent.WithAgentLogger(slog.Default()),
+	)
+
+	if defaultProvider != nil {
+		agentInstance = agent.NewAgentInstance(agent.AgentConfig{
+			Name:              "default",
+			Model:             cfg.Agent.DefaultModel,
+			MaxToolIterations: 20,
+		},
+			agent.WithAgentBus(messageBus),
+			agent.WithAgentStorage(store),
+			agent.WithAgentTools(toolRegistry),
+			agent.WithAgentMemory(memLoader),
+			agent.WithAgentProvider(defaultProvider),
+			agent.WithAgentLogger(slog.Default()),
 		)
 	}
+
+	// Initialize agent loop
+	loop := agent.NewLoop(
+		agent.WithLoopBus(messageBus),
+		agent.WithLoopProvider(defaultProvider),
+		agent.WithLoopTools(toolRegistry),
+		agent.WithLoopMemory(memLoader),
+		agent.WithLoopStorage(store),
+		agent.WithLoopLogger(slog.Default()),
+	)
 
 	// Setup context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
@@ -140,9 +161,9 @@ func runStart(cmd *cobra.Command, args []string) {
 		cancel()
 	}()
 
-	// Start agent
-	slog.Info("agent started", "name", ag.Name())
-	if err := ag.Run(ctx); err != nil && err != context.Canceled {
+	// Start agent loop
+	slog.Info("agent started", "name", agentInstance.Name())
+	if err := loop.Run(ctx); err != nil && err != context.Canceled {
 		slog.Error("agent error", "error", err)
 		os.Exit(1)
 	}

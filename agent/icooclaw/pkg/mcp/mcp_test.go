@@ -310,16 +310,25 @@ func TestMCPTool(t *testing.T) {
 		t.Errorf("len(Parameters()) = %v, want %v", len(params), 2)
 	}
 
-	if params["param1"].Type != "string" {
-		t.Errorf("param1.Type = %v, want %v", params["param1"].Type, "string")
+	if param1, ok := params["param1"].(map[string]any); ok {
+		if param1["type"] != "string" {
+			t.Errorf("param1.type = %v, want %v", param1["type"], "string")
+		}
+
+		if param1["default"] != "default_value" {
+			t.Errorf("param1.default = %v, want %v", param1["default"], "default_value")
+		}
+	} else {
+		t.Errorf("param1 is not a map[string]any")
 	}
 
-	if params["param1"].Default != "default_value" {
-		t.Errorf("param1.Default = %v, want %v", params["param1"].Default, "default_value")
-	}
-
-	if len(params["param2"].Enum) != 3 {
-		t.Errorf("len(param2.Enum) = %v, want %v", len(params["param2"].Enum), 3)
+	if param2, ok := params["param2"].(map[string]any); ok {
+		enum, ok := param2["enum"].([]any)
+		if !ok || len(enum) != 3 {
+			t.Errorf("len(param2.enum) = %v, want %v", len(enum), 3)
+		}
+	} else {
+		t.Errorf("param2 is not a map[string]any")
 	}
 }
 

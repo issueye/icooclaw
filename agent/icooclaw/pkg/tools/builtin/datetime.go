@@ -27,15 +27,15 @@ func (t *DateTimeTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *DateTimeTool) Parameters() map[string]tools.Parameter {
-	return map[string]tools.Parameter{
-		"timezone": {
-			Type:        "string",
-			Description: "Timezone (e.g., 'UTC', 'America/New_York')",
+func (t *DateTimeTool) Parameters() map[string]any {
+	return map[string]any{
+		"timezone": map[string]any{
+			"type":        "string",
+			"description": "Timezone (e.g., 'UTC', 'America/New_York')",
 		},
-		"format": {
-			Type:        "string",
-			Description: "Time format (e.g., '2006-01-02 15:04:05')",
+		"format": map[string]any{
+			"type":        "string",
+			"description": "Time format (e.g., '2006-01-02 15:04:05')",
 		},
 	}
 }

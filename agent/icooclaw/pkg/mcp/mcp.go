@@ -635,31 +635,29 @@ type BatchResult struct {
 type MCPTool struct {
 	name        string
 	description string
-	parameters  map[string]tools.Parameter
+	parameters  map[string]any
 	client      *Client
 }
 
 // NewMCPTool creates a new MCP tool wrapper.
 func NewMCPTool(tool mcp.Tool, client *Client) *MCPTool {
-	params := make(map[string]tools.Parameter)
+	params := make(map[string]any)
 
 	// Parse input schema
 	schema := tool.InputSchema
-	
+
 	// Parse properties
 	for name, prop := range schema.Properties {
 		if p, ok := prop.(map[string]any); ok {
-			param := tools.Parameter{
-				Type:        getString(p, "type"),
-				Description: getString(p, "description"),
+			param := map[string]any{
+				"type":        getString(p, "type"),
+				"description": getString(p, "description"),
 			}
 			if enum, ok := p["enum"].([]any); ok {
-				for _, e := range enum {
-					param.Enum = append(param.Enum, fmt.Sprintf("%v", e))
-				}
+				param["enum"] = enum
 			}
 			if def, ok := p["default"]; ok {
-				param.Default = def
+				param["default"] = def
 			}
 			params[name] = param
 		}
@@ -684,7 +682,7 @@ func (t *MCPTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *MCPTool) Parameters() map[string]tools.Parameter {
+func (t *MCPTool) Parameters() map[string]any {
 	return t.parameters
 }
 

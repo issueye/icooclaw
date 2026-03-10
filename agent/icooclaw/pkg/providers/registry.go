@@ -23,6 +23,9 @@ type Registry struct {
 
 // NewRegistry creates a new provider registry.
 func NewRegistry(logger *slog.Logger) *Registry {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	r := &Registry{
 		factories: make(map[consts.ProviderType]ProviderFactory),
 		providers: make(map[string]Provider),

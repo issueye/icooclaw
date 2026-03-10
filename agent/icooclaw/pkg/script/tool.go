@@ -35,15 +35,15 @@ func (t *ScriptTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *ScriptTool) Parameters() map[string]tools.Parameter {
-	return map[string]tools.Parameter{
-		"code": {
-			Type:        "string",
-			Description: "JavaScript code to execute",
+func (t *ScriptTool) Parameters() map[string]any {
+	return map[string]any{
+		"code": map[string]any{
+			"type":        "string",
+			"description": "JavaScript code to execute",
 		},
-		"timeout": {
-			Type:        "integer",
-			Description: "Execution timeout in seconds (default: 30)",
+		"timeout": map[string]any{
+			"type":        "integer",
+			"description": "Execution timeout in seconds (default: 30)",
 		},
 	}
 }
@@ -109,15 +109,15 @@ func (t *ScriptFileTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *ScriptFileTool) Parameters() map[string]tools.Parameter {
-	return map[string]tools.Parameter{
-		"path": {
-			Type:        "string",
-			Description: "Path to the JavaScript file (relative to workspace)",
+func (t *ScriptFileTool) Parameters() map[string]any {
+	return map[string]any{
+		"path": map[string]any{
+			"type":        "string",
+			"description": "Path to the JavaScript file (relative to workspace)",
 		},
-		"args": {
-			Type:        "object",
-			Description: "Arguments to pass to the script (available as global 'args' variable)",
+		"args": map[string]any{
+			"type":        "object",
+			"description": "Arguments to pass to the script (available as global 'args' variable)",
 		},
 	}
 }

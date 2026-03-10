@@ -36,23 +36,23 @@ func (t *HTTPTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *HTTPTool) Parameters() map[string]tools.Parameter {
-	return map[string]tools.Parameter{
-		"url": {
-			Type:        "string",
-			Description: "The URL to request",
+func (t *HTTPTool) Parameters() map[string]any {
+	return map[string]any{
+		"url": map[string]any{
+			"type":        "string",
+			"description": "The URL to request",
 		},
-		"method": {
-			Type:        "string",
-			Description: "HTTP method (GET, POST, PUT, DELETE)",
+		"method": map[string]any{
+			"type":        "string",
+			"description": "HTTP method (GET, POST, PUT, DELETE)",
 		},
-		"headers": {
-			Type:        "object",
-			Description: "HTTP headers as key-value pairs",
+		"headers": map[string]any{
+			"type":        "object",
+			"description": "HTTP headers as key-value pairs",
 		},
-		"body": {
-			Type:        "string",
-			Description: "Request body for POST/PUT requests",
+		"body": map[string]any{
+			"type":        "string",
+			"description": "Request body for POST/PUT requests",
 		},
 	}
 }

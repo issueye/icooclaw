@@ -37,15 +37,15 @@ func (t *WebSearchTool) Description() string {
 }
 
 // Parameters returns the tool parameters.
-func (t *WebSearchTool) Parameters() map[string]tools.Parameter {
-	return map[string]tools.Parameter{
-		"query": {
-			Type:        "string",
-			Description: "The search query",
+func (t *WebSearchTool) Parameters() map[string]any {
+	return map[string]any{
+		"query": map[string]any{
+			"type":        "string",
+			"description": "The search query",
 		},
-		"max_results": {
-			Type:        "integer",
-			Description: "Maximum number of results (default: 5)",
+		"max_results": map[string]any{
+			"type":        "integer",
+			"description": "Maximum number of results (default: 5)",
 		},
 	}
 }
