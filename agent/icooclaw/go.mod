@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/larksuite/oapi-sdk-go/v3 v3.5.3
 	github.com/mark3labs/mcp-go v0.44.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.9.1
@@ -24,6 +25,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
