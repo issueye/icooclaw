@@ -47,16 +47,40 @@
           <div
             class="bg-bg-secondary rounded-xl border border-border p-6 space-y-4"
           >
-            <div>
-              <label class="block text-sm text-text-secondary mb-2">
-                WebSocket 地址
-              </label>
-              <input
-                v-model="wsUrl"
-                type="text"
-                placeholder="ws://localhost:8080/ws"
-                class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
-              />
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block text-sm text-text-secondary mb-2">
+                  服务器 IP
+                </label>
+                <input
+                  v-model="wsHost"
+                  type="text"
+                  placeholder="localhost"
+                  class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+              <div>
+                <label class="block text-sm text-text-secondary mb-2">
+                  端口
+                </label>
+                <input
+                  v-model="wsPort"
+                  type="text"
+                  placeholder="8080"
+                  class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+              <div>
+                <label class="block text-sm text-text-secondary mb-2">
+                  路径
+                </label>
+                <input
+                  v-model="wsPath"
+                  type="text"
+                  placeholder="/ws/chat"
+                  class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
             </div>
 
             <div>
@@ -81,6 +105,33 @@
                 placeholder="user-1"
                 class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
               />
+            </div>
+
+            <div class="flex gap-3 pt-2">
+              <button
+                v-if="!wsConnected"
+                @click="handleConnect"
+                :disabled="connecting"
+                class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <WifiIcon v-if="!connecting" :size="16" />
+                <Loader2Icon v-else :size="16" class="animate-spin" />
+                {{ connecting ? "连接中..." : "连接" }}
+              </button>
+              <button
+                v-else
+                @click="handleDisconnect"
+                class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <WifiOffIcon :size="16" />
+                断开连接
+              </button>
+              <button
+                @click="handleSaveConnection"
+                class="px-4 py-2.5 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors"
+              >
+                保存设置
+              </button>
             </div>
           </div>
 
@@ -1136,7 +1187,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, reactive } from "vue";
+import { ref, onMounted, computed, watch, reactive, defineEmits } from "vue";
 import { useRouter } from "vue-router";
 import {
   ArrowLeft as ArrowLeftIcon,
@@ -1153,6 +1204,8 @@ import {
   Palette as PaletteIcon,
   Info as InfoIcon,
   Wifi as ConnectionIcon,
+  WifiOff as WifiOffIcon,
+  Loader2 as Loader2Icon,
   MessageSquare as ChannelIcon,
   Webhook as WebhookIcon,
   Send as TelegramIcon,
@@ -1168,6 +1221,7 @@ import { useSkillStore } from "@/stores/skill";
 import api from "@/services/api";
 
 const router = useRouter();
+const emit = defineEmits(["connect-ws", "disconnect-ws"]);
 const chatStore = useChatStore();
 const themeStore = useThemeStore();
 const skillStore = useSkillStore();
@@ -1188,9 +1242,15 @@ const menuItems = [
 const activeSection = ref("connection");
 
 // 表单数据
-const wsUrl = ref(chatStore.wsUrl);
+const wsHost = ref(chatStore.wsHost);
+const wsPort = ref(chatStore.wsPort);
+const wsPath = ref(localStorage.getItem("icooclaw_ws_path") || "/ws/chat");
 const apiBase = ref(chatStore.apiBase);
 const userId = ref(chatStore.userId);
+
+// 连接状态
+const wsConnected = ref(chatStore.wsConnected);
+const connecting = ref(false);
 
 // 工作区
 const workspace = ref("");
@@ -1282,7 +1342,8 @@ async function copyWebhookUrl() {
 // 是否有修改
 const hasChanges = computed(() => {
   return (
-    wsUrl.value !== chatStore.wsUrl ||
+    wsHost.value !== chatStore.wsHost ||
+    wsPort.value !== chatStore.wsPort ||
     apiBase.value !== chatStore.apiBase ||
     userId.value !== chatStore.userId
   );
@@ -1821,17 +1882,42 @@ async function handleDeleteProvider(provider) {
 
 // 重置表单
 function handleReset() {
-  wsUrl.value = chatStore.wsUrl;
+  wsHost.value = chatStore.wsHost;
+  wsPort.value = chatStore.wsPort;
+  wsPath.value = localStorage.getItem("icooclaw_ws_path") || "/ws/chat";
   apiBase.value = chatStore.apiBase;
   userId.value = chatStore.userId;
 }
 
-// 保存设置
-function handleSave() {
-  chatStore.setWsUrl(wsUrl.value);
+// 保存设置（不连接）
+function handleSaveConnection() {
+  chatStore.setWsHost(wsHost.value);
+  chatStore.setWsPort(wsPort.value);
+  localStorage.setItem("icooclaw_ws_path", wsPath.value);
   chatStore.setApiBase(apiBase.value);
   chatStore.setUserId(userId.value);
   router.push("/");
+}
+
+// 手动连接
+async function handleConnect() {
+  connecting.value = true;
+  chatStore.setWsHost(wsHost.value);
+  chatStore.setWsPort(wsPort.value);
+  localStorage.setItem("icooclaw_ws_path", wsPath.value);
+  chatStore.setApiBase(apiBase.value);
+  chatStore.setUserId(userId.value);
+  emit("connect-ws");
+  setTimeout(() => {
+    connecting.value = false;
+    wsConnected.value = chatStore.wsConnected;
+  }, 1000);
+}
+
+// 断开连接
+function handleDisconnect() {
+  emit("disconnect-ws");
+  wsConnected.value = false;
 }
 
 // 监听菜单切换，重新加载对应数据

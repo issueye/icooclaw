@@ -9,8 +9,9 @@
         <div class="flex flex-col flex-1 min-w-0 h-full">
             <!-- 顶部 Header -->
             <ChatHeader :title="chatStore.currentSession?.title" :sidebar-collapsed="sidebarCollapsed"
-                :api-status="apiStatus" @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed" @new-chat="handleNewChat"
-                @open-settings="router.push('/settings')">
+                :api-status="apiStatus" :ws-status="wsStatus" @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed" @new-chat="handleNewChat"
+                @open-settings="router.push('/settings')"
+                @connect="handleConnect" @disconnect="handleDisconnect">
             </ChatHeader>
 
             <!-- 消息列表 -->
@@ -114,6 +115,14 @@ const {
 
 function connectWs() {
     connect(chatStore.wsUrl);
+}
+
+function handleConnect() {
+    connectWs();
+}
+
+function handleDisconnect() {
+    disconnect();
 }
 
 // ===== API 状态 =====
@@ -361,16 +370,16 @@ onMounted(async () => {
         sidebarCollapsed.value = true;
     }
 
-    // WebSocket 模式初始化
-    try {
-        connectWs();
-        checkApiStatus();
-        await chatStore.loadSessions();
-        if (chatStore.currentSessionId) {
-            await chatStore.loadMessages(chatStore.currentSessionId);
-        }
-    } catch (error) {
-        console.error("初始化失败:", error);
+    // 手动连接模式，不再自动连接
+    checkApiStatus();
+    await chatStore.loadSessions();
+    if (chatStore.currentSessionId) {
+        await chatStore.loadMessages(chatStore.currentSessionId);
     }
+});
+
+// 监听 WebSocket 连接状态变化
+watch(wsStatus, (newStatus) => {
+    chatStore.setWsConnected(newStatus === "connected");
 });
 </script>

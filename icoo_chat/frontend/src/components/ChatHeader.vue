@@ -31,6 +31,34 @@
 
         <!-- 右侧操作 -->
         <div class="flex items-center gap-2">
+            <!-- WebSocket 连接状态按钮 -->
+            <button
+                v-if="wsStatus === 'connected'"
+                @click="$emit('disconnect')"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                title="断开连接"
+            >
+                <WifiIcon :size="14" />
+                <span>已连接</span>
+            </button>
+            <button
+                v-else-if="wsStatus === 'connecting' || wsStatus === 'reconnecting'"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors cursor-wait"
+                title="连接中..."
+            >
+                <Loader2Icon :size="14" class="animate-spin" />
+                <span>连接中</span>
+            </button>
+            <button
+                v-else
+                @click="$emit('connect')"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+                title="连接"
+            >
+                <WifiOffIcon :size="14" />
+                <span>未连接</span>
+            </button>
+
             <!-- 插槽：模式切换等自定义内容 -->
             <slot name="actions"></slot>
 
@@ -73,6 +101,9 @@ import {
     Settings2Icon,
     MoonIcon,
     SunIcon,
+    Wifi as WifiIcon,
+    WifiOff as WifiOffIcon,
+    Loader2 as Loader2Icon,
 } from "lucide-vue-next";
 import { useThemeStore } from "@/stores/theme";
 
@@ -81,7 +112,9 @@ const themeStore = useThemeStore();
 defineProps({
     title: { type: String, default: "" },
     sidebarCollapsed: { type: Boolean, default: false },
+    apiStatus: { type: String, default: "" },
+    wsStatus: { type: String, default: "" },
 });
 
-defineEmits(["toggle-sidebar", "new-chat", "open-settings"]);
+defineEmits(["toggle-sidebar", "new-chat", "open-settings", "connect", "disconnect"]);
 </script>

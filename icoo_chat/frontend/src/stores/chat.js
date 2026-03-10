@@ -6,16 +6,31 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+function getDefaultWsHost() {
+  return localStorage.getItem("icooclaw_ws_host") || "localhost";
+}
+
+function getDefaultWsPort() {
+  return localStorage.getItem("icooclaw_ws_port") || "8080";
+}
+
+function getDefaultWsPath() {
+  return localStorage.getItem("icooclaw_ws_path") || "/ws/chat";
+}
+
 export const useChatStore = defineStore("chat", () => {
   const sessions = ref([]);
   const currentSessionId = ref(null);
   const isLoading = ref(false);
   const isLoadingSessions = ref(false);
   const apiBase = ref(api.getApiBaseUrl());
-  const wsUrl = ref(
-    localStorage.getItem("icooclaw_ws_url") || "ws://localhost:8080/ws/chat",
-  );
+  const wsHost = ref(getDefaultWsHost());
+  const wsPort = ref(getDefaultWsPort());
+  const wsPath = ref(getDefaultWsPath());
   const userId = ref(localStorage.getItem("icooclaw_user_id") || "user-1");
+  
+  const wsUrl = computed(() => `ws://${wsHost.value}:${wsPort.value}${wsPath.value}`);
+  const wsConnected = ref(false);
 
   // WebSocket 会话ID映射: 前端sessionId -> 后端wsSessionId
   const wsSessionIdMap = ref({});
@@ -286,8 +301,34 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   function setWsUrl(url) {
-    wsUrl.value = url;
-    localStorage.setItem("icooclaw_ws_url", url);
+    try {
+      const urlObj = new URL(url);
+      wsHost.value = urlObj.hostname;
+      wsPort.value = urlObj.port || (urlObj.protocol === 'wss:' ? '443' : '80');
+      localStorage.setItem("icooclaw_ws_host", wsHost.value);
+      localStorage.setItem("icooclaw_ws_port", wsPort.value);
+    } catch (e) {
+      console.error("Invalid URL:", e);
+    }
+  }
+
+  function setWsHost(host) {
+    wsHost.value = host;
+    localStorage.setItem("icooclaw_ws_host", host);
+  }
+
+  function setWsPort(port) {
+    wsPort.value = port;
+    localStorage.setItem("icooclaw_ws_port", port);
+  }
+
+  function setWsPath(path) {
+    wsPath.value = path;
+    localStorage.setItem("icooclaw_ws_path", path);
+  }
+
+  function setWsConnected(connected) {
+    wsConnected.value = connected;
   }
 
   function setUserId(id) {
@@ -317,6 +358,9 @@ export const useChatStore = defineStore("chat", () => {
     isLoadingSessions,
     apiBase,
     wsUrl,
+    wsHost,
+    wsPort,
+    wsConnected,
     userId,
     wsSessionIdMap,
     currentSession,
@@ -339,6 +383,10 @@ export const useChatStore = defineStore("chat", () => {
     ensureSession,
     setApiBase,
     setWsUrl,
+    setWsHost,
+    setWsPort,
+    setWsPath,
+    setWsConnected,
     setUserId,
     setWsSessionId,
     getWsSessionId,
