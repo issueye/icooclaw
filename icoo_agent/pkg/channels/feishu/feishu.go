@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
@@ -274,12 +275,19 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 		return nil
 	}
 
+	// Process message asynchronously to avoid blocking the Feishu SDK
+	go c.processMessageAsync(ctx, event)
+	return nil
+}
+
+// processMessageAsync processes an incoming message asynchronously.
+func (c *Channel) processMessageAsync(ctx context.Context, event *larkim.P2MessageReceiveV1) {
 	message := event.Event.Message
 	sender := event.Event.Sender
 
 	chatID := stringValue(message.ChatId)
 	if chatID == "" {
-		return nil
+		return
 	}
 
 	senderID := extractSenderID(sender)
@@ -293,7 +301,7 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 
 	// Check allowlist early
 	if !c.IsAllowed(senderID) {
-		return nil
+		return
 	}
 
 	// Extract content based on message type
@@ -344,12 +352,13 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 		"preview", truncate(content, 80),
 	)
 
-	// Publish to bus
-	if err := c.bus.PublishInbound(ctx, inboundMsg); err != nil {
-		c.logger.With("name", "【飞书】").Error("发送消息失败：发布消息失败", "error", err)
-	}
+	// Publish to bus with timeout to avoid indefinite blocking
+	pubCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	return nil
+	if err := c.bus.PublishInbound(pubCtx, inboundMsg); err != nil {
+		c.logger.With("name", "【飞书】").Error("发布消息失败", "error", err)
+	}
 }
 
 // --- Internal helpers ---

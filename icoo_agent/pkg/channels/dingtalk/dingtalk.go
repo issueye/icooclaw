@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/open-dingtalk/dingtalk-stream-sdk-go/chatbot"
 	"github.com/open-dingtalk/dingtalk-stream-sdk-go/client"
@@ -168,6 +169,13 @@ func (c *Channel) onChatBotMessageReceived(
 	ctx context.Context,
 	data *chatbot.BotCallbackDataModel,
 ) ([]byte, error) {
+	// Process message asynchronously to avoid blocking the DingTalk SDK
+	go c.processDingTalkMessage(ctx, data)
+	return nil, nil
+}
+
+// processDingTalkMessage processes an incoming message asynchronously.
+func (c *Channel) processDingTalkMessage(ctx context.Context, data *chatbot.BotCallbackDataModel) {
 	// Extract message content from Text field
 	content := data.Text.Content
 	if content == "" {
@@ -180,7 +188,7 @@ func (c *Channel) onChatBotMessageReceived(
 	}
 
 	if content == "" {
-		return nil, nil // Ignore empty messages
+		return // Ignore empty messages
 	}
 
 	senderID := data.SenderStaffId
@@ -196,7 +204,7 @@ func (c *Channel) onChatBotMessageReceived(
 
 	// Check allowlist
 	if !c.IsAllowed(senderID) {
-		return nil, nil
+		return
 	}
 
 	metadata := map[string]any{
@@ -207,7 +215,7 @@ func (c *Channel) onChatBotMessageReceived(
 		"session_webhook":   data.SessionWebhook,
 	}
 
-	c.logger.With("name", "【钉钉】").Debug("Received message",
+	c.logger.With("name", "【钉钉】").Debug("收到消息",
 		"sender_nick", senderNick,
 		"sender_id", senderID,
 		"preview", truncate(content, 50),
@@ -222,13 +230,13 @@ func (c *Channel) onChatBotMessageReceived(
 		Metadata:  metadata,
 	}
 
-	// Publish to bus
-	if err := c.bus.PublishInbound(ctx, inboundMsg); err != nil {
-		c.logger.With("name", "【钉钉】").Error("推送失败", "error", err)
-	}
+	// Publish to bus with timeout to avoid indefinite blocking
+	pubCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Return nil to indicate we've handled the message asynchronously
-	return nil, nil
+	if err := c.bus.PublishInbound(pubCtx, inboundMsg); err != nil {
+		c.logger.With("name", "【钉钉】").Error("发布消息失败", "error", err)
+	}
 }
 
 // SendDirectReply sends a direct reply using the session webhook.
