@@ -109,7 +109,9 @@ export const useChatStore = defineStore("chat", () => {
     try {
       const response = await api.createSession({
         user_id: userId.value,
-        metadata: JSON.stringify({ title }),
+        metadata: {
+          title,
+        },
       });
       // 后端返回格式: { code, message, data: { session_id, chat_id, user_id, key } }
       const data = response.data || response;

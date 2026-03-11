@@ -89,14 +89,14 @@ func (f *Factory) GetByModel(model string) (Provider, error) {
 		if cfg.DefaultModel == model {
 			return f.Get(cfg.Name)
 		}
-		for _, m := range cfg.Models {
-			if m == model {
+		for _, m := range cfg.LLMs {
+			if m.Model == model {
 				return f.Get(cfg.Name)
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("no provider found for model %s", model)
+	return nil, fmt.Errorf("在所有供应商 的模型列表 中未找到模型 %s", model)
 }
 
 // List lists all provider names.

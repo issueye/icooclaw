@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -24,10 +25,10 @@ type Client struct {
 	logger  *slog.Logger
 
 	// State
-	connected   atomic.Bool
-	lastPing    time.Time
-	lastPong    time.Time
-	messageSeq  atomic.Uint64
+	connected  atomic.Bool
+	lastPing   time.Time
+	lastPong   time.Time
+	messageSeq atomic.Uint64
 
 	// Configuration
 	writeWait      time.Duration
@@ -63,15 +64,15 @@ func NewClient(conn *websocket.Conn, userID string, logger *slog.Logger) *Client
 	cfg := DefaultClientConfig()
 
 	return &Client{
-		ID:              uuid.New().String(),
-		conn:            conn,
-		send:            make(chan []byte, cfg.SendBufferSize),
-		userID:          userID,
-		logger:          logger,
-		writeWait:       cfg.WriteWait,
-		pongWait:        cfg.PongWait,
-		pingPeriod:      cfg.PingPeriod,
-		maxMessageSize:  cfg.MaxMessageSize,
+		ID:             uuid.New().String(),
+		conn:           conn,
+		send:           make(chan []byte, cfg.SendBufferSize),
+		userID:         userID,
+		logger:         logger,
+		writeWait:      cfg.WriteWait,
+		pongWait:       cfg.PongWait,
+		pingPeriod:     cfg.PingPeriod,
+		maxMessageSize: cfg.MaxMessageSize,
 	}
 }
 
@@ -192,15 +193,18 @@ func (c *Client) writePump(ctx context.Context) {
 // handleMessage handles an incoming message.
 func (c *Client) handleMessage(ctx context.Context, messageType int, message []byte) {
 	if messageType != websocket.TextMessage {
-		c.logger.Warn("unsupported message type", "type", messageType, "client_id", c.ID)
+		c.logger.With("name", "【WebSocket】").Warn("消息类型错误，仅支持文本消息", "type", messageType, "client_id", c.ID)
+		c.SendError("消息类型错误")
 		return
 	}
+
+	fmt.Println("收到消息", string(message))
 
 	// Parse message
 	var msg ChatMessage
 	if err := json.Unmarshal(message, &msg); err != nil {
-		c.logger.Error("failed to parse message", "error", err, "client_id", c.ID)
-		c.SendError("invalid message format")
+		c.logger.With("name", "【WebSocket】").Error("解析消息失败", "error", err, "client_id", c.ID)
+		c.SendError("消息格式错误")
 		return
 	}
 
@@ -216,12 +220,12 @@ func (c *Client) handleMessage(ctx context.Context, messageType int, message []b
 
 	// Validate message
 	if msg.Content == "" {
-		c.SendError("message content is required")
+		c.SendError("消息内容不能为空")
 		return
 	}
 
 	if msg.ChatID == "" {
-		c.SendError("chat_id is required")
+		c.SendError("聊天ID不能为空")
 		return
 	}
 
@@ -261,7 +265,7 @@ func (c *Client) Send(message []byte) bool {
 	case c.send <- message:
 		return true
 	default:
-		c.logger.Warn("send buffer full, dropping message", "client_id", c.ID)
+		c.logger.With("name", "【WebSocket】").Warn("发送消息队列已满，丢弃消息", "client_id", c.ID)
 		return false
 	}
 }
@@ -307,13 +311,13 @@ func (c *Client) IsConnected() bool {
 // GetStats returns client statistics.
 func (c *Client) GetStats() *ClientStats {
 	return &ClientStats{
-		ID:          c.ID,
-		UserID:      c.userID,
-		ChatID:      c.chatID,
-		Connected:   c.connected.Load(),
-		MessageSeq:  c.messageSeq.Load(),
-		LastPing:    c.lastPing,
-		LastPong:    c.lastPong,
+		ID:         c.ID,
+		UserID:     c.userID,
+		ChatID:     c.chatID,
+		Connected:  c.connected.Load(),
+		MessageSeq: c.messageSeq.Load(),
+		LastPing:   c.lastPing,
+		LastPong:   c.lastPong,
 	}
 }
 

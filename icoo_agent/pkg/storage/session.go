@@ -7,19 +7,17 @@ import (
 	icooclawErrors "icooclaw/pkg/errors"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // Session represents a chat session.
 type Session struct {
 	Model
-	SessionID  string    `gorm:"column:session_id;type:char(36);uniqueIndex;not null;comment:会话ID" json:"session_id"`
-	Channel    string    `gorm:"column:channel;type:varchar(50);not null;index:idx_session_channel_chat;comment:渠道" json:"channel"`
-	ChatID     string    `gorm:"column:chat_id;type:varchar(100);not null;index:idx_session_channel_chat;comment:聊天ID" json:"chat_id"`
-	AgentName  string    `gorm:"column:agent_name;type:varchar(100);comment:代理名称" json:"agent_name"`
-	Context    string    `gorm:"column:context;type:text;comment:上下文(JSON格式)" json:"context"`
-	Summary    string    `gorm:"column:summary;type:text;comment:会话摘要" json:"summary"`
-	LastActive time.Time `gorm:"column:last_active;type:datetime;comment:最后活跃时间" json:"last_active"`
+	Channel    string    `gorm:"column:channel;type:varchar(50);not null;comment:渠道" json:"channel"`    // 渠道
+	ChatID     string    `gorm:"column:chat_id;type:varchar(100);not null;comment:聊天ID" json:"chat_id"` // 聊天ID
+	UserID     string    `gorm:"column:user_id;type:varchar(100);not null;comment:用户ID" json:"user_id"` // 用户ID
+	Summary    string    `gorm:"column:summary;type:text;comment:会话摘要" json:"summary"`                  // 会话摘要
+	Title      string    `gorm:"column:title;type:varchar(100);comment:会话标题" json:"title"`              // 会话标题
+	LastActive time.Time `gorm:"column:last_active;type:datetime;comment:最后活跃时间" json:"last_active"`    // 最后活跃时间
 }
 
 // TableName returns the table name for Session.
@@ -35,8 +33,8 @@ type QuerySession struct {
 }
 
 type ResQuerySession struct {
-	Page    Page      `json:"page"`
-	Records []Session `json:"records"`
+	Page    Page       `json:"page"`
+	Records []*Session `json:"records"`
 }
 
 type SessionStorage struct {
@@ -50,17 +48,14 @@ func NewSessionStorage(db *gorm.DB) *SessionStorage {
 // Save saves a session.
 func (s *SessionStorage) Save(sess *Session) error {
 	sess.LastActive = time.Now()
-	result := s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "session_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"channel", "chat_id", "agent_name", "context", "summary", "last_active"}),
-	}).Create(sess)
+	result := s.db.Save(sess)
 	return result.Error
 }
 
-// Get gets a session by session ID.
-func (s *SessionStorage) Get(sessionID string) (*Session, error) {
+// Get gets a session by ID.
+func (s *SessionStorage) Get(id string) (*Session, error) {
 	var sess Session
-	result := s.db.Where("session_id = ?", sessionID).First(&sess)
+	result := s.db.Where("id = ?", id).First(&sess)
 	if result.Error == gorm.ErrRecordNotFound {
 		return nil, icooclawErrors.ErrRecordNotFound
 	}
@@ -84,8 +79,8 @@ func (s *SessionStorage) GetByChat(channel, chatID string) (*Session, error) {
 }
 
 // Delete deletes a session.
-func (s *SessionStorage) Delete(sessionID string) error {
-	result := s.db.Where("session_id = ?", sessionID).Delete(&Session{})
+func (s *SessionStorage) Delete(id string) error {
+	result := s.db.Where("id = ?", id).Delete(&Session{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete session: %w", result.Error)
 	}
@@ -97,27 +92,32 @@ func (s *SessionStorage) Page(query *QuerySession) (*ResQuerySession, error) {
 	var res ResQuerySession
 
 	qry := s.db.Model(&Session{}).
-		Where("channel = ? AND (agent_name LIKE ? OR chat_id LIKE ?)",
+		Where("channel = ? AND (chat_id LIKE ?)",
 			query.Channel, "%"+query.KeyWord+"%", "%"+query.KeyWord+"%").
 		Order("last_active DESC")
 
-	result := qry.Count(&res.Page.Total)
+	var count int64
+	result := qry.Count(&count)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to count sessions: %w", result.Error)
 	}
 
 	// 分页查询
+	var sessions []*Session
 	if query.Page.Page == 0 || query.Page.Size == 0 {
-		result = qry.Find(&res.Records)
+		result = qry.Find(&sessions)
 	} else {
 		result = qry.Limit(query.Page.Size).
 			Offset((query.Page.Page - 1) * query.Page.Size).
-			Find(&res.Records)
+			Find(&sessions)
 	}
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get sessions: %w", result.Error)
 	}
+
+	res.Page.Total = count
+	res.Records = sessions
 
 	return &res, nil
 }

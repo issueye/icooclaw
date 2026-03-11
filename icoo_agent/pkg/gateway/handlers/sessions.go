@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"icooclaw/pkg/channels/consts"
 	"icooclaw/pkg/gateway/models"
 	"icooclaw/pkg/storage"
 )
@@ -21,10 +22,10 @@ func NewSessionHandler(logger *slog.Logger, storage *storage.Storage) *SessionHa
 
 // CreateSessionRequest 创建会话请求
 type CreateSessionRequest struct {
-	Channel  string `json:"channel,omitempty"`  // 渠道 (默认为 "websocket")
-	UserID   string `json:"user_id,omitempty"`  // 用户ID
-	ChatID   string `json:"chat_id,omitempty"`  // 聊天ID (可选，不提供则自动生成)
-	Metadata string `json:"metadata,omitempty"` // 元数据 (JSON格式)
+	Channel  string            `json:"channel,omitempty"`  // 渠道 (默认为 "websocket")
+	UserID   string            `json:"user_id,omitempty"`  // 用户ID
+	ChatID   string            `json:"chat_id,omitempty"`  // 聊天ID (可选，不提供则自动生成)
+	Metadata map[string]string `json:"metadata,omitempty"` // 元数据 (JSON格式)
 }
 
 // CreateSessionResponse 创建会话响应
@@ -45,46 +46,39 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.With("name", "【会话】").Info("创建会话", slog.Any("params", req))
+
 	// 设置默认渠道
 	if req.Channel == "" {
-		req.Channel = "websocket"
+		req.Channel = consts.WEBSOCKET
 	}
+
+	var session storage.Session
 
 	// 如果没有提供 ChatID，生成唯一的 ChatID
 	if req.ChatID == "" {
 		chatID := fmt.Sprintf("chat-%d", time.Now().UnixNano())
-		session := &storage.Session{
+		session = storage.Session{
 			Channel: req.Channel,
 			ChatID:  chatID,
+			UserID:  req.UserID,
+			Title:   req.Metadata["title"],
 		}
-		err = h.storage.Session().Save(session)
-		if err != nil {
-			h.logger.Error("创建会话失败", "error", err)
-			http.Error(w, "创建会话失败", http.StatusInternalServerError)
-			return
-		}
-
-		models.WriteData(w, models.BaseResponse[*CreateSessionResponse]{
-			Code:    http.StatusOK,
-			Message: "会话创建成功",
-			Data: &CreateSessionResponse{
-				SessionID: session.ID,
-				Channel:   session.Channel,
-				ChatID:    session.ChatID,
-			},
-		})
-		return
 	}
 
 	// 使用提供的 ChatID 创建会话
-	session := &storage.Session{
+	session = storage.Session{
 		Channel: req.Channel,
 		ChatID:  req.ChatID,
+		UserID:  req.UserID,
+		Title:   req.Metadata["title"],
 	}
 
-	err = h.storage.Session().Save(session)
+	h.logger.With("name", "【会话】").Info("创建会话", slog.Any("params", session))
+
+	err = h.storage.Session().Save(&session)
 	if err != nil {
-		h.logger.Error("创建会话失败", "error", err)
+		h.logger.With("name", "【会话】").Error("创建会话失败", "error", err.Error())
 		http.Error(w, "创建会话失败", http.StatusInternalServerError)
 		return
 	}
@@ -106,6 +100,10 @@ func (h *SessionHandler) Page(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("绑定分页请求失败", "error", err)
 		http.Error(w, "绑定分页请求失败", http.StatusBadRequest)
 		return
+	}
+
+	if req.Channel == "" {
+		req.Channel = consts.WEBSOCKET
 	}
 
 	sessions, err := h.storage.Session().Page(req)

@@ -1,24 +1,60 @@
 package storage
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"icooclaw/pkg/consts"
 	icooclawErrors "icooclaw/pkg/errors"
 )
 
+type LLMs []LLM
+
+type LLM struct {
+	Alias string `gorm:"column:alias;type:varchar(100);not null;comment:模型别名" json:"alias"`
+	Model string `gorm:"column:model;type:varchar(100);not null;comment:模型名称" json:"model"`
+}
+
+func (s LLM) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+func (s *LLMs) Scan(value interface{}) error {
+	if value == nil {
+		*s = nil
+		return nil
+	}
+
+	var str string
+	switch v := value.(type) {
+	case []byte:
+		str = string(v)
+	case string:
+		str = v
+	default:
+		return nil
+	}
+
+	if str == "" {
+		*s = nil
+		return nil
+	}
+
+	return json.Unmarshal([]byte(str), s)
+}
+
 // Provider represents a provider configuration.
 type Provider struct {
 	Model
-	Name         string              `gorm:"column:name;type:varchar(100);not null;comment:提供商名称" json:"name"`
-	Type         consts.ProviderType `gorm:"column:type;type:varchar(50);not null;comment:提供商类型" json:"type"`
-	APIKey       string              `gorm:"column:api_key;type:varchar(255);comment:API密钥" json:"api_key"`
-	APIBase      string              `gorm:"column:api_base;type:varchar(255);comment:API基础URL" json:"api_base"`
-	DefaultModel string              `gorm:"column:default_model;type:varchar(100);comment:默认模型" json:"default_model"`
-	Models       []string            `gorm:"column:models;type:text;serializer:json;comment:支持的模型列表(JSON数组)" json:"models"` // JSON array
+	Name         string              `gorm:"column:name;type:varchar(100);not null;comment:提供商名称" json:"name"`              // 提供商名称
+	Type         consts.ProviderType `gorm:"column:type;type:varchar(50);not null;comment:提供商类型" json:"type"`               // 提供商类型
+	APIKey       string              `gorm:"column:api_key;type:varchar(255);comment:API密钥" json:"api_key"`                 // API密钥
+	APIBase      string              `gorm:"column:api_base;type:varchar(255);comment:API基础URL" json:"api_base"`            // API基础URL
+	DefaultModel string              `gorm:"column:default_model;type:varchar(100);comment:默认模型" json:"default_model"`      // 默认模型别名
+	LLMs         LLMs                `gorm:"column:llms;type:text;serializer:json;comment:LLM列表" json:"llms"`               // LLM列表
 	Config       string              `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                      // JSON object
 	Metadata     map[string]any      `gorm:"column:metadata;type:text;serializer:json;comment:元数据(JSON格式)" json:"metadata"` // JSON object
 }
@@ -38,10 +74,7 @@ func NewProviderStorage(db *gorm.DB) *ProviderStorage {
 
 // Save saves a provider configuration.
 func (s *ProviderStorage) Save(p *Provider) error {
-	result := s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{"type", "api_key", "api_base", "default_model", "models", "config", "updated_at"}),
-	}).Create(p)
+	result := s.db.Save(p)
 	return result.Error
 }
 
@@ -68,11 +101,20 @@ func (s *ProviderStorage) List() ([]*Provider, error) {
 	return providers, nil
 }
 
-// Delete deletes a provider by name.
-func (s *ProviderStorage) Delete(name string) error {
+// Delete deletes a provider by ID.
+func (s *ProviderStorage) Delete(id string) error {
+	result := s.db.Where("id = ?", id).Delete(&Provider{})
+	if result.Error != nil {
+		return fmt.Errorf("删除提供商失败: %w", result.Error)
+	}
+	return nil
+}
+
+// DeleteByName deletes a provider by name.
+func (s *ProviderStorage) DeleteByName(name string) error {
 	result := s.db.Where("name = ?", name).Delete(&Provider{})
 	if result.Error != nil {
-		return fmt.Errorf("failed to delete provider: %w", result.Error)
+		return fmt.Errorf("删除提供商失败: %w", result.Error)
 	}
 	return nil
 }

@@ -261,7 +261,7 @@ func (m *Manager) IsRunning() bool {
 
 // ProcessMessage processes an incoming chat message.
 func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatMessage) error {
-	m.logger.Debug("processing message",
+	m.logger.With("name", "【网关服务】").Debug("【WebSocket】处理消息",
 		"client_id", client.ID,
 		"chat_id", msg.ChatID,
 		"content_length", len(msg.Content))

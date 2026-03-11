@@ -121,6 +121,17 @@ func WithLoopSystemPrompt(prompt string) LoopOption {
 	return func(l *Loop) { l.systemPrompt = prompt }
 }
 
+// GetDefaultProvider returns the default provider.
+func (l *Loop) GetDefaultProvider() providers.Provider {
+	// Return the provider if set
+	if l.provider != nil {
+		return l.provider
+	}
+
+	// Return the fallback chain
+	return l.fallbackChain
+}
+
 // Run starts the agent loop.
 func (l *Loop) Run(ctx context.Context) error {
 	l.running.Store(true)

@@ -852,7 +852,7 @@
     <!-- Provider 编辑弹窗 -->
     <ModalDialog
       v-model:visible="providerDialogVisible"
-      :title="editingProvider ? '编辑 Provider' : '添加 Provider'"
+      :title="editingProvider ? '编辑供应商' : '添加供应商'"
       size="lg"
       :scrollable="true"
       :loading="savingProvider"
@@ -882,7 +882,7 @@
               class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
             />
             <label for="provider-enabled" class="text-sm">
-              启用此 Provider
+              启用此供应商
             </label>
           </div>
           <div>
@@ -890,7 +890,7 @@
               >API Key</label
             >
             <input
-              v-model="providerForm.apiKey"
+              v-model="providerForm.api_key"
               type="password"
               placeholder="sk-..."
               class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
@@ -901,7 +901,7 @@
               >API Base URL</label
             >
             <input
-              v-model="providerForm.apiBase"
+              v-model="providerForm.api_base"
               type="text"
               placeholder="https://api.openai.com/v1"
               class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
@@ -915,7 +915,7 @@
               >默认模型</label
             >
             <input
-              v-model="providerForm.defaultModel"
+              v-model="providerForm.default_model"
               type="text"
               placeholder="例如：gpt-4, claude-sonnet-4-20250514"
               class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
@@ -946,7 +946,7 @@
                 class="flex items-center gap-2"
               >
                 <input
-                  v-model="model.name"
+                  v-model="model.model"
                   type="text"
                   placeholder="模型名称 (如 gpt-4)"
                   class="flex-1 px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
@@ -1638,7 +1638,7 @@ function openEditProvider(provider) {
   // 解析 LLMs 字段
   if (provider.llms && provider.llms.length > 0) {
     providerForm.models = provider.llms.map((l) => ({
-      name: l.name || "",
+      model: l.model || "",
       alias: l.model || "", // alias 字段在 storage 中是 model
     }));
   } else {
@@ -1656,7 +1656,7 @@ function closeProviderDialog() {
 
 // 添加模型
 function addModel() {
-  providerForm.models.push({ name: "", alias: "" });
+  providerForm.models.push({ model: "", alias: "" });
 }
 
 // 删除模型
@@ -1674,16 +1674,16 @@ async function handleSaveProvider() {
   const llms = providerForm.models
     .filter((m) => m.name) // 过滤空模型
     .map((m) => ({
-      name: m.name,
-      model: m.alias || m.name, // alias 存储到 model 字段
+      model: m.model,
+      alias: m.alias, // alias 存储到 model 字段
     }));
 
   const data = {
     name: providerForm.name,
     enabled: providerForm.enabled,
-    api_key: providerForm.apiKey,
-    base_url: providerForm.apiBase,
-    default_model: providerForm.defaultModel,
+    api_key: providerForm.api_key,
+    base_url: providerForm.api_base,
+    default_model: providerForm.default_model,
     llms: llms,
   };
 
