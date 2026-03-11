@@ -26,7 +26,7 @@ func (a *App) Startup(ctx context.Context) {
 
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+	return fmt.Sprintf("你好 %s，现在是展示时间！", name)
 }
 
 // MinimizeWindow 将窗口最小化

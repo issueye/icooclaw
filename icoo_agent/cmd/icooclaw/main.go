@@ -62,30 +62,30 @@ func runStart(cmd *cobra.Command, args []string) {
 	// Load config
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
-		slog.Error("failed to load config", "error", err)
+		slog.Error("加载配置失败", "error", err)
 		os.Exit(1)
 	}
 
 	// Ensure directories exist
 	if err := cfg.EnsureWorkspace(); err != nil {
-		slog.Error("failed to create workspace", "error", err)
+		slog.Error("创建工作目录失败", "error", err)
 		os.Exit(1)
 	}
 	if err := cfg.EnsureDatabasePath(); err != nil {
-		slog.Error("failed to create database directory", "error", err)
+		slog.Error("创建数据库目录失败", "error", err)
 		os.Exit(1)
 	}
 
 	// Setup logging
 	setupLogging(cfg)
 
-	slog.Info("starting icooclaw", "version", version)
+	slog.Info("正在启动 icooclaw", "version", version)
 
 	// Initialize storage
 	dbPath, _ := cfg.GetDatabasePath()
 	store, err := storage.New(dbPath)
 	if err != nil {
-		slog.Error("failed to initialize storage", "error", err)
+		slog.Error("初始化存储失败", "error", err)
 		os.Exit(1)
 	}
 	defer store.Close()
@@ -106,7 +106,7 @@ func runStart(cmd *cobra.Command, args []string) {
 	var defaultProvider providers.Provider
 	defaultProvider, err = providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
 	if err != nil {
-		slog.Warn("default provider not found, will need to configure", "provider", cfg.Agent.DefaultProvider)
+		slog.Warn("未找到默认提供商，需要配置", "provider", cfg.Agent.DefaultProvider)
 	}
 
 	// Initialize agent instance
@@ -157,18 +157,18 @@ func runStart(cmd *cobra.Command, args []string) {
 
 	go func() {
 		<-sigChan
-		slog.Info("shutting down...")
+		slog.Info("正在关闭...")
 		cancel()
 	}()
 
 	// Start agent loop
-	slog.Info("agent started", "name", agentInstance.Name())
+	slog.Info("代理已启动", "name", agentInstance.Name())
 	if err := loop.Run(ctx); err != nil && err != context.Canceled {
-		slog.Error("agent error", "error", err)
+		slog.Error("代理运行错误", "error", err)
 		os.Exit(1)
 	}
 
-	slog.Info("agent stopped")
+	slog.Info("代理已停止")
 }
 
 func setupLogging(cfg *config.Config) {

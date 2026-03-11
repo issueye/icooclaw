@@ -123,17 +123,17 @@ func Load(path string) (*Config, error) {
 
 	// Read config file
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		return nil, fmt.Errorf("读取配置文件失败: %w", err)
 	}
 
 	// Unmarshal into config struct
 	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+		return nil, fmt.Errorf("解析配置失败: %w", err)
 	}
 
 	// Validate config
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
+		return nil, fmt.Errorf("配置验证失败: %w", err)
 	}
 
 	return cfg, nil
@@ -154,13 +154,13 @@ func setDefaults(v *viper.Viper, cfg *Config) {
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	if c.Agent.Workspace == "" {
-		return fmt.Errorf("agent.workspace is required")
+		return fmt.Errorf("agent.workspace 是必需的")
 	}
 	if c.Database.Path == "" {
-		return fmt.Errorf("database.path is required")
+		return fmt.Errorf("database.path 是必需的")
 	}
 	if c.Gateway.Enabled && (c.Gateway.Port <= 0 || c.Gateway.Port > 65535) {
-		return fmt.Errorf("gateway.port must be between 1 and 65535")
+		return fmt.Errorf("gateway.port 必须在 1 到 65535 之间")
 	}
 	return nil
 }
@@ -168,7 +168,7 @@ func (c *Config) Validate() error {
 // EnsureWorkspace ensures the workspace directory exists.
 func (c *Config) EnsureWorkspace() error {
 	if err := os.MkdirAll(c.Agent.Workspace, 0755); err != nil {
-		return fmt.Errorf("failed to create workspace directory: %w", err)
+		return fmt.Errorf("创建工作目录失败: %w", err)
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ func (c *Config) EnsureWorkspace() error {
 func (c *Config) EnsureDatabasePath() error {
 	dir := filepath.Dir(c.Database.Path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create database directory: %w", err)
+		return fmt.Errorf("创建数据库目录失败:%w", err)
 	}
 	return nil
 }

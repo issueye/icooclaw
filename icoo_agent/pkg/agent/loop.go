@@ -20,7 +20,7 @@ import (
 
 const (
 	defaultMaxToolIterations = 10
-	defaultResponse          = "I've completed processing but have no response to give."
+	defaultResponse          = "处理完成，但没有响应内容。"
 )
 
 // Loop represents the main agent processing loop.
@@ -126,12 +126,12 @@ func (l *Loop) Run(ctx context.Context) error {
 	l.running.Store(true)
 	defer l.running.Store(false)
 
-	l.logger.Info("agent loop started")
+	l.logger.Info("代理循环已启动")
 
 	for l.running.Load() {
 		select {
 		case <-ctx.Done():
-			l.logger.Info("agent loop stopped", "reason", ctx.Err())
+			l.logger.Info("代理循环已停止", "reason", ctx.Err())
 			return ctx.Err()
 		default:
 			msg, ok := l.bus.ConsumeInbound(ctx)
@@ -143,11 +143,11 @@ func (l *Loop) Run(ctx context.Context) error {
 			go func() {
 				response, err := l.processMessage(ctx, msg)
 				if err != nil {
-					l.logger.Error("failed to process message",
+					l.logger.Error("处理消息失败",
 						"channel", msg.Channel,
 						"chat_id", msg.ChatID,
 						"error", err)
-					response = fmt.Sprintf("Error processing message: %v", err)
+					response = fmt.Sprintf("处理消息时出错: %v", err)
 				}
 
 				if response != "" {
@@ -159,7 +159,7 @@ func (l *Loop) Run(ctx context.Context) error {
 						ChatID:  msg.ChatID,
 						Text:    response,
 					}); err != nil {
-						l.logger.Error("failed to publish response",
+						l.logger.Error("发布响应失败",
 							"channel", msg.Channel,
 							"chat_id", msg.ChatID,
 							"error", err)
@@ -179,7 +179,7 @@ func (l *Loop) Stop() {
 
 // processMessage processes an inbound message.
 func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
-	l.logger.Info("processing message",
+	l.logger.Info("正在处理消息",
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID,
 		"sender", msg.Sender.ID)
@@ -187,7 +187,7 @@ func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (stri
 	// Get binding
 	binding, err := l.storage.Binding().GetBinding(msg.Channel, msg.ChatID)
 	if err != nil {
-		l.logger.Debug("no binding found, using default agent",
+		l.logger.Debug("未找到绑定，使用默认代理",
 			"channel", msg.Channel,
 			"chat_id", msg.ChatID)
 		// Use default agent name
@@ -201,7 +201,7 @@ func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (stri
 // processWithAgent processes a message with a specific agent.
 // This is the core message processing logic, similar to PicoClaw's runAgentLoop.
 func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.InboundMessage) (string, error) {
-	l.logger.Info("processing with agent",
+	l.logger.Info("使用代理处理",
 		"agent", agentName,
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID)
@@ -214,7 +214,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	if l.memory != nil {
 		mem, err := l.memory.Load(ctx, sessionKey)
 		if err != nil {
-			l.logger.Warn("failed to load memory", "error", err, "session_key", sessionKey)
+			l.logger.Warn("加载记忆失败", "error", err, "session_key", sessionKey)
 		} else {
 			history = mem
 		}
@@ -226,7 +226,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	// 4. Save user message to memory
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, "user", msg.Text); err != nil {
-			l.logger.Warn("failed to save user message", "error", err)
+			l.logger.Warn("保存用户消息失败", "error", err)
 		}
 	}
 
@@ -244,12 +244,12 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	// 7. Save final assistant message to memory
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, "assistant", finalContent); err != nil {
-			l.logger.Warn("failed to save assistant message", "error", err)
+			l.logger.Warn("保存助手消息失败", "error", err)
 		}
 	}
 
 	// 8. Log response
-	l.logger.Info("response generated",
+	l.logger.Info("响应已生成",
 		"agent", agentName,
 		"session_key", sessionKey,
 		"iterations", iteration,
@@ -265,7 +265,7 @@ func (l *Loop) buildMessages(history []providers.ChatMessage, msg bus.InboundMes
 	// Add system prompt
 	systemPrompt := l.systemPrompt
 	if systemPrompt == "" {
-		systemPrompt = "You are a helpful AI assistant."
+		systemPrompt = "你是一个有帮助的AI助手。"
 	}
 	messages = append(messages, providers.ChatMessage{
 		Role:    "system",
@@ -307,20 +307,20 @@ func (l *Loop) runLLMIteration(
 			req.Tools = l.convertToolDefinitions(toolDefs)
 		}
 
-		l.logger.Debug("sending request to LLM",
+		l.logger.Debug("正在发送请求到LLM",
 			"iteration", iteration,
 			"message_count", len(currentMessages))
 
 		// Send to provider
 		resp, err := l.provider.Chat(ctx, req)
 		if err != nil {
-			l.logger.Error("LLM request failed", "error", err, "iteration", iteration)
-			return "", iteration, fmt.Errorf("LLM request failed: %w", err)
+			l.logger.Error("LLM请求失败", "error", err, "iteration", iteration)
+			return "", iteration, fmt.Errorf("LLM请求失败: %w", err)
 		}
 
 		// Handle tool calls
 		if len(resp.ToolCalls) > 0 {
-			l.logger.Info("processing tool calls",
+			l.logger.Info("正在处理工具调用",
 				"count", len(resp.ToolCalls),
 				"iteration", iteration)
 
@@ -336,7 +336,7 @@ func (l *Loop) runLLMIteration(
 			for _, tc := range resp.ToolCalls {
 				toolResult, err := l.executeToolCall(ctx, tc, msg)
 				if err != nil {
-					toolResult = fmt.Sprintf("Error: %v", err)
+					toolResult = fmt.Sprintf("错误: %v", err)
 				}
 
 				// Add tool result message
@@ -351,7 +351,7 @@ func (l *Loop) runLLMIteration(
 		}
 
 		// No tool calls, return the response
-		l.logger.Debug("LLM response received",
+		l.logger.Debug("LLM响应已接收",
 			"iteration", iteration,
 			"content_length", len(resp.Content))
 
@@ -359,10 +359,10 @@ func (l *Loop) runLLMIteration(
 	}
 
 	// Max iterations reached
-	l.logger.Warn("max tool iterations reached",
+	l.logger.Warn("已达到最大工具迭代次数",
 		"iterations", l.maxToolIterations)
 
-	return "", iteration, fmt.Errorf("max tool iterations (%d) reached", l.maxToolIterations)
+	return "", iteration, fmt.Errorf("已达到最大工具迭代次数 (%d)", l.maxToolIterations)
 }
 
 // executeToolCall executes a tool call and returns the result.
@@ -372,7 +372,7 @@ func (l *Loop) executeToolCall(
 	msg bus.InboundMessage,
 ) (string, error) {
 	toolName := tc.Function.Name
-	l.logger.Info("executing tool",
+	l.logger.Info("正在执行工具",
 		"tool", toolName,
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID)
@@ -381,10 +381,10 @@ func (l *Loop) executeToolCall(
 	var args map[string]any
 	if tc.Function.Arguments != "" {
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-			l.logger.Error("failed to parse tool arguments",
+			l.logger.Error("解析工具参数失败",
 				"tool", toolName,
 				"error", err)
-			return "", fmt.Errorf("failed to parse arguments: %w", err)
+			return "", fmt.Errorf("解析参数失败: %w", err)
 		}
 	}
 

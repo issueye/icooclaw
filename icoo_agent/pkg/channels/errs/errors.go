@@ -8,11 +8,11 @@ import (
 
 // Sentinel errors for channel operations.
 var (
-	ErrNotRunning      = errors.New("channel not running")
-	ErrRateLimit       = errors.New("rate limited")
-	ErrTemporary       = errors.New("temporary failure")
-	ErrSendFailed      = errors.New("send failed")
-	ErrChannelNotFound = errors.New("channel not found")
+	ErrNotRunning      = errors.New("通道未运行")
+	ErrRateLimit       = errors.New("请求频率受限")
+	ErrTemporary       = errors.New("临时故障")
+	ErrSendFailed      = errors.New("发送失败")
+	ErrChannelNotFound = errors.New("通道未找到")
 )
 
 // ClassifySendError classifies an HTTP error for retry decisions.

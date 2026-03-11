@@ -37,6 +37,6 @@ func main() {
 	})
 
 	if err != nil {
-		println("Error:", err.Error())
+		println("错误:", err.Error())
 	}
 }

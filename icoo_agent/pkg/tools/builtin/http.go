@@ -32,7 +32,7 @@ func (t *HTTPTool) Name() string {
 
 // Description returns the tool description.
 func (t *HTTPTool) Description() string {
-	return "Make HTTP requests to external APIs and websites."
+	return "向外部 API 和网站发送 HTTP 请求。"
 }
 
 // Parameters returns the tool parameters.
@@ -40,19 +40,19 @@ func (t *HTTPTool) Parameters() map[string]any {
 	return map[string]any{
 		"url": map[string]any{
 			"type":        "string",
-			"description": "The URL to request",
+			"description": "请求的 URL",
 		},
 		"method": map[string]any{
 			"type":        "string",
-			"description": "HTTP method (GET, POST, PUT, DELETE)",
+			"description": "HTTP 方法 (GET, POST, PUT, DELETE)",
 		},
 		"headers": map[string]any{
 			"type":        "object",
-			"description": "HTTP headers as key-value pairs",
+			"description": "HTTP 请求头，键值对形式",
 		},
 		"body": map[string]any{
 			"type":        "string",
-			"description": "Request body for POST/PUT requests",
+			"description": "POST/PUT 请求的请求体",
 		},
 	}
 }
@@ -61,7 +61,7 @@ func (t *HTTPTool) Parameters() map[string]any {
 func (t *HTTPTool) Execute(ctx context.Context, args map[string]any) *tools.Result {
 	reqURL, ok := args["url"].(string)
 	if !ok {
-		return &tools.Result{Success: false, Error: fmt.Errorf("url is required")}
+		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 url 参数")}
 	}
 
 	method := "GET"

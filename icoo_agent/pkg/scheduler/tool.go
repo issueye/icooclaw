@@ -31,7 +31,7 @@ func (t *SchedulerTool) Name() string {
 
 // Description returns the tool description.
 func (t *SchedulerTool) Description() string {
-	return "Manage scheduled tasks. List, enable, disable, or run tasks on demand."
+	return "管理定时任务。列出、启用、禁用或按需运行任务。"
 }
 
 // Parameters returns the tool parameters.
@@ -39,11 +39,11 @@ func (t *SchedulerTool) Parameters() map[string]any {
 	return map[string]any{
 		"action": map[string]any{
 			"type":        "string",
-			"description": "Action to perform: list, run, enable, disable",
+			"description": "要执行的操作: list, run, enable, disable",
 		},
 		"task_id": map[string]any{
 			"type":        "string",
-			"description": "Task ID for run/enable/disable actions",
+			"description": "任务ID，用于 run/enable/disable 操作",
 		},
 	}
 }
@@ -65,7 +65,7 @@ func (t *SchedulerTool) Execute(ctx context.Context, args map[string]any) *tools
 	default:
 		return &tools.Result{
 			Success: false,
-			Error:   fmt.Errorf("unknown action: %s", action),
+			Error:   fmt.Errorf("未知操作: %s", action),
 		}
 	}
 }
@@ -74,19 +74,19 @@ func (t *SchedulerTool) listTasks() *tools.Result {
 	tasks := t.scheduler.ListTasks()
 
 	var result string
-	result = fmt.Sprintf("Found %d scheduled tasks:\n\n", len(tasks))
+	result = fmt.Sprintf("找到 %d 个定时任务:\n\n", len(tasks))
 
 	for _, task := range tasks {
-		status := "enabled"
+		status := "已启用"
 		if !task.Enabled {
-			status = "disabled"
+			status = "已禁用"
 		}
 
 		result += fmt.Sprintf("- **%s** (%s)\n", task.Name, task.ID)
-		result += fmt.Sprintf("  Schedule: %s\n", task.Schedule)
-		result += fmt.Sprintf("  Status: %s\n", status)
-		result += fmt.Sprintf("  Last run: %s\n", task.LastRun.Format(time.RFC3339))
-		result += fmt.Sprintf("  Next run: %s\n\n", task.NextRun.Format(time.RFC3339))
+		result += fmt.Sprintf("  调度: %s\n", task.Schedule)
+		result += fmt.Sprintf("  状态: %s\n", status)
+		result += fmt.Sprintf("  上次运行: %s\n", task.LastRun.Format(time.RFC3339))
+		result += fmt.Sprintf("  下次运行: %s\n\n", task.NextRun.Format(time.RFC3339))
 	}
 
 	return &tools.Result{Success: true, Content: result}
@@ -94,38 +94,38 @@ func (t *SchedulerTool) listTasks() *tools.Result {
 
 func (t *SchedulerTool) runTask(taskID string) *tools.Result {
 	if taskID == "" {
-		return &tools.Result{Success: false, Error: fmt.Errorf("task_id is required")}
+		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 task_id")}
 	}
 
 	if err := t.scheduler.RunTask(taskID); err != nil {
 		return &tools.Result{Success: false, Error: err}
 	}
 
-	return &tools.Result{Success: true, Content: fmt.Sprintf("Task %s triggered", taskID)}
+	return &tools.Result{Success: true, Content: fmt.Sprintf("任务 %s 已触发", taskID)}
 }
 
 func (t *SchedulerTool) enableTask(taskID string) *tools.Result {
 	if taskID == "" {
-		return &tools.Result{Success: false, Error: fmt.Errorf("task_id is required")}
+		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 task_id")}
 	}
 
 	if err := t.scheduler.EnableTask(taskID); err != nil {
 		return &tools.Result{Success: false, Error: err}
 	}
 
-	return &tools.Result{Success: true, Content: fmt.Sprintf("Task %s enabled", taskID)}
+	return &tools.Result{Success: true, Content: fmt.Sprintf("任务 %s 已启用", taskID)}
 }
 
 func (t *SchedulerTool) disableTask(taskID string) *tools.Result {
 	if taskID == "" {
-		return &tools.Result{Success: false, Error: fmt.Errorf("task_id is required")}
+		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 task_id")}
 	}
 
 	if err := t.scheduler.DisableTask(taskID); err != nil {
 		return &tools.Result{Success: false, Error: err}
 	}
 
-	return &tools.Result{Success: true, Content: fmt.Sprintf("Task %s disabled", taskID)}
+	return &tools.Result{Success: true, Content: fmt.Sprintf("任务 %s 已禁用", taskID)}
 }
 
 // RegisterSchedulerTool registers the scheduler tool.

@@ -33,7 +33,7 @@ func (t *WebSearchTool) Name() string {
 
 // Description returns the tool description.
 func (t *WebSearchTool) Description() string {
-	return "Search the web for information using DuckDuckGo."
+	return "使用 DuckDuckGo 在网络上搜索信息。"
 }
 
 // Parameters returns the tool parameters.
@@ -41,11 +41,11 @@ func (t *WebSearchTool) Parameters() map[string]any {
 	return map[string]any{
 		"query": map[string]any{
 			"type":        "string",
-			"description": "The search query",
+			"description": "搜索查询",
 		},
 		"max_results": map[string]any{
 			"type":        "integer",
-			"description": "Maximum number of results (default: 5)",
+			"description": "最大结果数量 (默认: 5)",
 		},
 	}
 }
@@ -54,7 +54,7 @@ func (t *WebSearchTool) Parameters() map[string]any {
 func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) *tools.Result {
 	query, ok := args["query"].(string)
 	if !ok {
-		return &tools.Result{Success: false, Error: fmt.Errorf("query is required")}
+		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供查询参数")}
 	}
 
 	maxResults := 5
@@ -99,7 +99,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) *tools
 	// Build response
 	var response strings.Builder
 	if result.AbstractText != "" {
-		response.WriteString(fmt.Sprintf("**%s**\n%s\nSource: %s\n\n", result.Heading, result.AbstractText, result.AbstractURL))
+		response.WriteString(fmt.Sprintf("**%s**\n%s\n来源: %s\n\n", result.Heading, result.AbstractText, result.AbstractURL))
 	}
 
 	for i, topic := range result.RelatedTopics {
@@ -107,12 +107,12 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) *tools
 			break
 		}
 		if topic.Text != "" {
-			response.WriteString(fmt.Sprintf("- %s\n  URL: %s\n\n", topic.Text, topic.URL))
+			response.WriteString(fmt.Sprintf("- %s\n  链接: %s\n\n", topic.Text, topic.URL))
 		}
 	}
 
 	if response.Len() == 0 {
-		response.WriteString("No results found.")
+		response.WriteString("未找到结果。")
 	}
 
 	return &tools.Result{Success: true, Content: response.String()}

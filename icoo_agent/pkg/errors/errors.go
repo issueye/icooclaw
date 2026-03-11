@@ -9,45 +9,45 @@ import (
 // Sentinel errors
 var (
 	// Provider errors
-	ErrProviderUnavailable = errors.New("provider unavailable")
-	ErrRateLimited         = errors.New("rate limited")
-	ErrTimeout             = errors.New("timeout")
-	ErrAuthFailed          = errors.New("authentication failed")
+	ErrProviderUnavailable = errors.New("提供商不可用")
+	ErrRateLimited         = errors.New("请求频率受限")
+	ErrTimeout             = errors.New("请求超时")
+	ErrAuthFailed          = errors.New("认证失败")
 
 	// Config errors
-	ErrInvalidConfig = errors.New("invalid configuration")
-	ErrConfigNotFound = errors.New("configuration not found")
+	ErrInvalidConfig = errors.New("配置无效")
+	ErrConfigNotFound = errors.New("配置未找到")
 
 	// Tool errors
-	ErrToolNotFound    = errors.New("tool not found")
-	ErrToolExecution   = errors.New("tool execution failed")
-	ErrToolTimeout     = errors.New("tool execution timeout")
+	ErrToolNotFound    = errors.New("工具未找到")
+	ErrToolExecution   = errors.New("工具执行失败")
+	ErrToolTimeout     = errors.New("工具执行超时")
 
 	// Session errors
-	ErrSessionNotFound = errors.New("session not found")
-	ErrSessionExpired  = errors.New("session expired")
+	ErrSessionNotFound = errors.New("会话未找到")
+	ErrSessionExpired  = errors.New("会话已过期")
 
 	// Channel errors
-	ErrChannelNotRunning = errors.New("channel not running")
-	ErrChannelNotFound   = errors.New("channel not found")
-	ErrSendFailed        = errors.New("send failed")
+	ErrChannelNotRunning = errors.New("通道未运行")
+	ErrChannelNotFound   = errors.New("通道未找到")
+	ErrSendFailed        = errors.New("发送失败")
 
 	// Storage errors
-	ErrStorageFailed   = errors.New("storage operation failed")
-	ErrRecordNotFound  = errors.New("record not found")
-	ErrDuplicateRecord = errors.New("duplicate record")
+	ErrStorageFailed   = errors.New("存储操作失败")
+	ErrRecordNotFound  = errors.New("记录未找到")
+	ErrDuplicateRecord = errors.New("记录重复")
 
 	// Memory errors
-	ErrMemoryLoadFailed = errors.New("memory load failed")
+	ErrMemoryLoadFailed = errors.New("记忆加载失败")
 
 	// MCP errors
-	ErrMCPConnectionFailed = errors.New("MCP connection failed")
-	ErrMCPToolNotFound     = errors.New("MCP tool not found")
+	ErrMCPConnectionFailed = errors.New("MCP连接失败")
+	ErrMCPToolNotFound     = errors.New("MCP工具未找到")
 
 	// Generic errors
-	ErrBufferFull   = errors.New("buffer full")
-	ErrNotRunning   = errors.New("not running")
-	ErrTemporary    = errors.New("temporary failure")
+	ErrBufferFull   = errors.New("缓冲区已满")
+	ErrNotRunning   = errors.New("未在运行")
+	ErrTemporary    = errors.New("临时故障")
 )
 
 // FailoverReason represents the reason for provider failover.
@@ -72,10 +72,10 @@ type FailoverError struct {
 
 func (e *FailoverError) Error() string {
 	if e.Wrapped != nil {
-		return fmt.Sprintf("failover [%s]: %s (provider=%s, model=%s, status=%d)",
+		return fmt.Sprintf("故障转移 [%s]: %s (提供商=%s, 模型=%s, 状态=%d)",
 			e.Reason, e.Wrapped.Error(), e.Provider, e.Model, e.Status)
 	}
-	return fmt.Sprintf("failover [%s]: provider=%s, model=%s, status=%d",
+	return fmt.Sprintf("故障转移 [%s]: 提供商=%s, 模型=%s, 状态=%d",
 		e.Reason, e.Provider, e.Model, e.Status)
 }
 

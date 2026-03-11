@@ -437,14 +437,14 @@ func (c *Client) ExecuteTool(ctx context.Context, name string, args map[string]a
 		case mcp.TextContent:
 			content.WriteString(v.Text)
 		case mcp.ImageContent:
-			content.WriteString(fmt.Sprintf("[Image: %s]", v.MIMEType))
+			content.WriteString(fmt.Sprintf("[图片: %s]", v.MIMEType))
 		}
 	}
 
 	if result.IsError {
 		return &tools.Result{
 			Success: false,
-			Error:   fmt.Errorf("tool returned error: %s", content.String()),
+			Error:   fmt.Errorf("工具返回错误: %s", content.String()),
 		}, nil
 	}
 

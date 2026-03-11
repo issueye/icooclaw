@@ -23,7 +23,7 @@ func (t *DateTimeTool) Name() string {
 
 // Description returns the tool description.
 func (t *DateTimeTool) Description() string {
-	return "Get current date and time information."
+	return "获取当前日期和时间信息。"
 }
 
 // Parameters returns the tool parameters.
@@ -31,11 +31,11 @@ func (t *DateTimeTool) Parameters() map[string]any {
 	return map[string]any{
 		"timezone": map[string]any{
 			"type":        "string",
-			"description": "Timezone (e.g., 'UTC', 'America/New_York')",
+			"description": "时区 (例如: 'UTC', 'Asia/Shanghai')",
 		},
 		"format": map[string]any{
 			"type":        "string",
-			"description": "Time format (e.g., '2006-01-02 15:04:05')",
+			"description": "时间格式 (例如: '2006-01-02 15:04:05')",
 		},
 	}
 }
@@ -48,7 +48,7 @@ func (t *DateTimeTool) Execute(ctx context.Context, args map[string]any) *tools.
 	if tz, ok := args["timezone"].(string); ok {
 		loc, err := time.LoadLocation(tz)
 		if err != nil {
-			return &tools.Result{Success: false, Error: fmt.Errorf("invalid timezone: %v", err)}
+			return &tools.Result{Success: false, Error: fmt.Errorf("无效的时区: %v", err)}
 		}
 		now = now.In(loc)
 	}
