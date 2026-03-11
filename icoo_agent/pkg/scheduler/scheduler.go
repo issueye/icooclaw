@@ -62,13 +62,13 @@ func (s *Scheduler) AddTask(task *Task) error {
 	defer s.mu.Unlock()
 
 	if _, exists := s.tasks[task.ID]; exists {
-		return fmt.Errorf("task with ID %s already exists", task.ID)
+		return fmt.Errorf("任务ID %s 已存在", task.ID)
 	}
 
 	// Parse schedule
 	schedule, err := cron.ParseStandard(task.Schedule)
 	if err != nil {
-		return fmt.Errorf("invalid schedule: %w", err)
+		return fmt.Errorf("无效的调度表达式: %w", err)
 	}
 
 	// Create cron job
@@ -80,7 +80,7 @@ func (s *Scheduler) AddTask(task *Task) error {
 	task.NextRun = s.cron.Entry(entryID).Next
 	s.tasks[task.ID] = task
 
-	s.logger.Info("task added", "id", task.ID, "name", task.Name, "schedule", task.Schedule)
+	s.logger.Info("任务已添加", "id", task.ID, "name", task.Name, "schedule", task.Schedule)
 	return nil
 }
 
@@ -91,13 +91,13 @@ func (s *Scheduler) RemoveTask(id string) error {
 
 	task, exists := s.tasks[id]
 	if !exists {
-		return fmt.Errorf("task with ID %s not found", id)
+		return fmt.Errorf("任务ID %s 未找到", id)
 	}
 
 	s.cron.Remove(task.EntryID)
 	delete(s.tasks, id)
 
-	s.logger.Info("task removed", "id", id)
+	s.logger.Info("任务已移除", "id", id)
 	return nil
 }
 
@@ -108,11 +108,11 @@ func (s *Scheduler) EnableTask(id string) error {
 
 	task, exists := s.tasks[id]
 	if !exists {
-		return fmt.Errorf("task with ID %s not found", id)
+		return fmt.Errorf("任务ID %s 未找到", id)
 	}
 
 	task.Enabled = true
-	s.logger.Info("task enabled", "id", id)
+	s.logger.Info("任务已启用", "id", id)
 	return nil
 }
 
@@ -123,11 +123,11 @@ func (s *Scheduler) DisableTask(id string) error {
 
 	task, exists := s.tasks[id]
 	if !exists {
-		return fmt.Errorf("task with ID %s not found", id)
+		return fmt.Errorf("任务ID %s 未找到", id)
 	}
 
 	task.Enabled = false
-	s.logger.Info("task disabled", "id", id)
+	s.logger.Info("任务已禁用", "id", id)
 	return nil
 }
 
@@ -138,7 +138,7 @@ func (s *Scheduler) GetTask(id string) (*Task, error) {
 
 	task, exists := s.tasks[id]
 	if !exists {
-		return nil, fmt.Errorf("task with ID %s not found", id)
+		return nil, fmt.Errorf("任务ID %s 未找到", id)
 	}
 
 	// Update next run time
@@ -174,7 +174,7 @@ func (s *Scheduler) RunTask(id string) error {
 	s.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("task with ID %s not found", id)
+		return fmt.Errorf("任务ID %s 未找到", id)
 	}
 
 	go s.executeTask(task)
@@ -192,7 +192,7 @@ func (s *Scheduler) Start() {
 
 	s.cron.Start()
 	s.running = true
-	s.logger.Info("scheduler started")
+	s.logger.Info("调度器已启动")
 }
 
 // Stop stops the scheduler.
@@ -207,7 +207,7 @@ func (s *Scheduler) Stop() {
 	ctx := s.cron.Stop()
 	<-ctx.Done()
 	s.running = false
-	s.logger.Info("scheduler stopped")
+	s.logger.Info("调度器已停止")
 }
 
 // Results returns the results channel.
@@ -229,7 +229,7 @@ func (s *Scheduler) executeTask(task *Task) {
 	}
 
 	startTime := time.Now()
-	s.logger.Debug("executing task", "id", task.ID, "name", task.Name)
+	s.logger.Debug("正在执行任务", "id", task.ID, "name", task.Name)
 
 	ctx := context.Background()
 	err := task.Handler(ctx)
@@ -254,13 +254,13 @@ func (s *Scheduler) executeTask(task *Task) {
 	select {
 	case s.results <- result:
 	default:
-		s.logger.Warn("result channel full, dropping result", "task_id", task.ID)
+		s.logger.Warn("结果通道已满，丢弃结果", "task_id", task.ID)
 	}
 
 	if err != nil {
-		s.logger.Error("task execution failed", "id", task.ID, "error", err)
+		s.logger.Error("任务执行失败", "id", task.ID, "error", err)
 	} else {
-		s.logger.Debug("task executed successfully", "id", task.ID, "duration", endTime.Sub(startTime))
+		s.logger.Debug("任务执行成功", "id", task.ID, "duration", endTime.Sub(startTime))
 	}
 }
 
@@ -289,7 +289,7 @@ func ParseDuration(d string) (string, error) {
 	// Convert to cron schedule
 	switch {
 	case duration < time.Minute:
-		return "", fmt.Errorf("minimum duration is 1 minute")
+		return "", fmt.Errorf("最小持续时间为 1 分钟")
 	case duration == time.Minute:
 		return EveryMinute, nil
 	case duration%time.Hour == 0:
@@ -305,6 +305,6 @@ func ParseDuration(d string) (string, error) {
 		}
 		return fmt.Sprintf("*/%d * * * *", minutes), nil
 	default:
-		return "", fmt.Errorf("unsupported duration: %s", d)
+		return "", fmt.Errorf("不支持的持续时间: %s", d)
 	}
 }
