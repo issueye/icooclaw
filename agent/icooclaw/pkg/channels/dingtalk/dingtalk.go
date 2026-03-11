@@ -13,6 +13,7 @@ import (
 
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels"
+	"icooclaw/pkg/channels/errs"
 )
 
 // Config contains DingTalk channel configuration.
@@ -139,7 +140,7 @@ func (c *Channel) ReasoningChannelID() string {
 // Send sends a message to DingTalk via the chatbot reply API.
 func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error {
 	if !c.IsRunning() {
-		return channels.ErrNotRunning
+		return errs.ErrNotRunning
 	}
 
 	// Get session webhook from storage
@@ -211,11 +212,11 @@ func (c *Channel) onChatBotMessageReceived(
 
 	// Build inbound message
 	inboundMsg := bus.InboundMessage{
-		Channel:   c.Name(),
-		ChatID:    chatID,
-		Sender:    bus.SenderInfo{ID: senderID, Name: senderNick},
-		Text:      content,
-		Metadata:  metadata,
+		Channel:  c.Name(),
+		ChatID:   chatID,
+		Sender:   bus.SenderInfo{ID: senderID, Name: senderNick},
+		Text:     content,
+		Metadata: metadata,
 	}
 
 	// Publish to bus
@@ -243,7 +244,7 @@ func (c *Channel) SendDirectReply(ctx context.Context, sessionWebhook, content s
 		contentBytes,
 	)
 	if err != nil {
-		return fmt.Errorf("dingtalk send: %w", channels.ErrTemporary)
+		return fmt.Errorf("dingtalk send: %w", errs.ErrTemporary)
 	}
 
 	return nil

@@ -8,13 +8,13 @@ import (
 
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 
-	"icooclaw/pkg/channels"
+	"icooclaw/pkg/channels/errs"
 )
 
 // SendText sends a text message to a chat.
 func (c *Channel) SendText(ctx context.Context, chatID, text string) error {
 	if !c.IsRunning() {
-		return channels.ErrNotRunning
+		return errs.ErrNotRunning
 	}
 
 	content, err := json.Marshal(map[string]string{"text": text})
@@ -33,11 +33,11 @@ func (c *Channel) SendText(ctx context.Context, chatID, text string) error {
 
 	resp, err := c.client.Im.V1.Message.Create(ctx, req)
 	if err != nil {
-		return fmt.Errorf("feishu send text: %w", channels.ErrTemporary)
+		return fmt.Errorf("feishu send text: %w", errs.ErrTemporary)
 	}
 
 	if !resp.Success() {
-		return fmt.Errorf("feishu api error (code=%d msg=%s): %w", resp.Code, resp.Msg, channels.ErrTemporary)
+		return fmt.Errorf("feishu api error (code=%d msg=%s): %w", resp.Code, resp.Msg, errs.ErrTemporary)
 	}
 
 	return nil
@@ -46,7 +46,7 @@ func (c *Channel) SendText(ctx context.Context, chatID, text string) error {
 // SendImage sends an image message to a chat.
 func (c *Channel) SendImage(ctx context.Context, chatID string, imagePath string) error {
 	if !c.IsRunning() {
-		return channels.ErrNotRunning
+		return errs.ErrNotRunning
 	}
 
 	file, err := os.Open(imagePath)
@@ -100,7 +100,7 @@ func (c *Channel) SendImage(ctx context.Context, chatID string, imagePath string
 // SendFile sends a file message to a chat.
 func (c *Channel) SendFile(ctx context.Context, chatID string, filePath string, fileType string) error {
 	if !c.IsRunning() {
-		return channels.ErrNotRunning
+		return errs.ErrNotRunning
 	}
 
 	file, err := os.Open(filePath)

@@ -1,5 +1,5 @@
 // Package channels provides channel management for icooclaw.
-package channels
+package errs
 
 import (
 	"errors"
@@ -8,10 +8,10 @@ import (
 
 // Sentinel errors for channel operations.
 var (
-	ErrNotRunning  = errors.New("channel not running")
-	ErrRateLimit   = errors.New("rate limited")
-	ErrTemporary   = errors.New("temporary failure")
-	ErrSendFailed  = errors.New("send failed")
+	ErrNotRunning      = errors.New("channel not running")
+	ErrRateLimit       = errors.New("rate limited")
+	ErrTemporary       = errors.New("temporary failure")
+	ErrSendFailed      = errors.New("send failed")
 	ErrChannelNotFound = errors.New("channel not found")
 )
 

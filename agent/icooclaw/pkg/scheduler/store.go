@@ -11,16 +11,16 @@ import (
 
 // TaskRecord represents a scheduled task record in database.
 type TaskRecord struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	TaskID      string    `gorm:"uniqueIndex;not null" json:"task_id"`
-	Name        string    `gorm:"not null" json:"name"`
-	Schedule    string    `gorm:"not null" json:"schedule"`
-	Description string    `json:"description"`
-	Enabled     bool      `gorm:"default:true" json:"enabled"`
-	LastRun     time.Time `json:"last_run"`
-	NextRun     time.Time `json:"next_run"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uint      `gorm:"column:id;primaryKey:true" json:"id"`
+	TaskID      string    `gorm:"column:task_id;uniqueIndex;not null" json:"task_id"`
+	Name        string    `gorm:"column:name;not null" json:"name"`
+	Schedule    string    `gorm:"column:schedule;not null" json:"schedule"`
+	Description string    `gorm:"column:description;" json:"description"`
+	Enabled     bool      `gorm:"column:enabled;default:true" json:"enabled"`
+	LastRun     time.Time `gorm:"column:last_run;" json:"last_run"`
+	NextRun     time.Time `gorm:"column:next_run;" json:"next_run"`
+	CreatedAt   time.Time `gorm:"column:created_at;" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;" json:"updated_at"`
 }
 
 // TableName returns the table name.

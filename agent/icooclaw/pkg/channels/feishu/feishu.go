@@ -21,6 +21,7 @@ import (
 
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels"
+	"icooclaw/pkg/channels/errs"
 )
 
 // Config contains Feishu channel configuration.
@@ -153,11 +154,11 @@ func (c *Channel) ReasoningChannelID() string {
 // Send sends a message using Interactive Card format for markdown rendering.
 func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error {
 	if !c.IsRunning() {
-		return channels.ErrNotRunning
+		return errs.ErrNotRunning
 	}
 
 	if msg.ChatID == "" {
-		return fmt.Errorf("chat ID is empty: %w", channels.ErrSendFailed)
+		return fmt.Errorf("chat ID is empty: %w", errs.ErrSendFailed)
 	}
 
 	// Build interactive card with markdown content
@@ -325,12 +326,12 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 
 	// Build inbound message
 	inboundMsg := bus.InboundMessage{
-		Channel:   c.Name(),
-		ChatID:    chatID,
-		Sender:    bus.SenderInfo{ID: senderID},
-		Text:      content,
-		Media:     mediaRefs,
-		Metadata:  metadata,
+		Channel:  c.Name(),
+		ChatID:   chatID,
+		Sender:   bus.SenderInfo{ID: senderID},
+		Text:     content,
+		Media:    mediaRefs,
+		Metadata: metadata,
 	}
 
 	c.logger.Debug("Feishu message received",
@@ -395,11 +396,11 @@ func (c *Channel) sendCard(ctx context.Context, chatID, cardContent string) erro
 
 	resp, err := c.client.Im.V1.Message.Create(ctx, req)
 	if err != nil {
-		return fmt.Errorf("feishu send card: %w", channels.ErrTemporary)
+		return fmt.Errorf("feishu send card: %w", errs.ErrTemporary)
 	}
 
 	if !resp.Success() {
-		return fmt.Errorf("feishu api error (code=%d msg=%s): %w", resp.Code, resp.Msg, channels.ErrTemporary)
+		return fmt.Errorf("feishu api error (code=%d msg=%s): %w", resp.Code, resp.Msg, errs.ErrTemporary)
 	}
 
 	c.logger.Debug("Feishu card message sent", "chat_id", chatID)

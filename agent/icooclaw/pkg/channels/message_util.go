@@ -9,6 +9,8 @@ import (
 
 // Default message length limits per channel.
 var channelMaxLen = map[string]int{
+	"dingtalk": 4096,
+	"feishu":   4096,
 	"telegram": 4096,
 	"discord":  2000,
 	"slack":    40000,
@@ -144,7 +146,7 @@ func EstimateTokens(content string) int {
 	// Rough estimation: ~4 characters per token for English
 	// ~2 characters per token for Chinese/Japanese
 	charCount := utf8.RuneCountInString(content)
-	
+
 	// Count CJK characters
 	cjkCount := 0
 	for _, r := range content {

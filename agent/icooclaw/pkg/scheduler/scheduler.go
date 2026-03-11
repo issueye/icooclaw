@@ -266,17 +266,17 @@ func (s *Scheduler) executeTask(task *Task) {
 
 // Common task schedules
 const (
-	EveryMinute    = "* * * * *"
-	Every5Minutes  = "*/5 * * * *"
-	Every15Minutes = "*/15 * * * *"
-	Every30Minutes = "*/30 * * * *"
-	EveryHour      = "0 * * * *"
-	Every2Hours    = "0 */2 * * *"
-	Every6Hours    = "0 */6 * * *"
-	Every12Hours   = "0 */12 * * *"
-	EveryDay       = "0 0 * * *"
-	EveryWeek      = "0 0 * * 0"
-	EveryMonth     = "0 0 1 * *"
+	EveryMinute    = "* * * * *"    // 每分钟执行一次
+	Every5Minutes  = "*/5 * * * *"  // 每5分钟执行一次
+	Every15Minutes = "*/15 * * * *" // 每15分钟执行一次
+	Every30Minutes = "*/30 * * * *" // 每30分钟执行一次
+	EveryHour      = "0 * * * *"    // 每小时执行一次
+	Every2Hours    = "0 */2 * * *"  // 每2小时执行一次
+	Every6Hours    = "0 */6 * * *"  // 每6小时执行一次
+	Every12Hours   = "0 */12 * * *" // 每12小时执行一次
+	EveryDay       = "0 0 * * *"    // 每天执行一次
+	EveryWeek      = "0 0 * * 0"    // 每周执行一次（周日）
+	EveryMonth     = "0 0 1 * *"    // 每月1号执行一次
 )
 
 // ParseDuration parses a duration string and returns a cron schedule.

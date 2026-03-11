@@ -14,23 +14,9 @@ import (
 	"golang.org/x/time/rate"
 
 	"icooclaw/pkg/bus"
+	"icooclaw/pkg/channels/consts"
+	"icooclaw/pkg/channels/errs"
 	"icooclaw/pkg/storage"
-)
-
-// Default rate limits per channel (messages per second).
-var channelRateConfig = map[string]float64{
-	"telegram": 20,
-	"discord":  1,
-	"slack":    1,
-	"web":      100,
-}
-
-const (
-	defaultRateLimit = 10
-	maxRetries       = 3
-	rateLimitDelay   = 1 * time.Second
-	baseBackoff      = 500 * time.Millisecond
-	maxBackoff       = 8 * time.Second
 )
 
 // Manager manages all channels.
@@ -309,7 +295,7 @@ func (m *Manager) preSend(ctx context.Context, name, chatID string) {
 func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWorker, msg bus.OutboundMessage) {
 	var lastErr error
 
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; attempt <= consts.DefaultRetries; attempt++ {
 		// Convert bus.OutboundMessage to channels.OutboundMessage
 		chanMsg := OutboundMessage{
 			Channel:  msg.Channel,
@@ -326,21 +312,21 @@ func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWork
 		}
 
 		// Permanent failure - don't retry
-		if IsPermanent(lastErr) {
+		if errs.IsPermanent(lastErr) {
 			m.logger.Error("permanent send failure", "channel", name, "error", lastErr)
 			return
 		}
 
 		// Rate limit - fixed delay
-		if errors.Is(lastErr, ErrRateLimit) {
-			time.Sleep(rateLimitDelay)
+		if errors.Is(lastErr, errs.ErrRateLimit) {
+			time.Sleep(consts.DefaultRateLimitDelay)
 			continue
 		}
 
 		// Temporary - exponential backoff
-		backoff := baseBackoff * time.Duration(1<<uint(attempt))
-		if backoff > maxBackoff {
-			backoff = maxBackoff
+		backoff := consts.DefaultBaseBackoff * time.Duration(1<<uint(attempt))
+		if backoff > consts.DefaultMaxBackoff {
+			backoff = consts.DefaultMaxBackoff
 		}
 		time.Sleep(backoff)
 	}
@@ -432,8 +418,8 @@ type channelWorker struct {
 }
 
 func newChannelWorker(name string, channel Channel) *channelWorker {
-	rateVal := float64(defaultRateLimit)
-	if r, ok := channelRateConfig[name]; ok {
+	rateVal := float64(consts.DefaultRateLimit)
+	if r, ok := consts.ChannelRateConfig[name]; ok {
 		rateVal = r
 	}
 	burst := int(math.Ceil(rateVal / 2))
