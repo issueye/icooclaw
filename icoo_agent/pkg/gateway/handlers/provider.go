@@ -64,15 +64,15 @@ func (h *ProviderHandler) Save(w http.ResponseWriter, r *http.Request) {
 func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*storage.Provider](r)
 	if err != nil {
-		h.logger.Error("绑定创建Provider配置请求失败", "error", err)
-		http.Error(w, "绑定创建Provider配置请求失败", http.StatusBadRequest)
+		h.logger.Error("绑定创建供应商配置请求失败", "error", err)
+		http.Error(w, "绑定创建供应商配置请求失败", http.StatusBadRequest)
 		return
 	}
 
 	err = h.storage.Provider().Save(req)
 	if err != nil {
-		h.logger.Error("创建Provider配置失败", "error", err)
-		http.Error(w, "创建Provider配置失败", http.StatusInternalServerError)
+		h.logger.Error("创建供应商配置失败", "error", err)
+		http.Error(w, "创建供应商配置失败", http.StatusInternalServerError)
 		return
 	}
 
@@ -151,14 +151,14 @@ func (h *ProviderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *ProviderHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	configs, err := h.storage.Provider().List()
 	if err != nil {
-		h.logger.Error("获取所有Provider配置失败", "error", err)
-		http.Error(w, "获取所有Provider配置失败", http.StatusInternalServerError)
+		h.logger.Error("获取所有供应商配置失败", "error", err)
+		http.Error(w, "获取所有供应商配置失败", http.StatusInternalServerError)
 		return
 	}
 
 	models.WriteData(w, models.BaseResponse[[]*storage.Provider]{
 		Code:    http.StatusOK,
-		Message: "Provider配置列表获取成功",
+		Message: "供应商配置列表获取成功",
 		Data:    configs,
 	})
 }
