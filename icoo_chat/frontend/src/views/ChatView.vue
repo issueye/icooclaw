@@ -219,10 +219,7 @@ function sendPendingChatMessage() {
     const sent = send({
         type: "chat",
         session_id: wsSessionId,
-        data: {
-            session_id: wsSessionId,
-            content: pendingChatContent,
-        },
+        content: pendingChatContent,
     });
 
     if (!sent) {

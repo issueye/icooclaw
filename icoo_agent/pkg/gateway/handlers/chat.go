@@ -9,6 +9,7 @@ import (
 
 	"icooclaw/pkg/agent"
 	"icooclaw/pkg/bus"
+	"icooclaw/pkg/channels/consts"
 	"icooclaw/pkg/gateway/models"
 	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/storage"
@@ -137,7 +138,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 			ctx,
 			req.Content,
 			req.ChatID,
-			"http",
+			consts.WEBSOCKET,
 			req.ChatID,
 		)
 		if err != nil {
