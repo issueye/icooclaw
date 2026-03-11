@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -200,14 +199,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 // Start starts the HTTP server.
 func (s *Server) Start() error {
-	s.logger.Info("【网关服务】已启动", "addr", s.server.Addr)
+	s.logger.With("name", "【网关服务】").Info("已启动", "addr", s.server.Addr)
 
 	// Start WebSocket manager if configured
 	if s.wsManager != nil {
 		go func() {
 			ctx := context.Background()
 			if err := s.wsManager.Run(ctx); err != nil {
-				s.logger.Error("【网关服务】WebSocket管理器错误：", "error", err)
+				s.logger.With("name", "【网关服务】").Error("WebSocket管理器错误：", "error", err)
 			}
 		}()
 	}
@@ -221,14 +220,14 @@ func (s *Server) Start() error {
 	}
 
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("【网关服务】启动失败: %w", err)
+		s.logger.With("name", "【网关服务】").Error("【网关服务】已启动失败", "error", err)
 	}
 	return nil
 }
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
-	s.logger.Info("【网关服务】正在关闭")
+	s.logger.With("name", "【网关服务】").Info("正在关闭")
 
 	// Stop WebSocket manager
 	if s.wsManager != nil {

@@ -77,7 +77,8 @@ func (c *Channel) Start(ctx context.Context) error {
 
 	// Fetch bot open_id via API for reliable @mention detection.
 	if err := c.fetchBotOpenID(ctx); err != nil {
-		c.logger.Warn("failed to fetch bot open_id, @mention detection may not work", "error", err)
+		c.logger.With("name", "【飞书】").Error("获取机器人open_id失败", "error", err)
+		return fmt.Errorf("获取机器人open_id失败：%w", err)
 	}
 
 	dispatcher := larkdispatcher.NewEventDispatcher(c.config.VerificationToken, c.config.EncryptKey).
@@ -96,11 +97,11 @@ func (c *Channel) Start(ctx context.Context) error {
 	c.mu.Unlock()
 
 	c.running.Store(true)
-	c.logger.Info("Feishu channel started (websocket mode)")
+	c.logger.With("name", "【飞书】").Info("启动通道...（流模式）")
 
 	go func() {
 		if err := wsClient.Start(runCtx); err != nil {
-			c.logger.Error("Feishu websocket stopped with error", "error", err)
+			c.logger.With("name", "【飞书】").Error("启动通道失败：", "error", err)
 		}
 	}()
 
@@ -118,7 +119,7 @@ func (c *Channel) Stop(ctx context.Context) error {
 	c.mu.Unlock()
 
 	c.running.Store(false)
-	c.logger.Info("Feishu channel stopped")
+	c.logger.With("name", "【飞书】").Info("通道已停止")
 	return nil
 }
 
@@ -158,12 +159,14 @@ func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error 
 	}
 
 	if msg.ChatID == "" {
+		c.logger.With("name", "【飞书】").Error("发送消息失败：chatID不能为空", "error", errs.ErrSendFailed)
 		return fmt.Errorf("chat ID is empty: %w", errs.ErrSendFailed)
 	}
 
 	// Build interactive card with markdown content
 	cardContent, err := buildMarkdownCard(msg.Text)
 	if err != nil {
+		c.logger.With("name", "【飞书】").Error("发送消息失败：卡片构建失败", "error", err)
 		return fmt.Errorf("feishu send: card build failed: %w", err)
 	}
 	return c.sendCard(ctx, msg.ChatID, cardContent)
@@ -234,12 +237,12 @@ func (c *Channel) ReactToMessage(ctx context.Context, chatID, messageID string) 
 
 	resp, err := c.client.Im.V1.MessageReaction.Create(ctx, req)
 	if err != nil {
-		c.logger.Error("Failed to add reaction", "message_id", messageID, "error", err)
+		c.logger.With("name", "【飞书】").Error("发送消息失败：添加反应失败", "error", err)
 		return func() {}, fmt.Errorf("feishu react: %w", err)
 	}
 	if !resp.Success() {
-		c.logger.Error("Reaction API error", "message_id", messageID, "code", resp.Code, "msg", resp.Msg)
-		return func() {}, fmt.Errorf("feishu react api error (code=%d msg=%s)", resp.Code, resp.Msg)
+		c.logger.With("name", "【飞书】").Error("发送消息失败：添加反应失败", slog.Any("code", resp.Code), slog.Any("msg", resp.Msg))
+		return func() {}, fmt.Errorf("feishu react: %w", err)
 	}
 
 	var reactionID string
@@ -334,8 +337,8 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 		Metadata: metadata,
 	}
 
-	c.logger.Debug("Feishu message received",
-		"sender_id", senderID,
+	c.logger.With("name", "【飞书】").Info("收到消息",
+		slog.String("sender_id", senderID),
 		"chat_id", chatID,
 		"message_id", messageID,
 		"preview", truncate(content, 80),
@@ -343,7 +346,7 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 
 	// Publish to bus
 	if err := c.bus.PublishInbound(ctx, inboundMsg); err != nil {
-		c.logger.Error("Failed to publish inbound message", "error", err)
+		c.logger.With("name", "【飞书】").Error("发送消息失败：发布消息失败", "error", err)
 	}
 
 	return nil
@@ -359,6 +362,7 @@ func (c *Channel) fetchBotOpenID(ctx context.Context) error {
 		SupportedAccessTokenTypes: []larkcore.AccessTokenType{larkcore.AccessTokenTypeTenant},
 	})
 	if err != nil {
+		c.logger.With("name", "【飞书】").Error("获取机器人open_id失败", "error", err)
 		return fmt.Errorf("bot info request: %w", err)
 	}
 
@@ -369,17 +373,20 @@ func (c *Channel) fetchBotOpenID(ctx context.Context) error {
 		} `json:"bot"`
 	}
 	if err := json.Unmarshal(resp.RawBody, &result); err != nil {
-		return fmt.Errorf("bot info parse: %w", err)
+		c.logger.With("name", "【飞书】").Error("解析机器人open_id失败", "error", err)
+		return fmt.Errorf("机器人信息解析失败 %w", err)
 	}
 	if result.Code != 0 {
-		return fmt.Errorf("bot info api error (code=%d)", result.Code)
+		c.logger.With("name", "【飞书】").Error("获取机器人open_id失败", slog.Any("code", result.Code))
+		return fmt.Errorf("机器人信息解析失败 %w", err)
 	}
 	if result.Bot.OpenID == "" {
-		return fmt.Errorf("bot info: empty open_id")
+		c.logger.With("name", "【飞书】").Error("获取机器人open_id失败", "error", errs.ErrSendFailed)
+		return fmt.Errorf("机器人open_id为空 %w", errs.ErrSendFailed)
 	}
 
 	c.botOpenID.Store(result.Bot.OpenID)
-	c.logger.Info("Fetched bot open_id from API", "open_id", result.Bot.OpenID)
+	c.logger.With("name", "【飞书】").Info("获取机器人open_id成功", slog.Any("open_id", result.Bot.OpenID))
 	return nil
 }
 
@@ -396,14 +403,16 @@ func (c *Channel) sendCard(ctx context.Context, chatID, cardContent string) erro
 
 	resp, err := c.client.Im.V1.Message.Create(ctx, req)
 	if err != nil {
-		return fmt.Errorf("feishu send card: %w", errs.ErrTemporary)
+		c.logger.With("name", "【飞书】").Error("发送消息失败：发送卡片失败", "error", err)
+		return fmt.Errorf("发送卡片失败 %w", err)
 	}
 
 	if !resp.Success() {
-		return fmt.Errorf("feishu api error (code=%d msg=%s): %w", resp.Code, resp.Msg, errs.ErrTemporary)
+		c.logger.With("name", "【飞书】").Error("发送消息失败：发送卡片失败", slog.Any("code", resp.Code), slog.Any("msg", resp.Msg))
+		return fmt.Errorf("发送卡片失败 %w", err)
 	}
 
-	c.logger.Debug("Feishu card message sent", "chat_id", chatID)
+	c.logger.With("name", "【飞书】").Info("发送卡片成功", slog.String("chat_id", chatID))
 	return nil
 }
 
@@ -461,11 +470,11 @@ func (c *Channel) downloadResource(
 
 	resp, err := c.client.Im.V1.MessageResource.Get(ctx, req)
 	if err != nil {
-		c.logger.Error("Failed to download resource", "message_id", messageID, "file_key", fileKey, "error", err)
+		c.logger.With("name", "【飞书】").Error("下载资源失败：", "error", err)
 		return ""
 	}
 	if !resp.Success() {
-		c.logger.Error("Resource download api error", "code", resp.Code, "msg", resp.Msg)
+		c.logger.With("name", "【飞书】").Error("下载资源失败：", slog.Any("code", resp.Code), slog.Any("msg", resp.Msg))
 		return ""
 	}
 
@@ -488,7 +497,7 @@ func (c *Channel) downloadResource(
 	// Write to temp directory
 	mediaDir := filepath.Join(os.TempDir(), "icooclaw_media")
 	if mkdirErr := os.MkdirAll(mediaDir, 0o700); mkdirErr != nil {
-		c.logger.Error("Failed to create media directory", "error", mkdirErr)
+		c.logger.With("name", "【飞书】").Error("创建媒体目录失败", slog.String("目录", mediaDir), "error", mkdirErr.Error())
 		return ""
 	}
 	ext := filepath.Ext(filename)
@@ -496,14 +505,14 @@ func (c *Channel) downloadResource(
 
 	out, err := os.Create(localPath)
 	if err != nil {
-		c.logger.Error("Failed to create local file for resource", "error", err)
+		c.logger.With("name", "【飞书】").Error("创建媒体文件失败：", "error", err)
 		return ""
 	}
 
 	if _, copyErr := io.Copy(out, resp.File); copyErr != nil {
 		out.Close()
 		os.Remove(localPath)
-		c.logger.Error("Failed to write resource to file", "error", copyErr)
+		c.logger.With("name", "【飞书】").Error("下载资源失败：", "error", copyErr.Error())
 		return ""
 	}
 	out.Close()

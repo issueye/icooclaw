@@ -65,13 +65,13 @@ func (m *Manager) InitChannels(ctx context.Context) error {
 	for _, ch := range channels {
 		factory, ok := GetFactory(ch.Type)
 		if !ok {
-			m.logger.Warn("unknown channel type", "type", ch.Type, "name", ch.Name)
+			m.logger.With("name", "【通道管理器】").Warn("未找到通道工厂", "type", ch.Type, "name", ch.Name)
 			continue
 		}
 
 		channel, err := factory(parseConfig(ch.Config))
 		if err != nil {
-			m.logger.Error("failed to create channel", "name", ch.Name, "error", err)
+			m.logger.With("name", "【通道管理器】").Error("创建通道失败", err)
 			continue
 		}
 
@@ -88,7 +88,7 @@ func (m *Manager) StartAll(ctx context.Context) error {
 
 	for name, channel := range m.channels {
 		if err := channel.Start(ctx); err != nil {
-			m.logger.Error("failed to start channel", "name", name, "error", err)
+			m.logger.With("name", "【通道管理器】").Error("启动通道失败", err)
 			continue
 		}
 
@@ -141,7 +141,7 @@ func (m *Manager) StopAll(ctx context.Context) error {
 	m.mu.RLock()
 	for name, channel := range m.channels {
 		if err := channel.Stop(ctx); err != nil {
-			m.logger.Error("failed to stop channel", "name", name, "error", err)
+			m.logger.With("name", "【通道管理器】", slog.Any("channel", name)).Error("关闭通道失败", err)
 		}
 	}
 	m.mu.RUnlock()
@@ -161,14 +161,14 @@ func (m *Manager) dispatchOutbound(ctx context.Context) {
 			m.mu.RUnlock()
 
 			if !ok {
-				m.logger.Warn("unknown channel for outbound message", "channel", msg.Channel)
+				m.logger.With("name", "【通道管理器】").Warn("未知找到通道", "channel", msg.Channel)
 				continue
 			}
 
 			select {
 			case w.queue <- msg:
 			default:
-				m.logger.Warn("worker queue full, dropping message", "channel", msg.Channel)
+				m.logger.With("name", "【通道管理器】").Warn("通道队列已满", "channel", msg.Channel)
 			}
 		}
 	}
@@ -186,14 +186,14 @@ func (m *Manager) dispatchOutboundMedia(ctx context.Context) {
 			m.mu.RUnlock()
 
 			if !ok {
-				m.logger.Warn("unknown channel for outbound media", "channel", msg.Channel)
+				m.logger.With("name", "【通道管理器】").Warn("未知找到通道", "channel", msg.Channel)
 				continue
 			}
 
 			select {
 			case w.mediaQueue <- msg:
 			default:
-				m.logger.Warn("worker media queue full, dropping message", "channel", msg.Channel)
+				m.logger.With("name", "【通道管理器】").Warn("通道队列已满", "channel", msg.Channel)
 			}
 		}
 	}
@@ -259,7 +259,7 @@ func (m *Manager) processOutboundMedia(ctx context.Context, name string, w *chan
 			Metadata: msg.Metadata,
 		}
 		if err := ms.SendMedia(ctx, mediaMsg); err != nil {
-			m.logger.Error("failed to send media", "channel", name, "error", err)
+			m.logger.With("name", "【通道管理器】").Error("发送媒体失败", err)
 		}
 	}
 }
@@ -313,7 +313,7 @@ func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWork
 
 		// Permanent failure - don't retry
 		if errs.IsPermanent(lastErr) {
-			m.logger.Error("permanent send failure", "channel", name, "error", lastErr)
+			m.logger.With("name", "【通道管理器】").Error("永久发送失败", lastErr)
 			return
 		}
 
@@ -331,7 +331,7 @@ func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWork
 		time.Sleep(backoff)
 	}
 
-	m.logger.Error("send failed after retries", "channel", name, "error", lastErr)
+	m.logger.With("name", "【通道管理器】").Error("发送消息失败", lastErr)
 }
 
 // runTTLJanitor cleans up expired state entries.
@@ -391,7 +391,7 @@ func (m *Manager) SetupHTTPServer(addr string) {
 	for name, ch := range m.channels {
 		if wh, ok := ch.(WebhookHandler); ok {
 			m.mux.Handle(wh.WebhookPath(), wh)
-			m.logger.Info("registered webhook", "channel", name, "path", wh.WebhookPath())
+			m.logger.With("name", "【通道管理器】").Info("注册 webhook 成功", "channel", name, "path", wh.WebhookPath())
 		}
 	}
 

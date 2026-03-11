@@ -105,7 +105,10 @@ func (m *Manager) WithAgentRegistry(r *agent.AgentRegistry) *Manager {
 func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Check concurrent limit
 	if int(m.connections.Load()) >= m.maxConcurrent {
-		http.Error(w, "too many connections", http.StatusServiceUnavailable)
+		m.logger.With("name", "【网关服务】").Error("已达到最大并发连接数",
+			"max_concurrent", m.maxConcurrent,
+			"current_connections", int(m.connections.Load()))
+		http.Error(w, "【网关服务】已达到最大并发连接数", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -140,7 +143,7 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	m.hub.Register(client)
 	defer m.hub.Unregister(client)
 
-	m.logger.Info("websocket client connected",
+	m.logger.With("name", "【网关服务】").Info("WebSocket客户端连接成功",
 		"user_id", userID,
 		"client_id", client.ID,
 		"total_connections", m.connections.Load())
@@ -189,7 +192,7 @@ func (m *Manager) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Reque
 	m.hub.Register(client)
 	defer m.hub.Unregister(client)
 
-	m.logger.Info("websocket client connected",
+	m.logger.With("name", "【网关服务】").Info("WebSocket客户端连接成功",
 		"user_id", userID,
 		"client_id", client.ID,
 		"chat_id", chatID,

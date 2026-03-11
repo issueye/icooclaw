@@ -71,6 +71,7 @@ func (h *ChatHandler) WithAgentRegistry(r *agent.AgentRegistry) *ChatHandler {
 // HandleWebSocket handles WebSocket connection upgrade.
 func (h *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
+		h.logger.With("name", "【网关服务】").Error("WebSocket管理器未配置")
 		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
@@ -80,6 +81,7 @@ func (h *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 // HandleWebSocketWithChatID handles WebSocket connection with a specific chat ID.
 func (h *ChatHandler) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
+		h.logger.With("name", "【网关服务】").Error("WebSocket管理器未配置")
 		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
@@ -120,11 +122,13 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Content == "" {
+		h.logger.With("name", "【网关服务】").Error("内容不能为空")
 		http.Error(w, "【网关服务】内容不能为空", http.StatusBadRequest)
 		return
 	}
 
 	if req.ChatID == "" {
+		h.logger.With("name", "【网关服务】").Error("聊天ID不能为空")
 		http.Error(w, "【网关服务】聊天ID不能为空", http.StatusBadRequest)
 		return
 	}
@@ -142,7 +146,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 			req.ChatID,
 		)
 		if err != nil {
-			h.logger.Error("failed to process chat", "error", err)
+			h.logger.With("name", "【网关服务】").Error("处理聊天失败", "error", err)
 			http.Error(w, "【网关服务】处理聊天失败", http.StatusInternalServerError)
 			return
 		}
@@ -173,7 +177,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := h.bus.PublishInbound(ctx, msg); err != nil {
-			h.logger.Error("failed to publish message", "error", err)
+			h.logger.With("name", "【网关服务】").Error("发布消息失败", "error", err)
 			http.Error(w, "【网关服务】发布消息失败", http.StatusInternalServerError)
 			return
 		}
@@ -189,6 +193,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.With("name", "【网关服务】").Error("未配置智能体或消息总线")
 	http.Error(w, "【网关服务】未配置智能体或消息总线", http.StatusBadRequest)
 }
 
@@ -196,17 +201,19 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*ChatRequest](r)
 	if err != nil {
-		h.logger.Error("failed to bind chat request", "error", err)
+		h.logger.With("name", "【网关服务】").Error("failed to bind chat request", "error", err)
 		http.Error(w, "【网关服务】无效请求参数", http.StatusBadRequest)
 		return
 	}
 
 	if req.Content == "" {
+		h.logger.With("name", "【网关服务】").Error("内容不能为空")
 		http.Error(w, "【网关服务】内容不能为空", http.StatusBadRequest)
 		return
 	}
 
 	if req.ChatID == "" {
+		h.logger.With("name", "【网关服务】").Error("聊天ID不能为空")
 		http.Error(w, "【网关服务】聊天ID不能为空", http.StatusBadRequest)
 		return
 	}
@@ -219,11 +226,13 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		h.logger.With("name", "【网关服务】").Error("不支持流式传输")
 		http.Error(w, "【网关服务】不支持流式传输", http.StatusInternalServerError)
 		return
 	}
 
 	// Send start event
+	h.logger.With("name", "【网关服务】").Info("开始处理聊天请求", "chat_id", req.ChatID)
 	h.writeSSE(w, "start", map[string]string{"chat_id": req.ChatID})
 	flusher.Flush()
 
@@ -294,17 +303,19 @@ type SetMaxConcurrentRequest struct {
 func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxConcurrentRequest](r)
 	if err != nil {
-		h.logger.Error("failed to bind request", "error", err)
+		h.logger.With("name", "【网关服务】").Error("failed to bind request", "error", err)
 		http.Error(w, "【网关服务】无效请求参数", http.StatusBadRequest)
 		return
 	}
 
 	if req.Max <= 0 {
+		h.logger.With("name", "【网关服务】").Error("最大并发连接数必须大于0")
 		http.Error(w, "【网关服务】最大并发连接数必须大于0", http.StatusBadRequest)
 		return
 	}
 
 	if h.wsManager == nil {
+		h.logger.With("name", "【网关服务】").Error("WebSocket管理器未配置")
 		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
@@ -376,12 +387,13 @@ type SetMaxAgentsRequest struct {
 func (h *ChatHandler) SetMaxAgents(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxAgentsRequest](r)
 	if err != nil {
-		h.logger.Error("failed to bind request", "error", err)
+		h.logger.With("name", "【网关服务】").Error("绑定请求参数失败", "error", err)
 		http.Error(w, "【网关服务】无效请求参数", http.StatusBadRequest)
 		return
 	}
 
 	if req.Max <= 0 {
+		h.logger.With("name", "【网关服务】").Error("最大智能体数必须大于0")
 		http.Error(w, "【网关服务】最大智能体数必须大于0", http.StatusBadRequest)
 		return
 	}

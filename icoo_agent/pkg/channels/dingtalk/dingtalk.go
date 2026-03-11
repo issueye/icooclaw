@@ -46,7 +46,7 @@ type Channel struct {
 // New creates a new DingTalk channel instance.
 func New(cfg Config, b *bus.MessageBus, logger *slog.Logger) (*Channel, error) {
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
-		return nil, fmt.Errorf("dingtalk client_id and client_secret are required")
+		return nil, fmt.Errorf("钉钉client_id和client_secret不能为空")
 	}
 
 	return &Channel{
@@ -65,7 +65,7 @@ func (c *Channel) Name() string {
 
 // Start initializes the DingTalk channel with Stream Mode.
 func (c *Channel) Start(ctx context.Context) error {
-	c.logger.Info("Starting DingTalk channel (Stream Mode)...")
+	c.logger.With("name", "【钉钉】").Info("启动通道...")
 
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
@@ -83,17 +83,18 @@ func (c *Channel) Start(ctx context.Context) error {
 
 	// Start the stream client
 	if err := c.streamClient.Start(c.ctx); err != nil {
-		return fmt.Errorf("failed to start stream client: %w", err)
+		c.logger.With("name", "【钉钉】").Error("启动通道失败", "error", err)
+		return fmt.Errorf("启动通道失败：%w", err)
 	}
 
 	c.running.Store(true)
-	c.logger.Info("DingTalk channel started (Stream Mode)")
+	c.logger.With("name", "【钉钉】").Info("通道已启动（流模式）")
 	return nil
 }
 
 // Stop gracefully stops the DingTalk channel.
 func (c *Channel) Stop(ctx context.Context) error {
-	c.logger.Info("Stopping DingTalk channel...")
+	c.logger.With("name", "【钉钉】").Info("关闭通道...")
 
 	if c.cancel != nil {
 		c.cancel()
@@ -104,7 +105,7 @@ func (c *Channel) Stop(ctx context.Context) error {
 	}
 
 	c.running.Store(false)
-	c.logger.Info("DingTalk channel stopped")
+	c.logger.With("name", "【钉钉】").Info("通道已停止")
 	return nil
 }
 
@@ -146,15 +147,17 @@ func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error 
 	// Get session webhook from storage
 	sessionWebhookRaw, ok := c.sessionWebhooks.Load(msg.ChatID)
 	if !ok {
-		return fmt.Errorf("no session_webhook found for chat %s, cannot send message", msg.ChatID)
+		c.logger.With("name", "【钉钉】").Error("未找到会话webhook", "chat_id", msg.ChatID)
+		return fmt.Errorf("未找到会话webhook，无法发送消息：%s", msg.ChatID)
 	}
 
 	sessionWebhook, ok := sessionWebhookRaw.(string)
 	if !ok {
+		c.logger.With("name", "【钉钉】").Error("无效的会话webhook类型", "chat_id", msg.ChatID)
 		return fmt.Errorf("invalid session_webhook type for chat %s", msg.ChatID)
 	}
 
-	c.logger.Debug("Sending message", "chat_id", msg.ChatID, "preview", truncate(msg.Text, 100))
+	c.logger.With("name", "【钉钉】").Debug("发送消息", "chat_id", msg.ChatID, "preview", truncate(msg.Text, 100))
 
 	// Use the session webhook to send the reply
 	return c.SendDirectReply(ctx, sessionWebhook, msg.Text)
@@ -204,7 +207,7 @@ func (c *Channel) onChatBotMessageReceived(
 		"session_webhook":   data.SessionWebhook,
 	}
 
-	c.logger.Debug("Received message",
+	c.logger.With("name", "【钉钉】").Debug("Received message",
 		"sender_nick", senderNick,
 		"sender_id", senderID,
 		"preview", truncate(content, 50),
@@ -221,7 +224,7 @@ func (c *Channel) onChatBotMessageReceived(
 
 	// Publish to bus
 	if err := c.bus.PublishInbound(ctx, inboundMsg); err != nil {
-		c.logger.Error("Failed to publish inbound message", "error", err)
+		c.logger.With("name", "【钉钉】").Error("推送失败", "error", err)
 	}
 
 	// Return nil to indicate we've handled the message asynchronously
@@ -244,6 +247,7 @@ func (c *Channel) SendDirectReply(ctx context.Context, sessionWebhook, content s
 		contentBytes,
 	)
 	if err != nil {
+		c.logger.With("name", "【钉钉】").Error("发送失败", "error", err)
 		return fmt.Errorf("dingtalk send: %w", errs.ErrTemporary)
 	}
 

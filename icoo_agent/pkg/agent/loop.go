@@ -126,12 +126,12 @@ func (l *Loop) Run(ctx context.Context) error {
 	l.running.Store(true)
 	defer l.running.Store(false)
 
-	l.logger.Info("代理循环已启动")
+	l.logger.With("name", "【智能体】").Info("代理循环已启动")
 
 	for l.running.Load() {
 		select {
 		case <-ctx.Done():
-			l.logger.Info("代理循环已停止", "reason", ctx.Err())
+			l.logger.With("name", "【智能体】").Info("代理循环已停止", "reason", ctx.Err())
 			return ctx.Err()
 		default:
 			msg, ok := l.bus.ConsumeInbound(ctx)
@@ -143,7 +143,7 @@ func (l *Loop) Run(ctx context.Context) error {
 			go func() {
 				response, err := l.processMessage(ctx, msg)
 				if err != nil {
-					l.logger.Error("处理消息失败",
+					l.logger.With("name", "【智能体】").Error("处理消息失败",
 						"channel", msg.Channel,
 						"chat_id", msg.ChatID,
 						"error", err)
@@ -159,7 +159,7 @@ func (l *Loop) Run(ctx context.Context) error {
 						ChatID:  msg.ChatID,
 						Text:    response,
 					}); err != nil {
-						l.logger.Error("发布响应失败",
+						l.logger.With("name", "【智能体】").Error("发布响应失败",
 							"channel", msg.Channel,
 							"chat_id", msg.ChatID,
 							"error", err)
@@ -179,7 +179,7 @@ func (l *Loop) Stop() {
 
 // processMessage processes an inbound message.
 func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
-	l.logger.Info("正在处理消息",
+	l.logger.With("name", "【智能体】").Info("正在处理消息",
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID,
 		"sender", msg.Sender.ID)
@@ -187,7 +187,7 @@ func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (stri
 	// Get binding
 	binding, err := l.storage.Binding().GetBinding(msg.Channel, msg.ChatID)
 	if err != nil {
-		l.logger.Debug("未找到绑定，使用默认代理",
+		l.logger.With("name", "【智能体】").Debug("未找到绑定，使用默认代理",
 			"channel", msg.Channel,
 			"chat_id", msg.ChatID)
 		// Use default agent name
@@ -201,7 +201,7 @@ func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (stri
 // processWithAgent processes a message with a specific agent.
 // This is the core message processing logic, similar to PicoClaw's runAgentLoop.
 func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.InboundMessage) (string, error) {
-	l.logger.Info("使用代理处理",
+	l.logger.With("name", "【智能体】").Info("使用代理处理",
 		"agent", agentName,
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID)
@@ -214,7 +214,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	if l.memory != nil {
 		mem, err := l.memory.Load(ctx, sessionKey)
 		if err != nil {
-			l.logger.Warn("加载记忆失败", "error", err, "session_key", sessionKey)
+			l.logger.With("name", "【智能体】").Warn("加载记忆失败", "error", err, "session_key", sessionKey)
 		} else {
 			history = mem
 		}
@@ -226,7 +226,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	// 4. Save user message to memory
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, "user", msg.Text); err != nil {
-			l.logger.Warn("保存用户消息失败", "error", err)
+			l.logger.With("name", "【智能体】").Warn("保存用户消息失败", "error", err)
 		}
 	}
 
@@ -244,12 +244,12 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	// 7. Save final assistant message to memory
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, "assistant", finalContent); err != nil {
-			l.logger.Warn("保存助手消息失败", "error", err)
+			l.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
 		}
 	}
 
 	// 8. Log response
-	l.logger.Info("响应已生成",
+	l.logger.With("name", "【智能体】").Info("响应已生成",
 		"agent", agentName,
 		"session_key", sessionKey,
 		"iterations", iteration,
@@ -307,20 +307,20 @@ func (l *Loop) runLLMIteration(
 			req.Tools = l.convertToolDefinitions(toolDefs)
 		}
 
-		l.logger.Debug("正在发送请求到LLM",
+		l.logger.With("name", "【智能体】").Debug("正在发送请求到LLM",
 			"iteration", iteration,
 			"message_count", len(currentMessages))
 
 		// Send to provider
 		resp, err := l.provider.Chat(ctx, req)
 		if err != nil {
-			l.logger.Error("LLM请求失败", "error", err, "iteration", iteration)
+			l.logger.With("name", "【智能体】").Error("LLM请求失败", "error", err, "iteration", iteration)
 			return "", iteration, fmt.Errorf("LLM请求失败: %w", err)
 		}
 
 		// Handle tool calls
 		if len(resp.ToolCalls) > 0 {
-			l.logger.Info("正在处理工具调用",
+			l.logger.With("name", "【智能体】").Info("正在处理工具调用",
 				"count", len(resp.ToolCalls),
 				"iteration", iteration)
 
@@ -351,7 +351,7 @@ func (l *Loop) runLLMIteration(
 		}
 
 		// No tool calls, return the response
-		l.logger.Debug("LLM响应已接收",
+		l.logger.With("name", "【智能体】").Debug("LLM响应已接收",
 			"iteration", iteration,
 			"content_length", len(resp.Content))
 
@@ -359,7 +359,7 @@ func (l *Loop) runLLMIteration(
 	}
 
 	// Max iterations reached
-	l.logger.Warn("已达到最大工具迭代次数",
+	l.logger.With("name", "【智能体】").Warn("已达到最大工具迭代次数",
 		"iterations", l.maxToolIterations)
 
 	return "", iteration, fmt.Errorf("已达到最大工具迭代次数 (%d)", l.maxToolIterations)
@@ -372,7 +372,7 @@ func (l *Loop) executeToolCall(
 	msg bus.InboundMessage,
 ) (string, error) {
 	toolName := tc.Function.Name
-	l.logger.Info("正在执行工具",
+	l.logger.With("name", "【智能体】").Info("正在执行工具",
 		"tool", toolName,
 		"channel", msg.Channel,
 		"chat_id", msg.ChatID)
@@ -381,7 +381,7 @@ func (l *Loop) executeToolCall(
 	var args map[string]any
 	if tc.Function.Arguments != "" {
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-			l.logger.Error("解析工具参数失败",
+			l.logger.With("name", "【智能体】").Error("解析工具参数失败",
 				"tool", toolName,
 				"error", err)
 			return "", fmt.Errorf("解析参数失败: %w", err)

@@ -670,12 +670,16 @@ export function setApiBaseUrl(base) {
   setApiBase(base);
 }
 
+// 导出 request 函数供其他模块使用
+export { request };
+
 // 导出默认对象
 export default {
   // 通用
   getApiBaseUrl,
   setApiBaseUrl,
   checkHealth,
+  request,
 
   // Session
   getSessionsPage,
