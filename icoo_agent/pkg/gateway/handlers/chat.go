@@ -78,22 +78,22 @@ func (h *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	h.wsManager.HandleWebSocket(w, r)
 }
 
-// HandleWebSocketWithChatID handles WebSocket connection with a specific chat ID.
-func (h *ChatHandler) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request) {
+// HandleWebSocketWithSessionID handles WebSocket connection with a specific session ID.
+func (h *ChatHandler) HandleWebSocketWithSessionID(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
 		h.logger.With("name", "【网关服务】").Error("WebSocket管理器未配置")
 		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
 
-	// Get chat ID from URL path
-	chatID := r.PathValue("chat_id")
-	if chatID == "" {
+	// Get session ID from URL path
+	sessionID := r.PathValue("session_id")
+	if sessionID == "" {
 		// Try query parameter
-		chatID = r.URL.Query().Get("chat_id")
+		sessionID = r.URL.Query().Get("session_id")
 	}
 
-	h.wsManager.HandleWebSocketWithChatID(w, r, chatID)
+	h.wsManager.HandleWebSocketWithSessionID(w, r, sessionID)
 }
 
 // ChatRequest represents a chat request.

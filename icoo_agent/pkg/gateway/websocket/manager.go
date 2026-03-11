@@ -14,6 +14,7 @@ import (
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels/consts"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -135,9 +136,10 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	m.connections.Add(1)
 	defer m.connections.Add(-1)
 
-	// Create client
+	// Create client with auto-generated session ID
 	client := NewClient(conn, userID, m.logger)
 	client.WithManager(m)
+	client.WithSessionID(uuid.New().String()) // 自动生成 SessionID
 
 	// Register with hub
 	m.hub.Register(client)
@@ -146,14 +148,15 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	m.logger.With("name", "【网关服务】").Info("WebSocket客户端连接成功",
 		"user_id", userID,
 		"client_id", client.ID,
+		"session_id", client.sessionID,
 		"total_connections", m.connections.Load())
 
 	// Run client
 	client.Run(r.Context())
 }
 
-// HandleWebSocketWithChatID handles WebSocket connection with a specific ID.
-func (m *Manager) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request, sessionID string) {
+// HandleWebSocketWithSessionID handles WebSocket connection with a specific session ID.
+func (m *Manager) HandleWebSocketWithSessionID(w http.ResponseWriter, r *http.Request, sessionID string) {
 	// Check concurrent limit
 	if int(m.connections.Load()) >= m.maxConcurrent {
 		http.Error(w, "too many connections", http.StatusServiceUnavailable)

@@ -12,10 +12,10 @@ import (
 // Binding represents an agent binding.
 type Binding struct {
 	Model
-	Channel   string `gorm:"column:channel;type:varchar(50);not null;uniqueIndex:idx_binding;comment:渠道" json:"channel"`
-	ChatID    string `gorm:"column:chat_id;type:varchar(100);not null;uniqueIndex:idx_binding;comment:聊天ID" json:"chat_id"`
-	AgentName string `gorm:"column:agent_name;type:varchar(100);not null;comment:代理名称" json:"agent_name"`
-	Enabled   bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`
+	Channel    string `gorm:"column:channel;type:varchar(50);not null;uniqueIndex:idx_binding;comment:渠道" json:"channel"`
+	SessionID  string `gorm:"column:session_id;type:varchar(100);not null;uniqueIndex:idx_binding;comment:会话ID" json:"session_id"`
+	AgentName  string `gorm:"column:agent_name;type:varchar(100);not null;comment:代理名称" json:"agent_name"`
+	Enabled    bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`
 }
 
 // TableName returns the table name for Binding.
@@ -34,16 +34,16 @@ func NewBindingStorage(db *gorm.DB) *BindingStorage {
 // SaveBinding saves an agent binding.
 func (s *BindingStorage) SaveBinding(b *Binding) error {
 	result := s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "channel"}, {Name: "chat_id"}},
+		Columns:   []clause.Column{{Name: "channel"}, {Name: "session_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"agent_name", "enabled"}),
 	}).Create(b)
 	return result.Error
 }
 
-// GetBinding gets a binding by channel and chat ID.
-func (s *BindingStorage) GetBinding(channel, chatID string) (*Binding, error) {
+// GetBinding gets a binding by channel and session ID.
+func (s *BindingStorage) GetBinding(channel, sessionID string) (*Binding, error) {
 	var b Binding
-	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).First(&b)
+	result := s.db.Where("channel = ? AND session_id = ?", channel, sessionID).First(&b)
 	if result.Error == gorm.ErrRecordNotFound {
 		return nil, icooclawErrors.ErrRecordNotFound
 	}
@@ -56,7 +56,7 @@ func (s *BindingStorage) GetBinding(channel, chatID string) (*Binding, error) {
 // ListBindings lists all bindings.
 func (s *BindingStorage) ListBindings() ([]*Binding, error) {
 	var bindings []*Binding
-	result := s.db.Order("channel, chat_id").Find(&bindings)
+	result := s.db.Order("channel, session_id").Find(&bindings)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to list bindings: %w", result.Error)
 	}
@@ -64,8 +64,8 @@ func (s *BindingStorage) ListBindings() ([]*Binding, error) {
 }
 
 // DeleteBinding deletes a binding.
-func (s *BindingStorage) DeleteBinding(channel, chatID string) error {
-	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).Delete(&Binding{})
+func (s *BindingStorage) DeleteBinding(channel, sessionID string) error {
+	result := s.db.Where("channel = ? AND session_id = ?", channel, sessionID).Delete(&Binding{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete binding: %w", result.Error)
 	}
@@ -92,7 +92,7 @@ func (s *BindingStorage) Page(query *QueryBinding) (*ResQueryBinding, error) {
 	qry := s.db.Model(&Binding{})
 
 	if query.KeyWord != "" {
-		qry = qry.Where("agent_name LIKE ? OR chat_id LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
+		qry = qry.Where("agent_name LIKE ? OR session_id LIKE ?", "%"+query.KeyWord+"%", "%"+query.KeyWord+"%")
 	}
 
 	if query.Channel != "" {
@@ -107,7 +107,7 @@ func (s *BindingStorage) Page(query *QueryBinding) (*ResQueryBinding, error) {
 		qry = qry.Where("enabled = ?", *query.Enabled)
 	}
 
-	qry = qry.Order("channel, chat_id")
+	qry = qry.Order("channel, session_id")
 
 	result := qry.Count(&res.Page.Total)
 	if result.Error != nil {

@@ -10,15 +10,15 @@ type contextKey struct{}
 
 // Context contains context information for tool execution.
 type Context struct {
-	Channel string
-	ChatID  string
+	Channel   string
+	SessionID string
 }
 
 // WithToolContext injects tool context into a context.
-func WithToolContext(ctx context.Context, channel, chatID string) context.Context {
+func WithToolContext(ctx context.Context, channel, sessionID string) context.Context {
 	return context.WithValue(ctx, contextKey{}, Context{
-		Channel: channel,
-		ChatID:  chatID,
+		Channel:   channel,
+		SessionID: sessionID,
 	})
 }
 
@@ -38,10 +38,16 @@ func GetChannel(ctx context.Context) string {
 	return ""
 }
 
-// GetChatID extracts chat ID from context.
-func GetChatID(ctx context.Context) string {
+// GetSessionID extracts session ID from context.
+func GetSessionID(ctx context.Context) string {
 	if tc := GetToolContext(ctx); tc != nil {
-		return tc.ChatID
+		return tc.SessionID
 	}
 	return ""
+}
+
+// GetChatID extracts chat ID from context.
+// Deprecated: Use GetSessionID instead.
+func GetChatID(ctx context.Context) string {
+	return GetSessionID(ctx)
 }

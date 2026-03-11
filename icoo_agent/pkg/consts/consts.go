@@ -65,10 +65,13 @@ func (p ProviderType) String() string {
 
 const DEFAULT_AGENT_NAME = "default"
 
-func GetSessionKey(agentName, channel, sessionID string) string {
-	return fmt.Sprintf("%s:%s:%s", agentName, channel, sessionID)
+// GetSessionKey 生成会话键，格式: channel:sessionID
+func GetSessionKey(channel, sessionID string) string {
+	return fmt.Sprintf("%s:%s", channel, sessionID)
 }
 
+// GetDefSessionKey 使用默认代理名生成会话键（已废弃，保留兼容）
+// Deprecated: 使用 GetSessionKey 代替
 func GetDefSessionKey(channel, sessionID string) string {
-	return fmt.Sprintf("%s:%s:%s", DEFAULT_AGENT_NAME, channel, sessionID)
+	return GetSessionKey(channel, sessionID)
 }

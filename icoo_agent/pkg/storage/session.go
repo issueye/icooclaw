@@ -13,7 +13,6 @@ import (
 type Session struct {
 	Model
 	Channel    string    `gorm:"column:channel;type:varchar(50);not null;comment:渠道" json:"channel"`    // 渠道
-	ChatID     string    `gorm:"column:chat_id;type:varchar(100);not null;comment:聊天ID" json:"chat_id"` // 聊天ID
 	UserID     string    `gorm:"column:user_id;type:varchar(100);not null;comment:用户ID" json:"user_id"` // 用户ID
 	Summary    string    `gorm:"column:summary;type:text;comment:会话摘要" json:"summary"`                  // 会话摘要
 	Title      string    `gorm:"column:title;type:varchar(100);comment:会话标题" json:"title"`              // 会话标题
@@ -65,10 +64,10 @@ func (s *SessionStorage) Get(id string) (*Session, error) {
 	return &sess, nil
 }
 
-// GetByChat gets a session by channel and chat ID.
-func (s *SessionStorage) GetByChat(channel, chatID string) (*Session, error) {
+// GetBySessionID gets a session by channel and session ID.
+func (s *SessionStorage) GetBySessionID(channel, sessionID string) (*Session, error) {
 	var sess Session
-	result := s.db.Where("channel = ? AND chat_id = ?", channel, chatID).First(&sess)
+	result := s.db.Where("channel = ? AND id = ?", channel, sessionID).First(&sess)
 	if result.Error == gorm.ErrRecordNotFound {
 		return nil, icooclawErrors.ErrRecordNotFound
 	}
@@ -92,8 +91,8 @@ func (s *SessionStorage) Page(query *QuerySession) (*ResQuerySession, error) {
 	var res ResQuerySession
 
 	qry := s.db.Model(&Session{}).
-		Where("channel = ? AND (chat_id LIKE ?)",
-			query.Channel, "%"+query.KeyWord+"%", "%"+query.KeyWord+"%").
+		Where("channel = ? AND (title LIKE ?)",
+			query.Channel, "%"+query.KeyWord+"%").
 		Order("last_active DESC")
 
 	var count int64

@@ -218,8 +218,8 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 		"channel", msg.Channel,
 		"session_id", msg.SessionID)
 
-	// 1. Build session key
-	sessionKey := consts.GetSessionKey(agentName, msg.Channel, msg.SessionID)
+	// 1. Build session key (format: channel:sessionID)
+	sessionKey := consts.GetSessionKey(msg.Channel, msg.SessionID)
 
 	// 2. Load memory/history
 	var history []providers.ChatMessage
@@ -425,11 +425,6 @@ func (l *Loop) convertToolDefinitions(defs []tools.ToolDefinition) []providers.T
 	return tools
 }
 
-// getSessionKey returns a session key for the given parameters.
-func (l *Loop) getSessionKey(agentName, channel, chatID string) string {
-	return fmt.Sprintf("%s:%s:%s", agentName, channel, chatID)
-}
-
 // IsRunning returns true if the loop is running.
 func (l *Loop) IsRunning() bool {
 	return l.running.Load()
@@ -439,15 +434,15 @@ func (l *Loop) IsRunning() bool {
 // This is useful for CLI or API interactions.
 func (l *Loop) ProcessDirect(
 	ctx context.Context,
-	content, sessionKey string,
+	content, sessionID string,
 ) (string, error) {
-	return l.ProcessDirectWithChannel(ctx, content, sessionKey, "cli", "direct")
+	return l.ProcessDirectWithChannel(ctx, content, sessionID, "cli", sessionID)
 }
 
-// ProcessDirectWithChannel processes a message directly with specific channel/chatID.
+// ProcessDirectWithChannel processes a message directly with specific channel/sessionID.
 func (l *Loop) ProcessDirectWithChannel(
 	ctx context.Context,
-	content, sessionKey, channel, sessionID string,
+	content, sessionID, channel, _ string,
 ) (string, error) {
 	msg := bus.InboundMessage{
 		Channel:   channel,

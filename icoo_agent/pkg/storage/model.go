@@ -18,7 +18,10 @@ type Model struct {
 }
 
 func (c *Model) BeforeCreate(tx *gorm.DB) error {
-	c.ID = uuid.New().String()
+	// 自动生成主键 uuid
+	if c.ID == "" {
+		c.ID = uuid.New().String()
+	}
 	return nil
 }
 

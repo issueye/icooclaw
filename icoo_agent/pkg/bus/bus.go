@@ -43,11 +43,11 @@ type OutboundMessage struct {
 
 // OutboundMediaMessage represents a media message to be sent.
 type OutboundMediaMessage struct {
-	Channel  string
-	ChatID   string
-	Media    []string
-	Caption  string
-	Metadata map[string]any
+	Channel   string
+	SessionID string
+	Media     []string
+	Caption   string
+	Metadata  map[string]any
 }
 
 const defaultBusBufferSize = 64

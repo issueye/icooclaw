@@ -22,19 +22,17 @@ func NewSessionHandler(logger *slog.Logger, storage *storage.Storage) *SessionHa
 
 // CreateSessionRequest 创建会话请求
 type CreateSessionRequest struct {
-	Channel  string            `json:"channel,omitempty"`  // 渠道 (默认为 "websocket")
-	UserID   string            `json:"user_id,omitempty"`  // 用户ID
-	ChatID   string            `json:"chat_id,omitempty"`  // 聊天ID (可选，不提供则自动生成)
-	Metadata map[string]string `json:"metadata,omitempty"` // 元数据 (JSON格式)
+	Channel   string            `json:"channel,omitempty"`    // 渠道 (默认为 "websocket")
+	UserID    string            `json:"user_id,omitempty"`    // 用户ID
+	SessionID string            `json:"session_id,omitempty"` // 会话ID (可选，不提供则自动生成)
+	Metadata  map[string]string `json:"metadata,omitempty"`   // 元数据 (JSON格式)
 }
 
 // CreateSessionResponse 创建会话响应
 type CreateSessionResponse struct {
 	SessionID string `json:"session_id"`
 	Channel   string `json:"channel"`
-	ChatID    string `json:"chat_id"`
 	UserID    string `json:"user_id"`
-	Key       string `json:"key"`
 }
 
 // Create 创建新会话 (供前端调用)
@@ -53,25 +51,20 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Channel = consts.WEBSOCKET
 	}
 
-	var session storage.Session
-
-	// 如果没有提供 ChatID，生成唯一的 ChatID
-	if req.ChatID == "" {
-		chatID := fmt.Sprintf("chat-%d", time.Now().UnixNano())
-		session = storage.Session{
-			Channel: req.Channel,
-			ChatID:  chatID,
-			UserID:  req.UserID,
-			Title:   req.Metadata["title"],
-		}
+	// 如果没有提供 SessionID，生成唯一的 SessionID
+	if req.SessionID == "" {
+		req.SessionID = fmt.Sprintf("session-%d", time.Now().UnixNano())
 	}
 
-	// 使用提供的 ChatID 创建会话
-	session = storage.Session{
+	// 创建会话
+	session := storage.Session{
 		Channel: req.Channel,
-		ChatID:  req.ChatID,
 		UserID:  req.UserID,
 		Title:   req.Metadata["title"],
+	}
+
+	if req.SessionID != "" {
+		session.ID = req.SessionID
 	}
 
 	h.logger.With("name", "【会话】").Info("创建会话", slog.Any("params", session))
@@ -89,7 +82,7 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Data: &CreateSessionResponse{
 			SessionID: session.ID,
 			Channel:   session.Channel,
-			ChatID:    session.ChatID,
+			UserID:    session.UserID,
 		},
 	})
 }

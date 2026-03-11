@@ -147,7 +147,7 @@ func (s *Server) Setup() *Server {
 	// Add WebSocket routes
 	if s.wsManager != nil {
 		s.router.Get("/ws", s.handlers.Chat.HandleWebSocket)
-		s.router.Get("/ws/{chat_id}", s.handlers.Chat.HandleWebSocketWithChatID)
+		s.router.Get("/ws/{session_id}", s.handlers.Chat.HandleWebSocketWithSessionID)
 	}
 
 	// Add SSE routes

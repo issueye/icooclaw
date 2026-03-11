@@ -102,7 +102,7 @@ func (s *MessageStorage) Page(query *QueryMessage) (*ResQueryMessage, error) {
 		qry = qry.Where("content LIKE ?", "%"+query.KeyWord+"%")
 	}
 
-	qry = qry.Order("created_at DESC")
+	qry = qry.Order("created_at")
 
 	result := qry.Count(&res.Page.Total)
 	if result.Error != nil {

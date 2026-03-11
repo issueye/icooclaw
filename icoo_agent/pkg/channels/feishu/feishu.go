@@ -158,9 +158,9 @@ func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error 
 		return errs.ErrNotRunning
 	}
 
-	if msg.ChatID == "" {
-		c.logger.With("name", "【飞书】").Error("发送消息失败：chatID不能为空", "error", errs.ErrSendFailed)
-		return fmt.Errorf("chat ID is empty: %w", errs.ErrSendFailed)
+	if msg.SessionID == "" {
+		c.logger.With("name", "【飞书】").Error("发送消息失败：sessionID不能为空", "error", errs.ErrSendFailed)
+		return fmt.Errorf("session ID is empty: %w", errs.ErrSendFailed)
 	}
 
 	// Build interactive card with markdown content
@@ -169,7 +169,7 @@ func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error 
 		c.logger.With("name", "【飞书】").Error("发送消息失败：卡片构建失败", "error", err)
 		return fmt.Errorf("feishu send: card build failed: %w", err)
 	}
-	return c.sendCard(ctx, msg.ChatID, cardContent)
+	return c.sendCard(ctx, msg.SessionID, cardContent)
 }
 
 // EditMessage implements channels.MessageEditor.

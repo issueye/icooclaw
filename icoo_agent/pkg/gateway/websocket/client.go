@@ -82,7 +82,7 @@ func (c *Client) WithManager(m *Manager) *Client {
 	return c
 }
 
-// WithChatID sets the chat ID for the client.
+// WithSessionID sets the session ID for the client.
 func (c *Client) WithSessionID(sessionID string) *Client {
 	c.sessionID = sessionID
 	return c

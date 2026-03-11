@@ -10,10 +10,10 @@ import (
 // AgentHooks defines hooks for agent lifecycle events.
 type AgentHooks interface {
 	// OnMessageReceived is called when a message is received.
-	OnMessageReceived(ctx context.Context, channel, chatID, text string) error
+	OnMessageReceived(ctx context.Context, channel, sessionID, text string) error
 
 	// OnMessageSent is called when a message is sent.
-	OnMessageSent(ctx context.Context, channel, chatID, text string) error
+	OnMessageSent(ctx context.Context, channel, sessionID, text string) error
 
 	// OnToolCall is called when a tool is invoked.
 	OnToolCall(ctx context.Context, toolName string, args map[string]any) error
@@ -125,9 +125,9 @@ func (c *CompositeHooks) AddMemoryHooks(h MemoryHooks) {
 }
 
 // OnMessageReceived calls all agent hooks.
-func (c *CompositeHooks) OnMessageReceived(ctx context.Context, channel, chatID, text string) error {
+func (c *CompositeHooks) OnMessageReceived(ctx context.Context, channel, sessionID, text string) error {
 	for _, h := range c.agentHooks {
-		if err := h.OnMessageReceived(ctx, channel, chatID, text); err != nil {
+		if err := h.OnMessageReceived(ctx, channel, sessionID, text); err != nil {
 			return err
 		}
 	}
@@ -135,9 +135,9 @@ func (c *CompositeHooks) OnMessageReceived(ctx context.Context, channel, chatID,
 }
 
 // OnMessageSent calls all agent hooks.
-func (c *CompositeHooks) OnMessageSent(ctx context.Context, channel, chatID, text string) error {
+func (c *CompositeHooks) OnMessageSent(ctx context.Context, channel, sessionID, text string) error {
 	for _, h := range c.agentHooks {
-		if err := h.OnMessageSent(ctx, channel, chatID, text); err != nil {
+		if err := h.OnMessageSent(ctx, channel, sessionID, text); err != nil {
 			return err
 		}
 	}
@@ -264,14 +264,14 @@ type LoggingHooks struct {
 }
 
 // OnMessageReceived logs message received.
-func (h *LoggingHooks) OnMessageReceived(ctx context.Context, channel, chatID, text string) error {
-	h.logger.Debug("message received", "channel", channel, "chat_id", chatID, "text", text)
+func (h *LoggingHooks) OnMessageReceived(ctx context.Context, channel, sessionID, text string) error {
+	h.logger.Debug("message received", "channel", channel, "session_id", sessionID, "text", text)
 	return nil
 }
 
 // OnMessageSent logs message sent.
-func (h *LoggingHooks) OnMessageSent(ctx context.Context, channel, chatID, text string) error {
-	h.logger.Debug("message sent", "channel", channel, "chat_id", chatID)
+func (h *LoggingHooks) OnMessageSent(ctx context.Context, channel, sessionID, text string) error {
+	h.logger.Debug("message sent", "channel", channel, "session_id", sessionID)
 	return nil
 }
 

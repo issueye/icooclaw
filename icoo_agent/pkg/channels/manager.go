@@ -252,11 +252,11 @@ func (m *Manager) processOutboundMedia(ctx context.Context, name string, w *chan
 	if ms, ok := w.channel.(MediaSender); ok {
 		// Convert bus.OutboundMediaMessage to channels.OutboundMediaMessage
 		mediaMsg := OutboundMediaMessage{
-			Channel:  msg.Channel,
-			ChatID:   msg.ChatID,
-			Media:    msg.Media,
-			Caption:  msg.Caption,
-			Metadata: msg.Metadata,
+			Channel:   msg.Channel,
+			SessionID: msg.SessionID,
+			Media:     msg.Media,
+			Caption:   msg.Caption,
+			Metadata:  msg.Metadata,
 		}
 		if err := ms.SendMedia(ctx, mediaMsg); err != nil {
 			m.logger.With("name", "【通道管理器】").Error("发送媒体失败", err)
@@ -265,8 +265,8 @@ func (m *Manager) processOutboundMedia(ctx context.Context, name string, w *chan
 }
 
 // preSend performs pre-send operations (typing, reactions, placeholders).
-func (m *Manager) preSend(ctx context.Context, name, chatID string) {
-	key := name + ":" + chatID
+func (m *Manager) preSend(ctx context.Context, name, sessionID string) {
+	key := name + ":" + sessionID
 
 	// Stop typing indicator
 	if entry, ok := m.typingStops.LoadAndDelete(key); ok {
@@ -285,7 +285,7 @@ func (m *Manager) preSend(ctx context.Context, name, chatID string) {
 	// Edit placeholder if exists
 	if placeholderID, ok := m.placeholders.Load(key); ok {
 		if editor, ok := m.channels[name].(MessageEditor); ok {
-			editor.EditMessage(ctx, chatID, placeholderID.(string), "...")
+			editor.EditMessage(ctx, sessionID, placeholderID.(string), "...")
 		}
 		m.placeholders.Delete(key)
 	}
@@ -298,13 +298,13 @@ func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWork
 	for attempt := 0; attempt <= consts.DefaultRetries; attempt++ {
 		// Convert bus.OutboundMessage to channels.OutboundMessage
 		chanMsg := OutboundMessage{
-			Channel:  msg.Channel,
-			ChatID:   msg.SessionID,
-			Text:     msg.Text,
-			Media:    msg.Media,
-			ReplyTo:  msg.ReplyTo,
-			EditID:   msg.EditID,
-			Metadata: msg.Metadata,
+			Channel:   msg.Channel,
+			SessionID: msg.SessionID,
+			Text:      msg.Text,
+			Media:     msg.Media,
+			ReplyTo:   msg.ReplyTo,
+			EditID:    msg.EditID,
+			Metadata:  msg.Metadata,
 		}
 		lastErr = w.channel.Send(ctx, chanMsg)
 		if lastErr == nil {
@@ -359,14 +359,14 @@ func (m *Manager) runTTLJanitor(ctx context.Context) {
 }
 
 // RecordPlaceholder records a placeholder message ID.
-func (m *Manager) RecordPlaceholder(channel, chatID, messageID string) {
-	key := channel + ":" + chatID
+func (m *Manager) RecordPlaceholder(channel, sessionID, messageID string) {
+	key := channel + ":" + sessionID
 	m.placeholders.Store(key, messageID)
 }
 
 // GetPlaceholder gets a placeholder message ID.
-func (m *Manager) GetPlaceholder(channel, chatID string) string {
-	key := channel + ":" + chatID
+func (m *Manager) GetPlaceholder(channel, sessionID string) string {
+	key := channel + ":" + sessionID
 	if id, ok := m.placeholders.Load(key); ok {
 		return id.(string)
 	}
@@ -374,8 +374,8 @@ func (m *Manager) GetPlaceholder(channel, chatID string) string {
 }
 
 // DeletePlaceholder deletes a placeholder message ID.
-func (m *Manager) DeletePlaceholder(channel, chatID string) {
-	key := channel + ":" + chatID
+func (m *Manager) DeletePlaceholder(channel, sessionID string) {
+	key := channel + ":" + sessionID
 	m.placeholders.Delete(key)
 }
 

@@ -128,9 +128,10 @@ func (a *AgentInstance) RegisterTool(tool tools.Tool) {
 	a.tools.Register(tool)
 }
 
-// GetSessionKey returns a session key for the given channel and chat ID.
-func (a *AgentInstance) GetSessionKey(channel, chatID string) string {
-	return fmt.Sprintf("%s:%s:%s", a.config.Name, channel, chatID)
+// GetSessionKey returns a session key for the given channel and session ID.
+// Format: channel:sessionID
+func (a *AgentInstance) GetSessionKey(channel, sessionID string) string {
+	return fmt.Sprintf("%s:%s", channel, sessionID)
 }
 
 // AgentRegistry manages multiple agent instances.

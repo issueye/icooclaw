@@ -85,8 +85,8 @@ func (h *BindingHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *BindingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[struct {
-		Channel string `json:"channel"`
-		ChatID  string `json:"chat_id"`
+		Channel   string `json:"channel"`
+		SessionID string `json:"session_id"`
 	}](r)
 	if err != nil {
 		h.logger.Error("绑定删除绑定请求失败", "error", err)
@@ -94,7 +94,7 @@ func (h *BindingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.Binding().DeleteBinding(req.Channel, req.ChatID)
+	err = h.storage.Binding().DeleteBinding(req.Channel, req.SessionID)
 	if err != nil {
 		h.logger.Error("删除绑定失败", "error", err)
 		http.Error(w, "删除绑定失败", http.StatusInternalServerError)
@@ -109,8 +109,8 @@ func (h *BindingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *BindingHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[struct {
-		Channel string `json:"channel"`
-		ChatID  string `json:"chat_id"`
+		Channel   string `json:"channel"`
+		SessionID string `json:"session_id"`
 	}](r)
 	if err != nil {
 		h.logger.Error("绑定获取绑定请求失败", "error", err)
@@ -118,7 +118,7 @@ func (h *BindingHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	binding, err := h.storage.Binding().GetBinding(req.Channel, req.ChatID)
+	binding, err := h.storage.Binding().GetBinding(req.Channel, req.SessionID)
 	if err != nil {
 		h.logger.Error("获取绑定失败", "error", err)
 		http.Error(w, "获取绑定失败", http.StatusInternalServerError)

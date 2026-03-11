@@ -145,19 +145,19 @@ func (c *Channel) Send(ctx context.Context, msg channels.OutboundMessage) error 
 	}
 
 	// Get session webhook from storage
-	sessionWebhookRaw, ok := c.sessionWebhooks.Load(msg.ChatID)
+	sessionWebhookRaw, ok := c.sessionWebhooks.Load(msg.SessionID)
 	if !ok {
-		c.logger.With("name", "【钉钉】").Error("未找到会话webhook", "chat_id", msg.ChatID)
-		return fmt.Errorf("未找到会话webhook，无法发送消息：%s", msg.ChatID)
+		c.logger.With("name", "【钉钉】").Error("未找到会话webhook", "session_id", msg.SessionID)
+		return fmt.Errorf("未找到会话webhook，无法发送消息：%s", msg.SessionID)
 	}
 
 	sessionWebhook, ok := sessionWebhookRaw.(string)
 	if !ok {
-		c.logger.With("name", "【钉钉】").Error("无效的会话webhook类型", "chat_id", msg.ChatID)
-		return fmt.Errorf("invalid session_webhook type for chat %s", msg.ChatID)
+		c.logger.With("name", "【钉钉】").Error("无效的会话webhook类型", "session_id", msg.SessionID)
+		return fmt.Errorf("invalid session_webhook type for session %s", msg.SessionID)
 	}
 
-	c.logger.With("name", "【钉钉】").Debug("发送消息", "chat_id", msg.ChatID, "preview", truncate(msg.Text, 100))
+	c.logger.With("name", "【钉钉】").Debug("发送消息", "session_id", msg.SessionID, "preview", truncate(msg.Text, 100))
 
 	// Use the session webhook to send the reply
 	return c.SendDirectReply(ctx, sessionWebhook, msg.Text)
