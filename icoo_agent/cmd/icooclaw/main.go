@@ -185,14 +185,14 @@ func runStart(cmd *cobra.Command, args []string) {
 }
 
 func runGateway(cmd *cobra.Command, args []string) {
-	// Load config
+	// 加载配置
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		slog.Error("加载配置失败", "error", err)
 		os.Exit(1)
 	}
 
-	// Ensure directories exist
+	// 确保目录存在
 	if err := cfg.EnsureWorkspace(); err != nil {
 		slog.Error("创建工作目录失败", "error", err)
 		os.Exit(1)
@@ -202,12 +202,12 @@ func runGateway(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Setup logging
+	// 设置日志
 	setupLogging(cfg)
 
 	slog.Info("正在启动网关服务", "version", version)
 
-	// Initialize storage
+	// 初始化存储
 	dbPath, _ := cfg.GetDatabasePath()
 	store, err := storage.New(dbPath)
 	if err != nil {
@@ -216,22 +216,22 @@ func runGateway(cmd *cobra.Command, args []string) {
 	}
 	defer store.Close()
 
-	// Initialize message bus
+	// 初始化消息总线
 	messageBus := bus.NewMessageBus(bus.DefaultConfig())
 
-	// Initialize provider factory
+	// 初始化提供商工厂
 	providerFactory := providers.NewFactory(store)
 
-	// Initialize tools registry
+	// 初始化工具注册表
 	toolRegistry := tools.NewRegistry()
 
-	// Initialize memory loader
+	// 初始化记忆加载器
 	memLoader := memory.NewLoader(store, 100, slog.Default())
 
-	// Get default provider
+	// 获取默认提供商
 	var defaultProvider providers.Provider
 	defaultModel, err := store.Param().Get(consts.DEFAULT_MODEL_KEY)
-	if err != nil || (defaultModel != nil && defaultModel.Value == "") {
+	if err != nil || defaultModel == nil || defaultModel.Value == "" {
 		slog.Warn("未找到默认模型，需要配置", "key", consts.DEFAULT_MODEL_KEY)
 	} else {
 		arrs := strings.Split(defaultModel.Value, "/")
@@ -247,7 +247,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Initialize agent loop
+	// 初始化代理循环
 	agentLoop := agent.NewLoop(
 		agent.WithLoopBus(messageBus),
 		agent.WithLoopProvider(defaultProvider),
@@ -257,16 +257,16 @@ func runGateway(cmd *cobra.Command, args []string) {
 		agent.WithLoopLogger(slog.Default()),
 	)
 
-	// Initialize agent registry
+	// 初始化代理注册表
 	agentRegistry := agent.NewAgentRegistry(slog.Default())
 
-	// Create gateway server config
+	// 创建网关服务器配置
 	serverCfg := gateway.DefaultServerConfig()
 	if cfg.Gateway.Port > 0 {
 		serverCfg.Addr = fmt.Sprintf(":%d", cfg.Gateway.Port)
 	}
 
-	// Create gateway server
+	// 创建网关服务器
 	gw := gateway.NewServer(serverCfg, store, slog.Default()).
 		WithWebSocket(websocket.DefaultManagerConfig()).
 		WithSSE().
@@ -275,11 +275,11 @@ func runGateway(cmd *cobra.Command, args []string) {
 		WithAgentRegistry(agentRegistry).
 		Setup()
 
-	// Setup context with cancellation
+	// 设置上下文取消
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Handle shutdown signals
+	// 处理关闭信号
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -287,7 +287,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 		<-sigChan
 		slog.Info("正在关闭网关服务...")
 
-		// Shutdown gateway server
+		// 关闭网关服务器
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		if err := gw.Shutdown(shutdownCtx); err != nil {
@@ -297,14 +297,14 @@ func runGateway(cmd *cobra.Command, args []string) {
 		cancel()
 	}()
 
-	// Start agent loop in background
+	// 在后台启动代理循环
 	go func() {
 		if err := agentLoop.Run(ctx); err != nil && err != context.Canceled {
 			slog.Error("代理循环错误", "error", err)
 		}
 	}()
 
-	// Start gateway server
+	// 启动网关服务器
 	if err := gw.Start(); err != nil && err != http.ErrServerClosed {
 		slog.Error("网关服务错误", "error", err)
 		os.Exit(1)
