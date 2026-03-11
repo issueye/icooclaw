@@ -70,7 +70,7 @@ func (h *ChatHandler) WithAgentRegistry(r *agent.AgentRegistry) *ChatHandler {
 // HandleWebSocket handles WebSocket connection upgrade.
 func (h *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
-		http.Error(w, "WebSocket manager not configured", http.StatusInternalServerError)
+		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
 	h.wsManager.HandleWebSocket(w, r)
@@ -79,7 +79,7 @@ func (h *ChatHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 // HandleWebSocketWithChatID handles WebSocket connection with a specific chat ID.
 func (h *ChatHandler) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
-		http.Error(w, "WebSocket manager not configured", http.StatusInternalServerError)
+		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
 
@@ -119,12 +119,12 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Content == "" {
-		http.Error(w, "content is required", http.StatusBadRequest)
+		http.Error(w, "【网关服务】内容不能为空", http.StatusBadRequest)
 		return
 	}
 
 	if req.ChatID == "" {
-		http.Error(w, "chat_id is required", http.StatusBadRequest)
+		http.Error(w, "【网关服务】聊天ID不能为空", http.StatusBadRequest)
 		return
 	}
 
@@ -142,7 +142,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			h.logger.Error("failed to process chat", "error", err)
-			http.Error(w, "failed to process chat", http.StatusInternalServerError)
+			http.Error(w, "【网关服务】处理聊天失败", http.StatusInternalServerError)
 			return
 		}
 
@@ -173,7 +173,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 
 		if err := h.bus.PublishInbound(ctx, msg); err != nil {
 			h.logger.Error("failed to publish message", "error", err)
-			http.Error(w, "failed to process chat", http.StatusInternalServerError)
+			http.Error(w, "【网关服务】发布消息失败", http.StatusInternalServerError)
 			return
 		}
 
@@ -188,7 +188,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Error(w, "no agent or bus configured", http.StatusInternalServerError)
+	http.Error(w, "【网关服务】未配置智能体或消息总线", http.StatusBadRequest)
 }
 
 // HandleChatStream handles HTTP chat requests with SSE streaming.
@@ -196,17 +196,17 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*ChatRequest](r)
 	if err != nil {
 		h.logger.Error("failed to bind chat request", "error", err)
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "【网关服务】无效请求参数", http.StatusBadRequest)
 		return
 	}
 
 	if req.Content == "" {
-		http.Error(w, "content is required", http.StatusBadRequest)
+		http.Error(w, "【网关服务】内容不能为空", http.StatusBadRequest)
 		return
 	}
 
 	if req.ChatID == "" {
-		http.Error(w, "chat_id is required", http.StatusBadRequest)
+		http.Error(w, "【网关服务】聊天ID不能为空", http.StatusBadRequest)
 		return
 	}
 
@@ -218,7 +218,7 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		http.Error(w, "【网关服务】不支持流式传输", http.StatusInternalServerError)
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *ChatHandler) GetQueueStatus(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
 		models.WriteData(w, models.BaseResponse[any]{
 			Code:    http.StatusOK,
-			Message: "WebSocket manager not configured",
+			Message: "【网关服务】WebSocket管理器未配置",
 			Data:    nil,
 		})
 		return
@@ -279,7 +279,7 @@ func (h *ChatHandler) GetQueueStatus(w http.ResponseWriter, r *http.Request) {
 
 	models.WriteData(w, models.BaseResponse[*websocket.QueueStatus]{
 		Code:    http.StatusOK,
-		Message: "queue status retrieved",
+		Message: "【网关服务】队列状态获取成功",
 		Data:    status,
 	})
 }
@@ -294,17 +294,17 @@ func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxConcurrentRequest](r)
 	if err != nil {
 		h.logger.Error("failed to bind request", "error", err)
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "【网关服务】无效请求参数", http.StatusBadRequest)
 		return
 	}
 
 	if req.Max <= 0 {
-		http.Error(w, "max must be greater than 0", http.StatusBadRequest)
+		http.Error(w, "【网关服务】最大并发连接数必须大于0", http.StatusBadRequest)
 		return
 	}
 
 	if h.wsManager == nil {
-		http.Error(w, "WebSocket manager not configured", http.StatusInternalServerError)
+		http.Error(w, "【网关服务】WebSocket管理器未配置", http.StatusInternalServerError)
 		return
 	}
 
@@ -312,7 +312,7 @@ func (h *ChatHandler) SetMaxConcurrent(w http.ResponseWriter, r *http.Request) {
 
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,
-		Message: "max concurrent updated",
+		Message: "【网关服务】最大并发连接数更新成功",
 		Data: map[string]int{
 			"max_concurrent": req.Max,
 		},
@@ -332,7 +332,7 @@ func (h *ChatHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
 	if h.agentRegistry == nil {
 		models.WriteData(w, models.BaseResponse[any]{
 			Code:    http.StatusOK,
-			Message: "Agent registry not configured",
+			Message: "【网关服务】智能体注册未配置成功",
 			Data:    nil,
 		})
 		return
@@ -361,7 +361,7 @@ func (h *ChatHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
 
 	models.WriteData(w, models.BaseResponse[[]*AgentStatus]{
 		Code:    http.StatusOK,
-		Message: "agent status retrieved",
+		Message: "【网关服务】智能体状态获取成功",
 		Data:    statuses,
 	})
 }
@@ -376,18 +376,18 @@ func (h *ChatHandler) SetMaxAgents(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxAgentsRequest](r)
 	if err != nil {
 		h.logger.Error("failed to bind request", "error", err)
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "【网关服务】无效请求参数", http.StatusBadRequest)
 		return
 	}
 
 	if req.Max <= 0 {
-		http.Error(w, "max must be greater than 0", http.StatusBadRequest)
+		http.Error(w, "【网关服务】最大智能体数必须大于0", http.StatusBadRequest)
 		return
 	}
 
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,
-		Message: "max agents updated",
+		Message: "【网关服务】最大智能体数更新成功",
 		Data: map[string]int{
 			"max_agents": req.Max,
 		},
@@ -405,7 +405,7 @@ func (h *ChatHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request
 	if h.wsManager == nil {
 		models.WriteData(w, models.BaseResponse[*ConnectionStatus]{
 			Code:    http.StatusOK,
-			Message: "WebSocket manager not configured",
+			Message: "【网关服务】WebSocket管理器未配置成功",
 			Data:    nil,
 		})
 		return
@@ -418,7 +418,7 @@ func (h *ChatHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request
 
 	models.WriteData(w, models.BaseResponse[*ConnectionStatus]{
 		Code:    http.StatusOK,
-		Message: "connection status retrieved",
+		Message: "【网关服务】连接状态获取成功",
 		Data:    status,
 	})
 }

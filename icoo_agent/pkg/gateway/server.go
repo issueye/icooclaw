@@ -28,8 +28,8 @@ type Server struct {
 	// New components
 	wsManager     *websocket.Manager
 	sseBroker     *sse.Broker
-	bus          *bus.MessageBus
-	agentLoop    *agent.Loop
+	bus           *bus.MessageBus
+	agentLoop     *agent.Loop
 	agentRegistry *agent.AgentRegistry
 }
 
@@ -200,14 +200,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 // Start starts the HTTP server.
 func (s *Server) Start() error {
-	s.logger.Info("starting gateway server", "addr", s.server.Addr)
+	s.logger.Info("【网关服务】已启动", "addr", s.server.Addr)
 
 	// Start WebSocket manager if configured
 	if s.wsManager != nil {
 		go func() {
 			ctx := context.Background()
 			if err := s.wsManager.Run(ctx); err != nil {
-				s.logger.Error("websocket manager error", "error", err)
+				s.logger.Error("【网关服务】WebSocket管理器错误：", "error", err)
 			}
 		}()
 	}
@@ -221,14 +221,14 @@ func (s *Server) Start() error {
 	}
 
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("failed to start server: %w", err)
+		return fmt.Errorf("【网关服务】启动失败: %w", err)
 	}
 	return nil
 }
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
-	s.logger.Info("shutting down gateway server")
+	s.logger.Info("【网关服务】正在关闭")
 
 	// Stop WebSocket manager
 	if s.wsManager != nil {

@@ -12,15 +12,16 @@ import (
 
 	"icooclaw/pkg/agent"
 	"icooclaw/pkg/bus"
+	"icooclaw/pkg/channels/consts"
 
 	"github.com/gorilla/websocket"
 )
 
 // Manager manages WebSocket connections and message routing.
 type Manager struct {
-	hub          *Hub
-	bus          *bus.MessageBus
-	agentLoop    *agent.Loop
+	hub           *Hub
+	bus           *bus.MessageBus
+	agentLoop     *agent.Loop
 	agentRegistry *agent.AgentRegistry
 
 	// Configuration
@@ -41,8 +42,8 @@ type Manager struct {
 
 // ManagerConfig holds configuration for the Manager.
 type ManagerConfig struct {
-	MaxConcurrent  int
-	Authenticate   func(r *http.Request) (string, bool)
+	MaxConcurrent   int
+	Authenticate    func(r *http.Request) (string, bool)
 	ReadBufferSize  int
 	WriteBufferSize int
 }
@@ -50,7 +51,7 @@ type ManagerConfig struct {
 // DefaultManagerConfig returns the default manager configuration.
 func DefaultManagerConfig() *ManagerConfig {
 	return &ManagerConfig{
-		MaxConcurrent:  100,
+		MaxConcurrent:   100,
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
@@ -233,7 +234,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.running.Store(true)
 	defer m.running.Store(false)
 
-	m.logger.Info("websocket manager started")
+	m.logger.Info("【WebSocket】管理器已启动")
 
 	// Start hub
 	go m.hub.Run(ctx)
@@ -241,7 +242,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	// Wait for context cancellation
 	<-ctx.Done()
 
-	m.logger.Info("websocket manager stopped")
+	m.logger.Info("【WebSocket】管理器已停止")
 	return ctx.Err()
 }
 
@@ -269,7 +270,7 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 			ctx,
 			msg.Content,
 			msg.ChatID,
-			"websocket",
+			consts.WEBSOCKET,
 			msg.ChatID,
 		)
 		if err != nil {
@@ -296,7 +297,7 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 	// If we have a bus, publish the message
 	if m.bus != nil {
 		inbound := bus.InboundMessage{
-			Channel:   "websocket",
+			Channel:   consts.WEBSOCKET,
 			ChatID:    msg.ChatID,
 			Sender:    bus.SenderInfo{ID: client.userID, Name: client.userID},
 			Text:      msg.Content,

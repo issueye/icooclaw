@@ -3,12 +3,13 @@ package consts
 import "time"
 
 const (
-	DINGTALK = "dingtalk"
-	FEISHU   = "feishu"
-	TELEGRAM = "telegram"
-	DISCORD  = "discord"
-	SLACK    = "slack"
-	WEB      = "web"
+	DINGTALK  = "dingtalk"
+	FEISHU    = "feishu"
+	TELEGRAM  = "telegram"
+	DISCORD   = "discord"
+	SLACK     = "slack"
+	WEB       = "web"
+	WEBSOCKET = "websocket"
 )
 
 // Default rate limits per channel (messages per second).
