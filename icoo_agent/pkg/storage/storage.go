@@ -76,6 +76,9 @@ func New(path string) (*Storage, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	// Enable debug mode
+	db = db.Debug()
+
 	// Get underlying sql.DB for connection pool settings
 	sqlDB, err := db.DB()
 	if err != nil {

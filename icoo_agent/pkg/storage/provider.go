@@ -56,6 +56,7 @@ type Provider struct {
 	DefaultModel string              `gorm:"column:default_model;type:varchar(100);comment:默认模型" json:"default_model"`      // 默认模型别名
 	LLMs         LLMs                `gorm:"column:llms;type:text;serializer:json;comment:LLM列表" json:"llms"`               // LLM列表
 	Config       string              `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                      // JSON object
+	Enabled      bool                `gorm:"column:isenabled;type:boolean;default:false;comment:是否启用" json:"enabled"`       // 是否启用
 	Metadata     map[string]any      `gorm:"column:metadata;type:text;serializer:json;comment:元数据(JSON格式)" json:"metadata"` // JSON object
 }
 

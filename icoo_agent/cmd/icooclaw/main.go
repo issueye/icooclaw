@@ -16,6 +16,7 @@ import (
 	"icooclaw/pkg/agent"
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/config"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/gateway"
 	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/memory"
@@ -228,9 +229,15 @@ func runGateway(cmd *cobra.Command, args []string) {
 
 	// Get default provider
 	var defaultProvider providers.Provider
-	defaultProvider, err = providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
-	if err != nil {
-		slog.Warn("未找到默认提供商，需要配置", "provider", cfg.Agent.DefaultProvider)
+	defaultModel, err := store.Param().Get(consts.DEFAULT_MODEL_KEY)
+	if err != nil || (defaultModel != nil && defaultModel.Value == "") {
+		slog.Warn("未找到默认模型，需要配置", "key", consts.DEFAULT_MODEL_KEY)
+	} else {
+		slog.Info("默认模型", "model", defaultModel.Value)
+		defaultProvider, err = providerFactory.Get(defaultModel.Value)
+		if err != nil {
+			slog.Warn("未找到默认提供商，需要配置", "provider", defaultModel.Value)
+		}
 	}
 
 	// Initialize agent loop

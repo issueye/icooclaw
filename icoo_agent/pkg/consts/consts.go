@@ -25,6 +25,9 @@ const DEF_GATEWAY_PORT = 16777
 // DEF_GATEWAY_HOST 默认网关主机
 const DEF_GATEWAY_HOST = "0.0.0.0"
 
+// DEFAULT_MODEL_KEY 默认模型键名
+const DEFAULT_MODEL_KEY = "agent.default_model"
+
 // ProviderType represents a provider type.
 type ProviderType string
 

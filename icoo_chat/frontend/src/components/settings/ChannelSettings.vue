@@ -16,10 +16,7 @@
       </button>
     </div>
 
-    <div
-      v-if="loadingChannels"
-      class="text-text-secondary text-center py-8"
-    >
+    <div v-if="loadingChannels" class="text-text-secondary text-center py-8">
       加载中...
     </div>
 
@@ -45,7 +42,9 @@
             </div>
             <div>
               <div class="font-medium">{{ ch.name }}</div>
-              <div class="text-xs text-text-secondary mt-0.5 flex items-center gap-2">
+              <div
+                class="text-xs text-text-secondary mt-0.5 flex items-center gap-2"
+              >
                 <span>{{ getChannelTypeLabel(ch) }}</span>
                 <span v-if="getChannelEndpoint(ch)" class="text-text-muted">
                   · {{ getChannelEndpoint(ch) }}
@@ -115,9 +114,7 @@
     >
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-text-secondary mb-2"
-            >渠道名称</label
-          >
+          <label class="block text-sm text-text-secondary mb-2">渠道名称</label>
           <input
             v-model="channelForm.name"
             type="text"
@@ -126,9 +123,7 @@
           />
         </div>
         <div>
-          <label class="block text-sm text-text-secondary mb-2"
-            >渠道类型</label
-          >
+          <label class="block text-sm text-text-secondary mb-2">渠道类型</label>
           <select
             v-model="channelForm.type"
             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
@@ -151,13 +146,31 @@
         <!-- 飞书专属配置 -->
         <template v-if="channelForm.type === 'feishu'">
           <div class="border-t border-border pt-4">
-            <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
-              <div class="text-sm font-medium text-blue-400 mb-2">📋 配置步骤</div>
-              <ol class="text-xs text-text-secondary space-y-1 list-decimal list-inside">
-                <li>前往 <a href="https://open.feishu.cn/app" target="_blank" class="text-accent hover:underline">飞书开放平台</a> 创建企业自建应用</li>
+            <div
+              class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4"
+            >
+              <div class="text-sm font-medium text-blue-400 mb-2">
+                📋 配置步骤
+              </div>
+              <ol
+                class="text-xs text-text-secondary space-y-1 list-decimal list-inside"
+              >
+                <li>
+                  前往
+                  <a
+                    href="https://open.feishu.cn/app"
+                    target="_blank"
+                    class="text-accent hover:underline"
+                    >飞书开放平台</a
+                  >
+                  创建企业自建应用
+                </li>
                 <li>在「凭证与基础信息」获取 App ID 和 App Secret</li>
                 <li>在「事件订阅」配置请求网址，并获取 Verification Token</li>
-                <li>在「权限管理」开通所需权限（im:message, im:message:send_as_bot）</li>
+                <li>
+                  在「权限管理」开通所需权限（im:message,
+                  im:message:send_as_bot）
+                </li>
               </ol>
             </div>
 
@@ -174,7 +187,9 @@
                     placeholder="8082"
                     class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                   />
-                  <p class="text-xs text-text-muted mt-1">本地 Webhook 监听端口</p>
+                  <p class="text-xs text-text-muted mt-1">
+                    本地 Webhook 监听端口
+                  </p>
                 </div>
                 <div>
                   <label class="block text-xs text-text-secondary mb-1"
@@ -191,9 +206,13 @@
               </div>
 
               <div>
-                <label class="block text-xs text-text-secondary mb-1">Webhook 回调地址</label>
+                <label class="block text-xs text-text-secondary mb-1"
+                  >Webhook 回调地址</label
+                >
                 <div class="flex items-center gap-2">
-                  <code class="flex-1 bg-bg-tertiary px-3 py-2 rounded-lg text-sm text-text-primary break-all">
+                  <code
+                    class="flex-1 bg-bg-tertiary px-3 py-2 rounded-lg text-sm text-text-primary break-all"
+                  >
                     {{ getWebhookUrl() }}
                   </code>
                   <button
@@ -202,10 +221,15 @@
                     class="px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm hover:bg-bg-hover transition-colors flex items-center gap-1"
                     :title="webhookUrlCopied ? '已复制' : '复制'"
                   >
-                    <component :is="webhookUrlCopied ? CheckIcon : CopyIcon" :size="14" />
+                    <component
+                      :is="webhookUrlCopied ? CheckIcon : CopyIcon"
+                      :size="14"
+                    />
                   </button>
                 </div>
-                <p class="text-xs text-text-muted mt-1">将此地址配置到飞书事件订阅</p>
+                <p class="text-xs text-text-muted mt-1">
+                  将此地址配置到飞书事件订阅
+                </p>
               </div>
 
               <div>
@@ -218,7 +242,9 @@
                   placeholder="cli_xxxxxxxxxxxx"
                   class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                 />
-                <p class="text-xs text-text-muted mt-1">飞书应用凭证，格式：cli_ 开头</p>
+                <p class="text-xs text-text-muted mt-1">
+                  飞书应用凭证，格式：cli_ 开头
+                </p>
               </div>
 
               <div>
@@ -231,7 +257,9 @@
                   placeholder="应用密钥"
                   class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                 />
-                <p class="text-xs text-text-muted mt-1">在「凭证与基础信息」页面获取</p>
+                <p class="text-xs text-text-muted mt-1">
+                  在「凭证与基础信息」页面获取
+                </p>
               </div>
 
               <div>
@@ -244,7 +272,9 @@
                   placeholder="事件订阅验证 Token"
                   class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                 />
-                <p class="text-xs text-text-muted mt-1">在「事件订阅」页面获取，用于验证请求来源</p>
+                <p class="text-xs text-text-muted mt-1">
+                  在「事件订阅」页面获取，用于验证请求来源
+                </p>
               </div>
 
               <div>
@@ -257,7 +287,9 @@
                   placeholder="消息加密密钥"
                   class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
                 />
-                <p class="text-xs text-text-muted mt-1">开启消息加密后需要配置，不加密可留空</p>
+                <p class="text-xs text-text-muted mt-1">
+                  开启消息加密后需要配置，不加密可留空
+                </p>
               </div>
             </div>
 
@@ -285,7 +317,9 @@
                     />
                     <div>
                       <span class="text-sm">处理群聊事件</span>
-                      <p class="text-xs text-text-muted">成员加入/退出、群解散等事件</p>
+                      <p class="text-xs text-text-muted">
+                        成员加入/退出、群解散等事件
+                      </p>
                     </div>
                   </label>
 
@@ -297,7 +331,9 @@
                     />
                     <div>
                       <span class="text-sm">启用卡片消息</span>
-                      <p class="text-xs text-text-muted">支持发送交互式卡片消息</p>
+                      <p class="text-xs text-text-muted">
+                        支持发送交互式卡片消息
+                      </p>
                     </div>
                   </label>
                 </div>
@@ -318,7 +354,8 @@
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                    <code>contact:user.base:readonly</code> - 获取用户信息（可选）
+                    <code>contact:user.base:readonly</code> -
+                    获取用户信息（可选）
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
@@ -333,9 +370,7 @@
         <!-- Webhook 通用配置 -->
         <template v-else-if="channelForm.type === 'webhook'">
           <div class="border-t border-border pt-4">
-            <div class="text-sm font-medium mb-3 text-accent">
-              Webhook 配置
-            </div>
+            <div class="text-sm font-medium mb-3 text-accent">Webhook 配置</div>
             <div class="space-y-3">
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -474,7 +509,7 @@ const channelDialogVisible = computed({
   get: () => showChannelDialog.value || !!editingChannel.value,
   set: (val) => {
     if (!val) closeChannelDialog();
-  }
+  },
 });
 
 const channelForm = reactive({

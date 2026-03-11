@@ -19,7 +19,9 @@
       <div class="flex items-start justify-between mb-3">
         <div>
           <h3 class="text-sm font-medium mb-1">AI Agent 默认模型</h3>
-          <p class="text-xs text-text-secondary">设置 AI Agent 默认使用的模型，此设置优先于供应商 的默认模型</p>
+          <p class="text-xs text-text-secondary">
+            设置 AI Agent 默认使用的模型，此设置优先于供应商 的默认模型
+          </p>
         </div>
         <button
           @click="openAgentModelDialog"
@@ -99,9 +101,7 @@
       v-else
       class="bg-bg-secondary rounded-xl border border-border p-8 text-center"
     >
-      <div class="text-text-secondary text-sm mb-4">
-        暂无供应商配置
-      </div>
+      <div class="text-text-secondary text-sm mb-4">暂无供应商配置</div>
       <button
         @click="openAddProvider"
         class="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors"
@@ -124,9 +124,9 @@
     >
       <div class="space-y-4">
         <div>
-          <label class="block text-sm text-text-secondary mb-2"
-            >供应商名称</label
-          >
+          <label class="block text-sm text-text-secondary mb-2">
+            供应商名称
+          </label>
           <input
             v-model="providerForm.name"
             type="text"
@@ -142,14 +142,29 @@
             id="provider-enabled"
             class="w-4 h-4 rounded border-border bg-bg-tertiary text-accent focus:ring-accent"
           />
-          <label for="provider-enabled" class="text-sm">
-            启用此供应商
-          </label>
+          <label for="provider-enabled" class="text-sm"> 启用此供应商 </label>
         </div>
         <div>
           <label class="block text-sm text-text-secondary mb-2"
-            >API Key</label
+            >供应商类型</label
           >
+          <select
+            v-model="providerForm.type"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+            placeholder="请选择供应商类型"
+          >
+            <option value="deepseek">DeepSeek</option>
+            <option value="qwen">Qwen</option>
+            <option value="qwen_coding_plan">Qwen Coding Plan</option>
+            <option value="siliconflow">SiliconFlow</option>
+            <option value="zhipu">Zhipu</option>
+            <option value="openai">OpenAI</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-text-secondary mb-2">API Key</label>
           <input
             v-model="providerForm.api_key"
             type="password"
@@ -172,9 +187,9 @@
           </p>
         </div>
         <div>
-          <label class="block text-sm text-text-secondary mb-2"
-            >默认模型</label
-          >
+          <label class="block text-sm text-text-secondary mb-2">
+            默认模型
+          </label>
           <input
             v-model="providerForm.default_model"
             type="text"
@@ -182,7 +197,7 @@
             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
           />
           <p class="text-xs text-text-secondary mt-1">
-            可选，此 Provider 的默认模型。如果未设置，将使用第一个支持的模型。
+            可选，此供应商的默认模型。如果未设置，将使用第一个支持的模型。
           </p>
         </div>
 
@@ -284,7 +299,7 @@
                   'px-3 py-1.5 rounded-lg text-xs transition-colors',
                   agentModelForm.model === llm.model
                     ? 'bg-accent text-white'
-                    : 'bg-bg-secondary text-text-secondary hover:bg-bg-hover'
+                    : 'bg-bg-secondary text-text-secondary hover:bg-bg-hover',
                 ]"
               >
                 {{ `${provider.name}/${llm.model}` }}
@@ -326,7 +341,7 @@ const agentModelDialogVisible = computed({
   get: () => showAgentModelDialog.value,
   set: (val) => {
     if (!val) closeAgentModelDialog();
-  }
+  },
 });
 
 // Provider 对话框
@@ -347,7 +362,7 @@ const providerDialogVisible = computed({
   get: () => showProviderDialog.value || !!editingProvider.value,
   set: (val) => {
     if (!val) closeProviderDialog();
-  }
+  },
 });
 
 // 获取 Provider 模型名称
@@ -396,7 +411,9 @@ async function loadAgentDefaultModel() {
 // 打开 AI Agent 默认模型对话框
 function openAgentModelDialog() {
   agentModelForm.model = agentDefaultModel.value || "";
-  agentModelForm.providers = providers.value.filter(p => p.enabled && p.llms && p.llms.length > 0);
+  agentModelForm.providers = providers.value.filter(
+    (p) => p.enabled && p.llms && p.llms.length > 0,
+  );
   showAgentModelDialog.value = true;
 }
 
@@ -499,7 +516,7 @@ async function handleSaveProvider() {
     name: providerForm.name,
     enabled: providerForm.enabled,
     api_key: providerForm.api_key,
-    base_url: providerForm.api_base,
+    api_base: providerForm.api_base,
     default_model: providerForm.default_model,
     llms: llms,
   };

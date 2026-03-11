@@ -86,21 +86,21 @@ func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ProviderHandler) Update(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*storage.Provider](r)
 	if err != nil {
-		h.logger.Error("绑定更新Provider配置请求失败", "error", err)
-		http.Error(w, "绑定更新Provider配置请求失败", http.StatusBadRequest)
+		h.logger.Error("绑定更新供应商配置请求失败", "error", err)
+		http.Error(w, "绑定更新供应商配置请求失败", http.StatusBadRequest)
 		return
 	}
 
 	err = h.storage.Provider().Save(req)
 	if err != nil {
-		h.logger.Error("更新Provider配置失败", "error", err)
-		http.Error(w, "更新Provider配置失败", http.StatusInternalServerError)
+		h.logger.Error("更新供应商配置失败", "error", err)
+		http.Error(w, "更新供应商配置失败", http.StatusInternalServerError)
 		return
 	}
 
 	models.WriteData(w, models.BaseResponse[*storage.Provider]{
 		Code:    http.StatusOK,
-		Message: "Provider配置更新成功",
+		Message: "供应商配置更新成功",
 		Data:    req,
 	})
 }

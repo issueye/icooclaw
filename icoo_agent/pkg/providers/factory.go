@@ -47,7 +47,7 @@ func (f *Factory) Get(name string) (Provider, error) {
 	// Try to load from database
 	cfg, err := f.storage.Provider().GetByName(name)
 	if err != nil {
-		return nil, fmt.Errorf("provider %s not found: %w", name, err)
+		return nil, fmt.Errorf("供应商 %s 未找到: %w", name, err)
 	}
 
 	p, err := f.createFromConfig(cfg)

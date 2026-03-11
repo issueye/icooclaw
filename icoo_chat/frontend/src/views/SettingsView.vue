@@ -1,7 +1,7 @@
 <template>
   <div class="w-full min-h-screen bg-bg-primary text-text-primary flex">
     <!-- 左侧导航 -->
-    <aside class="w-64 border-r border-border bg-bg-secondary flex-shrink-0">
+    <aside class="w-48 border-r border-border bg-bg-secondary flex-shrink-0">
       <div class="p-4 border-b border-border">
         <div class="flex items-center gap-2">
           <button
@@ -185,7 +185,7 @@ const { status: wsStatus } = useWebSocket();
 // 菜单项
 const menuItems = [
   { key: "connection", label: "连接设置", icon: ConnectionIcon },
-  { key: "provider", label: "LLM Provider", icon: BotIcon },
+  { key: "provider", label: "LLM 供应商", icon: BotIcon },
   { key: "skill", label: "技能管理", icon: SparklesIcon },
   { key: "channel", label: "渠道管理", icon: ChannelIcon },
   { key: "appearance", label: "外观", icon: PaletteIcon },
