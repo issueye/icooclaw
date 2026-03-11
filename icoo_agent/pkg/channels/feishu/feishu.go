@@ -329,12 +329,12 @@ func (c *Channel) handleMessageReceive(ctx context.Context, event *larkim.P2Mess
 
 	// Build inbound message
 	inboundMsg := bus.InboundMessage{
-		Channel:  c.Name(),
-		ChatID:   chatID,
-		Sender:   bus.SenderInfo{ID: senderID},
-		Text:     content,
-		Media:    mediaRefs,
-		Metadata: metadata,
+		Channel:   c.Name(),
+		SessionID: chatID,
+		Sender:    bus.SenderInfo{ID: senderID},
+		Text:      content,
+		Media:     mediaRefs,
+		Metadata:  metadata,
 	}
 
 	c.logger.With("name", "【飞书】").Info("收到消息",

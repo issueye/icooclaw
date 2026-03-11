@@ -215,11 +215,11 @@ func (c *Channel) onChatBotMessageReceived(
 
 	// Build inbound message
 	inboundMsg := bus.InboundMessage{
-		Channel:  c.Name(),
-		ChatID:   chatID,
-		Sender:   bus.SenderInfo{ID: senderID, Name: senderNick},
-		Text:     content,
-		Metadata: metadata,
+		Channel:   c.Name(),
+		SessionID: chatID,
+		Sender:    bus.SenderInfo{ID: senderID, Name: senderNick},
+		Text:      content,
+		Metadata:  metadata,
 	}
 
 	// Publish to bus

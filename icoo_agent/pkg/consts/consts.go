@@ -1,5 +1,7 @@
 package consts
 
+import "fmt"
+
 type RoleType string
 
 const (
@@ -59,4 +61,14 @@ func ToProviderType(providerType string) ProviderType {
 
 func (p ProviderType) String() string {
 	return string(p)
+}
+
+const DEFAULT_AGENT_NAME = "default"
+
+func GetSessionKey(agentName, channel, sessionID string) string {
+	return fmt.Sprintf("%s:%s:%s", agentName, channel, sessionID)
+}
+
+func GetDefSessionKey(channel, sessionID string) string {
+	return fmt.Sprintf("%s:%s:%s", DEFAULT_AGENT_NAME, channel, sessionID)
 }

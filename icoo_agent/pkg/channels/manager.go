@@ -223,7 +223,7 @@ func (m *Manager) processOutbound(ctx context.Context, name string, w *channelWo
 	}
 
 	// Pre-send operations
-	m.preSend(ctx, name, msg.ChatID)
+	m.preSend(ctx, name, msg.SessionID)
 
 	// Split message if needed
 	maxLen := GetMaxMessageLength(name)
@@ -299,7 +299,7 @@ func (m *Manager) sendWithRetry(ctx context.Context, name string, w *channelWork
 		// Convert bus.OutboundMessage to channels.OutboundMessage
 		chanMsg := OutboundMessage{
 			Channel:  msg.Channel,
-			ChatID:   msg.ChatID,
+			ChatID:   msg.SessionID,
 			Text:     msg.Text,
 			Media:    msg.Media,
 			ReplyTo:  msg.ReplyTo,

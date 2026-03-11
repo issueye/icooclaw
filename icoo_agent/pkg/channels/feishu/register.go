@@ -6,10 +6,11 @@ import (
 
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels"
+	"icooclaw/pkg/channels/consts"
 )
 
 func init() {
-	channels.RegisterFactory("feishu", func(config map[string]any) (channels.Channel, error) {
+	channels.RegisterFactory(consts.FEISHU, func(config map[string]any) (channels.Channel, error) {
 		cfg, err := parseConfig(config)
 		if err != nil {
 			return nil, err

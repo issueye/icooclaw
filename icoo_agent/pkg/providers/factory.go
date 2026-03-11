@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"errors"
+	"icooclaw/pkg/consts"
 	icooclawErrors "icooclaw/pkg/errors"
 	"icooclaw/pkg/storage"
 )
@@ -96,7 +97,7 @@ func (f *Factory) GetByModel(model string) (Provider, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("在所有供应商 的模型列表 中未找到模型 %s", model)
+	return nil, fmt.Errorf("在所有供应商的模型列表中未找到模型 %s", model)
 }
 
 // List lists all provider names.
@@ -127,16 +128,18 @@ func (f *Factory) CreateChain(names ...string) (*FallbackChain, error) {
 // createFromConfig creates a provider from configuration.
 func (f *Factory) createFromConfig(cfg *storage.Provider) (Provider, error) {
 	switch cfg.Type {
-	case "openai":
+	case consts.ProviderOpenAI:
 		return NewOpenAIProvider(cfg), nil
-	case "anthropic":
+	case consts.ProviderAnthropic:
 		return NewAnthropicProvider(cfg), nil
-	case "deepseek":
+	case consts.ProviderDeepSeek:
 		return NewDeepSeekProvider(cfg), nil
-	case "openrouter":
+	case consts.ProviderOpenRouter:
 		return NewOpenRouterProvider(cfg), nil
+	case consts.ProviderQwen, consts.ProviderQwenCodingPlan:
+		return NewQwenProvider(cfg), nil
 	default:
-		return nil, fmt.Errorf("unknown provider type: %s", cfg.Type)
+		return nil, fmt.Errorf("未支持的供应商类型: %s", cfg.Type)
 	}
 }
 

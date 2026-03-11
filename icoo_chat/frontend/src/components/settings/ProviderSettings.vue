@@ -468,7 +468,8 @@ function openEditProvider(provider) {
   providerForm.name = provider.name;
   providerForm.enabled = provider.enabled;
   providerForm.api_key = provider.api_key || "";
-  providerForm.api_base = provider.base_url || "";
+  providerForm.api_base = provider.api_base || "";
+  providerForm.type = provider.type || "";
   providerForm.default_model = provider.default_model || "";
 
   if (provider.llms && provider.llms.length > 0) {
@@ -517,6 +518,7 @@ async function handleSaveProvider() {
     enabled: providerForm.enabled,
     api_key: providerForm.api_key,
     api_base: providerForm.api_base,
+    type: providerForm.type,
     default_model: providerForm.default_model,
     llms: llms,
   };

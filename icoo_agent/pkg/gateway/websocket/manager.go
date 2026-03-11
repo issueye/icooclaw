@@ -152,8 +152,8 @@ func (m *Manager) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	client.Run(r.Context())
 }
 
-// HandleWebSocketWithChatID handles WebSocket connection with a specific chat ID.
-func (m *Manager) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request, chatID string) {
+// HandleWebSocketWithChatID handles WebSocket connection with a specific ID.
+func (m *Manager) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Request, sessionID string) {
 	// Check concurrent limit
 	if int(m.connections.Load()) >= m.maxConcurrent {
 		http.Error(w, "too many connections", http.StatusServiceUnavailable)
@@ -186,7 +186,7 @@ func (m *Manager) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Reque
 	// Create client with chat ID
 	client := NewClient(conn, userID, m.logger)
 	client.WithManager(m)
-	client.chatID = chatID
+	client.WithSessionID(sessionID)
 
 	// Register with hub
 	m.hub.Register(client)
@@ -195,7 +195,7 @@ func (m *Manager) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.Reque
 	m.logger.With("name", "【网关服务】").Info("WebSocket客户端连接成功",
 		"user_id", userID,
 		"client_id", client.ID,
-		"chat_id", chatID,
+		"session_id", sessionID,
 		"total_connections", m.connections.Load())
 
 	// Run client
@@ -263,7 +263,7 @@ func (m *Manager) IsRunning() bool {
 func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatMessage) error {
 	m.logger.With("name", "【网关服务】").Debug("【WebSocket】处理消息",
 		"client_id", client.ID,
-		"chat_id", msg.ChatID,
+		"session_id", msg.SessionID,
 		"content_length", len(msg.Content))
 
 	// If we have an agent loop, process the message
@@ -272,9 +272,9 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 		response, err := m.agentLoop.ProcessDirectWithChannel(
 			ctx,
 			msg.Content,
-			msg.ChatID,
+			msg.SessionID,
 			consts.WEBSOCKET,
-			msg.ChatID,
+			msg.SessionID,
 		)
 		if err != nil {
 			return err
@@ -283,7 +283,7 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 		// Send response back to client
 		resp := &ChatResponse{
 			Type:      "response",
-			ChatID:    msg.ChatID,
+			SessionID: msg.SessionID,
 			Content:   response,
 			Timestamp: time.Now().Unix(),
 		}
@@ -301,7 +301,7 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 	if m.bus != nil {
 		inbound := bus.InboundMessage{
 			Channel:   consts.WEBSOCKET,
-			ChatID:    msg.ChatID,
+			SessionID: msg.SessionID,
 			Sender:    bus.SenderInfo{ID: client.userID, Name: client.userID},
 			Text:      msg.Content,
 			Timestamp: time.Now(),
@@ -317,12 +317,12 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 func (m *Manager) ProcessStreamMessage(ctx context.Context, client *Client, msg *ChatMessage) error {
 	m.logger.Debug("processing stream message",
 		"client_id", client.ID,
-		"chat_id", msg.ChatID)
+		"session_id", msg.SessionID)
 
 	// Send start event
 	client.SendJSON(&StreamEvent{
-		Type:   "stream_start",
-		ChatID: msg.ChatID,
+		Type:      "stream_start",
+		SessionID: msg.SessionID,
 	})
 
 	// For now, use the same logic as ProcessMessage
@@ -339,8 +339,8 @@ func (m *Manager) ProcessStreamMessage(ctx context.Context, client *Client, msg 
 
 	// Send end event
 	client.SendJSON(&StreamEvent{
-		Type:   "stream_end",
-		ChatID: msg.ChatID,
+		Type:      "stream_end",
+		SessionID: msg.SessionID,
 	})
 
 	return nil
@@ -355,7 +355,7 @@ type QueueStatus struct {
 // ChatMessage represents an incoming chat message.
 type ChatMessage struct {
 	Type      string `json:"type"`
-	ChatID    string `json:"chat_id"`
+	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	Stream    bool   `json:"stream,omitempty"`
 	Timestamp int64  `json:"timestamp,omitempty"`
@@ -364,7 +364,7 @@ type ChatMessage struct {
 // ChatResponse represents a chat response.
 type ChatResponse struct {
 	Type      string `json:"type"`
-	ChatID    string `json:"chat_id"`
+	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	Timestamp int64  `json:"timestamp"`
 }
@@ -372,7 +372,7 @@ type ChatResponse struct {
 // StreamEvent represents a streaming event.
 type StreamEvent struct {
 	Type      string `json:"type"`
-	ChatID    string `json:"chat_id,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
 	Content   string `json:"content,omitempty"`
 	Error     string `json:"error,omitempty"`
 	Timestamp int64  `json:"timestamp"`

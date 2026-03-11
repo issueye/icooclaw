@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -233,10 +234,16 @@ func runGateway(cmd *cobra.Command, args []string) {
 	if err != nil || (defaultModel != nil && defaultModel.Value == "") {
 		slog.Warn("未找到默认模型，需要配置", "key", consts.DEFAULT_MODEL_KEY)
 	} else {
+		arrs := strings.Split(defaultModel.Value, "/")
+		if len(arrs) != 2 {
+			slog.Warn("默认模型格式错误，需要配置", "model", defaultModel.Value)
+			return
+		}
+
 		slog.Info("默认模型", "model", defaultModel.Value)
-		defaultProvider, err = providerFactory.Get(defaultModel.Value)
+		defaultProvider, err = providerFactory.Get(arrs[0])
 		if err != nil {
-			slog.Warn("未找到默认提供商，需要配置", "provider", defaultModel.Value)
+			slog.Warn("未找到默认提供商，需要配置", "provider", arrs[0])
 		}
 	}
 

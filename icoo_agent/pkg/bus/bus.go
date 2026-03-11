@@ -21,7 +21,7 @@ type SenderInfo struct {
 // InboundMessage represents a message received from a channel.
 type InboundMessage struct {
 	Channel   string
-	ChatID    string
+	SessionID string
 	Sender    SenderInfo
 	Text      string
 	Media     []string
@@ -32,13 +32,13 @@ type InboundMessage struct {
 
 // OutboundMessage represents a message to be sent to a channel.
 type OutboundMessage struct {
-	Channel  string
-	ChatID   string
-	Text     string
-	Media    []string
-	ReplyTo  string
-	EditID   string
-	Metadata map[string]any
+	Channel   string
+	SessionID string
+	Text      string
+	Media     []string
+	ReplyTo   string
+	EditID    string
+	Metadata  map[string]any
 }
 
 // OutboundMediaMessage represents a media message to be sent.

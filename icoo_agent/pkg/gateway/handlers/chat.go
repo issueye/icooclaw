@@ -98,7 +98,7 @@ func (h *ChatHandler) HandleWebSocketWithChatID(w http.ResponseWriter, r *http.R
 
 // ChatRequest represents a chat request.
 type ChatRequest struct {
-	ChatID    string `json:"chat_id"`
+	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	Stream    bool   `json:"stream,omitempty"`
 	AgentName string `json:"agent_name,omitempty"`
@@ -106,7 +106,7 @@ type ChatRequest struct {
 
 // ChatResponse represents a chat response.
 type ChatResponse struct {
-	ChatID    string `json:"chat_id"`
+	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	AgentName string `json:"agent_name,omitempty"`
 	Timestamp int64  `json:"timestamp"`
@@ -127,9 +127,9 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ChatID == "" {
-		h.logger.With("name", "【网关服务】").Error("聊天ID不能为空")
-		http.Error(w, "【网关服务】聊天ID不能为空", http.StatusBadRequest)
+	if req.SessionID == "" {
+		h.logger.With("name", "【网关服务】").Error("会话ID不能为空")
+		http.Error(w, "【网关服务】会话ID不能为空", http.StatusBadRequest)
 		return
 	}
 
@@ -141,9 +141,9 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		response, err := h.agentLoop.ProcessDirectWithChannel(
 			ctx,
 			req.Content,
-			req.ChatID,
+			req.SessionID,
 			consts.WEBSOCKET,
-			req.ChatID,
+			req.SessionID,
 		)
 		if err != nil {
 			h.logger.With("name", "【网关服务】").Error("处理聊天失败", "error", err)
@@ -155,7 +155,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 			Code:    http.StatusOK,
 			Message: "success",
 			Data: &ChatResponse{
-				ChatID:    req.ChatID,
+				SessionID: req.SessionID,
 				Content:   response,
 				Timestamp: time.Now().Unix(),
 			},
@@ -169,8 +169,8 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 
 		msg := bus.InboundMessage{
-			Channel:   "http",
-			ChatID:    req.ChatID,
+			Channel:   consts.WEBSOCKET,
+			SessionID: req.SessionID,
 			Sender:    bus.SenderInfo{ID: "http", Name: "HTTP Client"},
 			Text:      req.Content,
 			Timestamp: time.Now(),
@@ -186,8 +186,8 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 			Code:    http.StatusOK,
 			Message: "message queued",
 			Data: map[string]string{
-				"chat_id": req.ChatID,
-				"status":  "queued",
+				"session_id": req.SessionID,
+				"status":     "queued",
 			},
 		})
 		return
@@ -212,9 +212,9 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ChatID == "" {
-		h.logger.With("name", "【网关服务】").Error("聊天ID不能为空")
-		http.Error(w, "【网关服务】聊天ID不能为空", http.StatusBadRequest)
+	if req.SessionID == "" {
+		h.logger.With("name", "【网关服务】").Error("会话ID不能为空")
+		http.Error(w, "【网关服务】会话ID不能为空", http.StatusBadRequest)
 		return
 	}
 
@@ -232,8 +232,8 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send start event
-	h.logger.With("name", "【网关服务】").Info("开始处理聊天请求", "chat_id", req.ChatID)
-	h.writeSSE(w, "start", map[string]string{"chat_id": req.ChatID})
+	h.logger.With("name", "【网关服务】").Info("开始处理聊天请求", "session_id", req.SessionID)
+	h.writeSSE(w, "start", map[string]string{"session_id": req.SessionID})
 	flusher.Flush()
 
 	// Process with agent loop
@@ -244,9 +244,9 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 		response, err := h.agentLoop.ProcessDirectWithChannel(
 			ctx,
 			req.Content,
-			req.ChatID,
+			req.SessionID,
 			"http-stream",
-			req.ChatID,
+			req.SessionID,
 		)
 		if err != nil {
 			h.writeSSE(w, "error", map[string]string{"error": err.Error()})
@@ -256,14 +256,14 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 
 		// Send content event
 		h.writeSSE(w, "content", map[string]string{
-			"chat_id": req.ChatID,
-			"content": response,
+			"session_id": req.SessionID,
+			"content":    response,
 		})
 		flusher.Flush()
 	}
 
 	// Send end event
-	h.writeSSE(w, "end", map[string]string{"chat_id": req.ChatID})
+	h.writeSSE(w, "end", map[string]string{"session_id": req.SessionID})
 	flusher.Flush()
 }
 

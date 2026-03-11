@@ -11,6 +11,7 @@ import (
 
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels"
+	"icooclaw/pkg/consts"
 	"icooclaw/pkg/memory"
 	"icooclaw/pkg/providers"
 	"icooclaw/pkg/skill"
@@ -156,7 +157,7 @@ func (l *Loop) Run(ctx context.Context) error {
 				if err != nil {
 					l.logger.With("name", "【智能体】").Error("处理消息失败",
 						"channel", msg.Channel,
-						"chat_id", msg.ChatID,
+						"session_id", msg.SessionID,
 						"error", err)
 					response = fmt.Sprintf("处理消息时出错: %v", err)
 				}
@@ -166,13 +167,13 @@ func (l *Loop) Run(ctx context.Context) error {
 					defer cancel()
 
 					if err := l.bus.PublishOutbound(pubCtx, bus.OutboundMessage{
-						Channel: msg.Channel,
-						ChatID:  msg.ChatID,
-						Text:    response,
+						Channel:   msg.Channel,
+						SessionID: msg.SessionID,
+						Text:      response,
 					}); err != nil {
 						l.logger.With("name", "【智能体】").Error("发布响应失败",
 							"channel", msg.Channel,
-							"chat_id", msg.ChatID,
+							"session_id", msg.SessionID,
 							"error", err)
 					}
 				}
@@ -192,15 +193,15 @@ func (l *Loop) Stop() {
 func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
 	l.logger.With("name", "【智能体】").Info("正在处理消息",
 		"channel", msg.Channel,
-		"chat_id", msg.ChatID,
+		"session_id", msg.SessionID,
 		"sender", msg.Sender.ID)
 
 	// Get binding
-	binding, err := l.storage.Binding().GetBinding(msg.Channel, msg.ChatID)
+	binding, err := l.storage.Binding().GetBinding(msg.Channel, msg.SessionID)
 	if err != nil {
 		l.logger.With("name", "【智能体】").Debug("未找到绑定，使用默认代理",
 			"channel", msg.Channel,
-			"chat_id", msg.ChatID)
+			"session_id", msg.SessionID)
 		// Use default agent name
 		return l.processWithAgent(ctx, "default", msg)
 	}
@@ -215,10 +216,10 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	l.logger.With("name", "【智能体】").Info("使用代理处理",
 		"agent", agentName,
 		"channel", msg.Channel,
-		"chat_id", msg.ChatID)
+		"session_id", msg.SessionID)
 
 	// 1. Build session key
-	sessionKey := l.getSessionKey(agentName, msg.Channel, msg.ChatID)
+	sessionKey := consts.GetSessionKey(agentName, msg.Channel, msg.SessionID)
 
 	// 2. Load memory/history
 	var history []providers.ChatMessage
@@ -386,7 +387,7 @@ func (l *Loop) executeToolCall(
 	l.logger.With("name", "【智能体】").Info("正在执行工具",
 		"tool", toolName,
 		"channel", msg.Channel,
-		"chat_id", msg.ChatID)
+		"session_id", msg.SessionID)
 
 	// Parse arguments
 	var args map[string]any
@@ -400,7 +401,7 @@ func (l *Loop) executeToolCall(
 	}
 
 	// Execute tool
-	result := l.tools.ExecuteWithContext(ctx, toolName, args, msg.Channel, msg.ChatID, nil)
+	result := l.tools.ExecuteWithContext(ctx, toolName, args, msg.Channel, msg.SessionID, nil)
 	if result.Error != nil {
 		return "", result.Error
 	}
@@ -446,11 +447,11 @@ func (l *Loop) ProcessDirect(
 // ProcessDirectWithChannel processes a message directly with specific channel/chatID.
 func (l *Loop) ProcessDirectWithChannel(
 	ctx context.Context,
-	content, sessionKey, channel, chatID string,
+	content, sessionKey, channel, sessionID string,
 ) (string, error) {
 	msg := bus.InboundMessage{
-		Channel: channel,
-		ChatID:  chatID,
+		Channel:   channel,
+		SessionID: sessionID,
 		Sender: bus.SenderInfo{
 			ID: "direct",
 		},

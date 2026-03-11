@@ -182,13 +182,13 @@ func (r *Registry) ExecuteWithContext(
 	ctx context.Context,
 	name string,
 	args map[string]any,
-	channel, chatID string,
+	channel, sessionID string,
 	asyncCallback AsyncCallback,
 ) *Result {
 	r.logger.Info("tool execution started",
 		"tool", name,
 		"channel", channel,
-		"chat_id", chatID)
+		"session_id", sessionID)
 
 	tool, err := r.Get(name)
 	if err != nil {
@@ -200,7 +200,7 @@ func (r *Registry) ExecuteWithContext(
 	}
 
 	// Inject context
-	ctx = WithToolContext(ctx, channel, chatID)
+	ctx = WithToolContext(ctx, channel, sessionID)
 
 	// Execute with timing
 	start := time.Now()

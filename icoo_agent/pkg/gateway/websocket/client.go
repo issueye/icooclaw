@@ -15,11 +15,11 @@ import (
 
 // Client represents a WebSocket client connection.
 type Client struct {
-	ID     string
-	conn   *websocket.Conn
-	send   chan []byte
-	userID string
-	chatID string
+	ID        string
+	conn      *websocket.Conn
+	send      chan []byte
+	userID    string
+	sessionID string
 
 	manager *Manager
 	logger  *slog.Logger
@@ -83,8 +83,8 @@ func (c *Client) WithManager(m *Manager) *Client {
 }
 
 // WithChatID sets the chat ID for the client.
-func (c *Client) WithChatID(chatID string) *Client {
-	c.chatID = chatID
+func (c *Client) WithSessionID(sessionID string) *Client {
+	c.sessionID = sessionID
 	return c
 }
 
@@ -213,9 +213,9 @@ func (c *Client) handleMessage(ctx context.Context, messageType int, message []b
 		msg.Timestamp = time.Now().Unix()
 	}
 
-	// Use client's chat ID if not provided in message
-	if msg.ChatID == "" {
-		msg.ChatID = c.chatID
+	// Use client's session ID if not provided in message
+	if msg.SessionID == "" {
+		msg.SessionID = c.sessionID
 	}
 
 	// Validate message
@@ -224,8 +224,8 @@ func (c *Client) handleMessage(ctx context.Context, messageType int, message []b
 		return
 	}
 
-	if msg.ChatID == "" {
-		c.SendError("聊天ID不能为空")
+	if msg.SessionID == "" {
+		c.SendError("会话ID不能为空")
 		return
 	}
 
@@ -313,7 +313,7 @@ func (c *Client) GetStats() *ClientStats {
 	return &ClientStats{
 		ID:         c.ID,
 		UserID:     c.userID,
-		ChatID:     c.chatID,
+		SessionID:  c.sessionID,
 		Connected:  c.connected.Load(),
 		MessageSeq: c.messageSeq.Load(),
 		LastPing:   c.lastPing,
@@ -325,7 +325,7 @@ func (c *Client) GetStats() *ClientStats {
 type ClientStats struct {
 	ID         string    `json:"id"`
 	UserID     string    `json:"user_id"`
-	ChatID     string    `json:"chat_id"`
+	SessionID  string    `json:"session_id"`
 	Connected  bool      `json:"connected"`
 	MessageSeq uint64    `json:"message_seq"`
 	LastPing   time.Time `json:"last_ping"`
