@@ -13,9 +13,9 @@ import (
 type Channel struct {
 	Model
 	Name        string `gorm:"column:name;type:varchar(100);uniqueIndex;not null;comment:渠道名称" json:"name"` // 渠道名称
-	Type        string `gorm:"column:type;type:varchar(50);not null;comment:渠道类型" json:"type"`             // 渠道类型
-	Enabled     bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`    // 是否启用
-	Config      string `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                   // JSON object
+	Type        string `gorm:"column:type;type:varchar(50);not null;comment:渠道类型" json:"type"`              // 渠道类型
+	Enabled     bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`     // 是否启用
+	Config      string `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"`                    // JSON object
 	Permissions string `gorm:"column:permissions;type:text;comment:权限(JSON数组)" json:"permissions"`          // JSON array
 }
 
@@ -72,6 +72,15 @@ func (s *ChannelStorage) ListEnabledChannels() ([]*Channel, error) {
 		return nil, fmt.Errorf("failed to list enabled channels: %w", result.Error)
 	}
 	return channels, nil
+}
+
+// Delete deletes a channel by ID.
+func (s *ChannelStorage) Delete(id string) error {
+	result := s.db.Where("id = ?", id).Delete(&Channel{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete channel: %w", result.Error)
+	}
+	return nil
 }
 
 // DeleteChannel deletes a channel by name.

@@ -129,6 +129,7 @@
             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
           >
             <option value="feishu">飞书</option>
+            <option value="dingtalk">钉钉</option>
             <option value="webhook">Webhook</option>
             <option value="telegram">Telegram</option>
           </select>
@@ -367,6 +368,86 @@
           </div>
         </template>
 
+        <!-- 钉钉配置 -->
+        <template v-else-if="channelForm.type === 'dingtalk'">
+          <div class="border-t border-border pt-4">
+            <div
+              class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4"
+            >
+              <div class="text-sm font-medium text-blue-400 mb-2">
+                📋 配置步骤
+              </div>
+              <ol
+                class="text-xs text-text-secondary space-y-1 list-decimal list-inside"
+              >
+                <li>
+                  前往
+                  <a
+                    href="https://open.dingtalk.com"
+                    target="_blank"
+                    class="text-accent hover:underline"
+                    >钉钉开放平台</a
+                  >
+                  创建企业内部应用
+                </li>
+                <li>在「应用信息」获取 Client ID 和 Client Secret</li>
+                <li>在「开发管理」配置消息接收地址</li>
+                <li>
+                  在「权限管理」开通所需权限（Contact.User.Read, Message.Robot.Send）
+                </li>
+              </ol>
+            </div>
+
+            <div class="text-sm font-medium mb-3 text-accent">基础配置</div>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-text-secondary mb-1">
+                  Client ID <span class="text-red-400">*</span>
+                </label>
+                <input
+                  v-model="channelForm.config.client_id"
+                  type="text"
+                  placeholder="dingxxxxxxxxxxxxxxx"
+                  class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
+                />
+                <p class="text-xs text-text-muted mt-1">
+                  钉钉应用 Client ID
+                </p>
+              </div>
+
+              <div>
+                <label class="block text-xs text-text-secondary mb-1">
+                  Client Secret <span class="text-red-400">*</span>
+                </label>
+                <input
+                  v-model="channelForm.config.client_secret"
+                  type="password"
+                  placeholder="应用密钥"
+                  class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
+                />
+                <p class="text-xs text-text-muted mt-1">
+                  在「应用信息」页面获取
+                </p>
+              </div>
+
+              <div>
+                <label class="block text-xs text-text-secondary mb-1">
+                  Agent ID <span class="text-text-muted">（可选）</span>
+                </label>
+                <input
+                  v-model.number="channelForm.config.agent_id"
+                  type="number"
+                  placeholder="应用 Agent ID"
+                  class="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm focus:outline-none focus:border-accent transition-colors"
+                />
+                <p class="text-xs text-text-muted mt-1">
+                  企业内部应用的 AgentId
+                </p>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <!-- Webhook 通用配置 -->
         <template v-else-if="channelForm.type === 'webhook'">
           <div class="border-t border-border pt-4">
@@ -519,12 +600,19 @@ const channelForm = reactive({
   config: {
     port: null,
     path: "",
+    // 飞书配置
     app_id: "",
     app_secret: "",
     verification_token: "",
     encrypt_key: "",
+    // 钉钉配置
+    client_id: "",
+    client_secret: "",
+    agent_id: null,
+    // Telegram 配置
     bot_token: "",
     webhook_url: "",
+    // 通用配置
     welcome_message: "",
     enable_group_events: true,
     enable_card_message: true,
@@ -559,60 +647,36 @@ async function copyWebhookUrl() {
 function getChannelTypeLabel(ch) {
   const typeMap = {
     feishu: "飞书",
+    dingtalk: "钉钉",
     webhook: "Webhook",
     telegram: "Telegram",
     websocket: "WebSocket",
   };
-  try {
-    const cfg =
-      typeof ch.config === "string"
-        ? JSON.parse(ch.config || "{}")
-        : ch.config || {};
-    const typeKey = cfg.type || ch.type || "webhook";
-    return typeMap[typeKey] || typeKey;
-  } catch {
-    return ch.type || "Webhook";
-  }
+  return typeMap[ch.type] || ch.type || "未知";
 }
 
 // 获取渠道图标
 function getChannelIcon(ch) {
   const iconMap = {
     feishu: FeishuIcon,
+    dingtalk: FeishuIcon,
     webhook: WebhookIcon,
     telegram: TelegramIcon,
     websocket: ConnectionIcon,
   };
-  try {
-    const cfg =
-      typeof ch.config === "string"
-        ? JSON.parse(ch.config || "{}")
-        : ch.config || {};
-    const typeKey = cfg.type || ch.type || "webhook";
-    return iconMap[typeKey] || ChannelIcon;
-  } catch {
-    return ChannelIcon;
-  }
+  return iconMap[ch.type] || ChannelIcon;
 }
 
 // 获取渠道图标背景色
 function getChannelIconBg(ch) {
   const bgMap = {
     feishu: "bg-blue-500/10",
+    dingtalk: "bg-blue-500/10",
     webhook: "bg-purple-500/10",
     telegram: "bg-sky-500/10",
     websocket: "bg-green-500/10",
   };
-  try {
-    const cfg =
-      typeof ch.config === "string"
-        ? JSON.parse(ch.config || "{}")
-        : ch.config || {};
-    const typeKey = cfg.type || ch.type || "webhook";
-    return bgMap[typeKey] || "bg-accent/10";
-  } catch {
-    return "bg-accent/10";
-  }
+  return bgMap[ch.type] || "bg-accent/10";
 }
 
 // 获取渠道端点信息
@@ -669,6 +733,13 @@ function validateChannelConfig() {
     if (!config.verification_token) {
       channelErrors.value.push("Verification Token 不能为空");
     }
+  } else if (type === "dingtalk") {
+    if (!config.client_id) {
+      channelErrors.value.push("Client ID 不能为空");
+    }
+    if (!config.client_secret) {
+      channelErrors.value.push("Client Secret 不能为空");
+    }
   } else if (type === "telegram") {
     if (!config.bot_token) {
       channelErrors.value.push("Bot Token 不能为空");
@@ -691,6 +762,7 @@ async function toggleChannelEnabled(ch) {
     await api.updateChannel({
       id: ch.id,
       name: ch.name,
+      type: ch.type,
       enabled: newEnabled,
       config: ch.config,
     });
@@ -720,12 +792,19 @@ function resetChannelForm() {
   channelForm.enabled = true;
   channelForm.config.port = null;
   channelForm.config.path = "";
+  // 飞书配置
   channelForm.config.app_id = "";
   channelForm.config.app_secret = "";
   channelForm.config.verification_token = "";
   channelForm.config.encrypt_key = "";
+  // 钉钉配置
+  channelForm.config.client_id = "";
+  channelForm.config.client_secret = "";
+  channelForm.config.agent_id = null;
+  // Telegram 配置
   channelForm.config.bot_token = "";
   channelForm.config.webhook_url = "";
+  // 通用配置
   channelForm.config.welcome_message = "";
   channelForm.config.enable_group_events = true;
   channelForm.config.enable_card_message = true;
@@ -741,6 +820,7 @@ function openAddChannel() {
 function openEditChannel(ch) {
   editingChannel.value = ch;
   channelForm.name = ch.name;
+  channelForm.type = ch.type || "feishu";
   channelForm.enabled = ch.enabled;
   channelErrors.value = [];
   try {
@@ -748,21 +828,28 @@ function openEditChannel(ch) {
       typeof ch.config === "string"
         ? JSON.parse(ch.config || "{}")
         : ch.config || {};
-    channelForm.type = cfg.type || ch.type || "feishu";
     channelForm.config.port = cfg.port || null;
     channelForm.config.path = cfg.path || "";
+    // 飞书配置
     channelForm.config.app_id = cfg.app_id || "";
     channelForm.config.app_secret = cfg.app_secret || "";
     channelForm.config.verification_token = cfg.verification_token || "";
     channelForm.config.encrypt_key = cfg.encrypt_key || "";
+    // 钉钉配置
+    channelForm.config.client_id = cfg.client_id || "";
+    channelForm.config.client_secret = cfg.client_secret || "";
+    channelForm.config.agent_id = cfg.agent_id || null;
+    // Telegram 配置
     channelForm.config.bot_token = cfg.bot_token || "";
     channelForm.config.webhook_url = cfg.webhook_url || "";
+    // 通用配置
     channelForm.config.welcome_message = cfg.welcome_message || "";
     channelForm.config.enable_group_events = cfg.enable_group_events !== false;
     channelForm.config.enable_card_message = cfg.enable_card_message !== false;
   } catch {
     resetChannelForm();
     channelForm.name = ch.name;
+    channelForm.type = ch.type || "feishu";
     channelForm.enabled = ch.enabled;
   }
   showChannelDialog.value = true;
@@ -783,9 +870,10 @@ async function handleSaveChannel() {
 
   savingChannel.value = true;
   const data = {
-    name: channelForm.name,
+    name: channelForm.name.trim(),
+    type: channelForm.type,
     enabled: channelForm.enabled,
-    config: JSON.stringify({ type: channelForm.type, ...channelForm.config }),
+    config: JSON.stringify(channelForm.config),
   };
   try {
     if (editingChannel.value) {

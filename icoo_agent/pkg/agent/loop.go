@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -340,7 +341,12 @@ func (l *Loop) runLLMIteration(
 		resp, err := provider.Chat(ctx, req)
 		if err != nil {
 			l.logger.With("name", "【智能体】").Error("LLM请求失败", "error", err, "iteration", iteration)
-			return "", iteration, fmt.Errorf("LLM请求失败: %w", err)
+			// Provide user-friendly error message
+			errMsg := fmt.Sprintf("LLM请求失败: %v", err)
+			if errors.Is(err, context.DeadlineExceeded) {
+				errMsg = "请求超时，AI服务响应时间过长，请稍后重试"
+			}
+			return "", iteration, fmt.Errorf("%s", errMsg)
 		}
 
 		// Handle tool calls

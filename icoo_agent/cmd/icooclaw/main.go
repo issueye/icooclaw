@@ -16,6 +16,7 @@ import (
 
 	"icooclaw/pkg/agent"
 	"icooclaw/pkg/bus"
+	"icooclaw/pkg/channels"
 	"icooclaw/pkg/config"
 	"icooclaw/pkg/consts"
 	"icooclaw/pkg/gateway"
@@ -24,6 +25,10 @@ import (
 	"icooclaw/pkg/providers"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
+
+	// Import channel implementations to register their factories
+	_ "icooclaw/pkg/channels/feishu"
+	_ "icooclaw/pkg/channels/dingtalk"
 )
 
 var (
@@ -260,6 +265,16 @@ func runGateway(cmd *cobra.Command, args []string) {
 	// 初始化代理注册表
 	agentRegistry := agent.NewAgentRegistry(slog.Default())
 
+	// 设置上下文取消
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 初始化渠道管理器
+	channelManager := channels.NewManager(messageBus, store, slog.Default())
+	if err := channelManager.InitChannels(ctx); err != nil {
+		slog.Warn("初始化渠道失败", "error", err)
+	}
+
 	// 创建网关服务器配置
 	serverCfg := gateway.DefaultServerConfig()
 	if cfg.Gateway.Port > 0 {
@@ -275,10 +290,6 @@ func runGateway(cmd *cobra.Command, args []string) {
 		WithAgentRegistry(agentRegistry).
 		Setup()
 
-	// 设置上下文取消
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// 处理关闭信号
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -287,9 +298,14 @@ func runGateway(cmd *cobra.Command, args []string) {
 		<-sigChan
 		slog.Info("正在关闭网关服务...")
 
-		// 关闭网关服务器
+		// 关闭渠道管理器
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
+		if err := channelManager.StopAll(shutdownCtx); err != nil {
+			slog.Error("关闭渠道管理器失败", "error", err)
+		}
+
+		// 关闭网关服务器
 		if err := gw.Shutdown(shutdownCtx); err != nil {
 			slog.Error("网关服务关闭失败", "error", err)
 		}
@@ -301,6 +317,13 @@ func runGateway(cmd *cobra.Command, args []string) {
 	go func() {
 		if err := agentLoop.Run(ctx); err != nil && err != context.Canceled {
 			slog.Error("代理循环错误", "error", err)
+		}
+	}()
+
+	// 启动渠道管理器
+	go func() {
+		if err := channelManager.StartAll(ctx); err != nil {
+			slog.Error("渠道管理器错误", "error", err)
 		}
 	}()
 

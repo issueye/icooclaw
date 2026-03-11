@@ -174,8 +174,8 @@ func (s *Server) setupMiddleware() {
 	// Recoverer
 	s.router.Use(middleware.Recoverer)
 
-	// Timeout
-	s.router.Use(middleware.Timeout(60 * time.Second))
+	// Timeout - increased for long LLM responses
+	s.router.Use(middleware.Timeout(300 * time.Second))
 
 	// CORS
 	s.router.Use(corsMiddleware)

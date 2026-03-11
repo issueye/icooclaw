@@ -10,14 +10,11 @@ import (
 )
 
 func init() {
-	channels.RegisterFactory(consts.FEISHU, func(config map[string]any) (channels.Channel, error) {
+	channels.RegisterFactory(consts.FEISHU, func(config map[string]any, bus *bus.MessageBus, logger *slog.Logger) (channels.Channel, error) {
 		cfg, err := parseConfig(config)
 		if err != nil {
 			return nil, err
 		}
-
-		bus := bus.NewMessageBus(bus.DefaultConfig())
-		logger := slog.Default().With("channel", "feishu")
 
 		return New(cfg, bus, logger)
 	})

@@ -3,6 +3,7 @@ package channels
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"math"
@@ -69,13 +70,14 @@ func (m *Manager) InitChannels(ctx context.Context) error {
 			continue
 		}
 
-		channel, err := factory(parseConfig(ch.Config))
+		channel, err := factory(parseConfig(ch.Config), m.bus, m.logger.With("channel", ch.Name))
 		if err != nil {
-			m.logger.With("name", "【通道管理器】").Error("创建通道失败", err)
+			m.logger.With("name", "【通道管理器】").Error("创建通道失败", "error", err, "type", ch.Type, "name", ch.Name)
 			continue
 		}
 
 		m.channels[ch.Name] = channel
+		m.logger.With("name", "【通道管理器】").Info("通道创建成功", "type", ch.Type, "name", ch.Name)
 	}
 
 	return nil
@@ -438,7 +440,15 @@ func newChannelWorker(name string, channel Channel) *channelWorker {
 }
 
 func parseConfig(configStr string) map[string]any {
-	// Simple JSON config parsing
-	// In production, use proper JSON unmarshaling
-	return make(map[string]any)
+	result := make(map[string]any)
+	if configStr == "" {
+		return result
+	}
+
+	// Parse JSON config string
+	if err := json.Unmarshal([]byte(configStr), &result); err != nil {
+		// Log error but return empty map
+		return make(map[string]any)
+	}
+	return result
 }

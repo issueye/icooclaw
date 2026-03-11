@@ -2,11 +2,14 @@
 package channels
 
 import (
+	"log/slog"
 	"sync"
+
+	"icooclaw/pkg/bus"
 )
 
 // Factory creates Channel instances.
-type Factory func(config map[string]any) (Channel, error)
+type Factory func(config map[string]any, bus *bus.MessageBus, logger *slog.Logger) (Channel, error)
 
 var (
 	factoriesMu sync.RWMutex

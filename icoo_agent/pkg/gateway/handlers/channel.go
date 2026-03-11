@@ -91,7 +91,7 @@ func (h *ChannelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.Channel().DeleteChannel(id)
+	err = h.storage.Channel().Delete(id)
 	if err != nil {
 		h.logger.Error("删除通道配置失败", "error", err)
 		http.Error(w, "删除通道配置失败", http.StatusInternalServerError)

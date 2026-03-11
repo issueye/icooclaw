@@ -32,7 +32,7 @@ func NewBaseProvider(name, apiKey, apiBase, defaultModel string) *BaseProvider {
 		apiBase:      apiBase,
 		defaultModel: defaultModel,
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout: 300 * time.Second, // 5 minutes for long LLM responses
 		},
 	}
 }
