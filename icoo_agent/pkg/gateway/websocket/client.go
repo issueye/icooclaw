@@ -213,25 +213,22 @@ func (c *Client) handleMessage(ctx context.Context, messageType int, message []b
 		msg.Timestamp = time.Now().Unix()
 	}
 
-	// Use client's session ID if not provided in message
-	if msg.SessionID == "" {
-		msg.SessionID = c.sessionID
-	}
-
-	// Validate message
-	if msg.Content == "" {
-		c.SendError("消息内容不能为空")
-		return
-	}
-
-	if msg.SessionID == "" {
-		c.SendError("会话ID不能为空")
-		return
-	}
-
 	// Process message based on type
 	switch msg.Type {
 	case "chat", "":
+		// Validate message
+		if msg.Content == "" {
+			c.SendError("消息内容不能为空")
+			return
+		}
+		if msg.SessionID == "" {
+			msg.SessionID = c.sessionID
+		}
+		if msg.SessionID == "" {
+			c.SendError("会话ID不能为空")
+			return
+		}
+
 		if c.manager == nil {
 			c.SendError("manager not configured")
 			return
@@ -243,6 +240,10 @@ func (c *Client) handleMessage(ctx context.Context, messageType int, message []b
 			go c.manager.ProcessMessage(ctx, c, &msg)
 		}
 
+	case "create_session":
+		// Handle create_session message from frontend
+		c.handleCreateSession(ctx, message)
+
 	case "ping":
 		c.SendJSON(map[string]interface{}{
 			"type":      "pong",
@@ -253,6 +254,46 @@ func (c *Client) handleMessage(ctx context.Context, messageType int, message []b
 		c.logger.Warn("unknown message type", "type", msg.Type, "client_id", c.ID)
 		c.SendError("unknown message type: " + msg.Type)
 	}
+}
+
+// handleCreateSession handles the create_session message type.
+func (c *Client) handleCreateSession(ctx context.Context, message []byte) {
+	var req struct {
+		Data struct {
+			SessionID string `json:"session_id"`
+			Channel   string `json:"channel"`
+			UserID    string `json:"user_id"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(message, &req); err != nil {
+		c.logger.With("name", "【WebSocket】").Error("解析创建会话请求失败", "error", err, "client_id", c.ID)
+		c.SendError("创建会话请求格式错误")
+		return
+	}
+
+	// Use provided session_id or generate a new one
+	sessionID := req.Data.SessionID
+	if sessionID == "" {
+		sessionID = c.sessionID
+	}
+	if sessionID == "" {
+		sessionID = c.ID // Use client ID as fallback
+	}
+
+	// Update client's session ID
+	c.sessionID = sessionID
+
+	// Send session_created response
+	c.SendJSON(map[string]interface{}{
+		"type": "session_created",
+		"data": map[string]interface{}{
+			"session_id": sessionID,
+		},
+		"timestamp": time.Now().Unix(),
+	})
+
+	c.logger.With("name", "【WebSocket】").Info("会话创建成功", "session_id", sessionID, "client_id", c.ID)
 }
 
 // Send queues a message to be sent to the client.

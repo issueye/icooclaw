@@ -3,7 +3,6 @@ package websocket
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -269,6 +268,15 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 		"session_id", msg.SessionID,
 		"content_length", len(msg.Content))
 
+	// Helper function to send error response
+	sendErrorResponse := func(errMsg string) {
+		client.SendJSON(map[string]interface{}{
+			"type":      "error",
+			"error":     map[string]string{"message": errMsg},
+			"timestamp": time.Now().Unix(),
+		})
+	}
+
 	// If we have an agent loop, process the message
 	if m.agentLoop != nil {
 		// Process directly and get response
@@ -280,23 +288,28 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 			msg.SessionID,
 		)
 		if err != nil {
+			m.logger.With("name", "【网关服务】").Error("处理消息失败",
+				"error", err,
+				"client_id", client.ID,
+				"session_id", msg.SessionID)
+			sendErrorResponse("处理消息失败: " + err.Error())
 			return err
 		}
 
-		// Send response back to client
-		resp := &ChatResponse{
-			Type:      "response",
-			SessionID: msg.SessionID,
-			Content:   response,
-			Timestamp: time.Now().Unix(),
-		}
+		// Send chunk message (matching frontend expected format)
+		client.SendJSON(map[string]interface{}{
+			"type": "chunk",
+			"data": map[string]string{
+				"content": response,
+			},
+			"timestamp": time.Now().Unix(),
+		})
 
-		data, err := json.Marshal(resp)
-		if err != nil {
-			return err
-		}
-
-		client.Send(data)
+		// Send end message
+		client.SendJSON(map[string]interface{}{
+			"type":      "end",
+			"timestamp": time.Now().Unix(),
+		})
 		return nil
 	}
 
@@ -310,9 +323,28 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 			Timestamp: time.Now(),
 		}
 
-		return m.bus.PublishInbound(ctx, inbound)
+		if err := m.bus.PublishInbound(ctx, inbound); err != nil {
+			m.logger.With("name", "【网关服务】").Error("发布消息失败",
+				"error", err,
+				"client_id", client.ID,
+				"session_id", msg.SessionID)
+			sendErrorResponse("发布消息失败: " + err.Error())
+			return err
+		}
+
+		// Send acknowledgment response
+		client.SendJSON(map[string]interface{}{
+			"type": "chunk",
+			"data": map[string]string{
+				"content": "消息已接收，正在处理中",
+			},
+			"timestamp": time.Now().Unix(),
+		})
+		return nil
 	}
 
+	// No agent loop or bus configured
+	sendErrorResponse("服务未配置：缺少智能体或消息总线")
 	return nil
 }
 
@@ -322,29 +354,29 @@ func (m *Manager) ProcessStreamMessage(ctx context.Context, client *Client, msg 
 		"client_id", client.ID,
 		"session_id", msg.SessionID)
 
-	// Send start event
-	client.SendJSON(&StreamEvent{
-		Type:      "stream_start",
-		SessionID: msg.SessionID,
-	})
+	// Helper function to send stream error event
+	sendStreamError := func(errMsg string) {
+		client.SendJSON(map[string]interface{}{
+			"type":      "error",
+			"error":     map[string]string{"message": errMsg},
+			"timestamp": time.Now().Unix(),
+		})
+	}
+
+	// Check if agent loop is available
+	if m.agentLoop == nil && m.bus == nil {
+		sendStreamError("服务未配置：缺少智能体或消息总线")
+		return nil
+	}
 
 	// For now, use the same logic as ProcessMessage
 	// In a real implementation, this would use streaming LLM responses
 	err := m.ProcessMessage(ctx, client, msg)
 	if err != nil {
-		// Send error event
-		client.SendJSON(&StreamEvent{
-			Type:  "stream_error",
-			Error: err.Error(),
-		})
+		// Send error event (ProcessMessage already sent error response, but we also send error for consistency)
+		sendStreamError("处理消息失败: " + err.Error())
 		return err
 	}
-
-	// Send end event
-	client.SendJSON(&StreamEvent{
-		Type:      "stream_end",
-		SessionID: msg.SessionID,
-	})
 
 	return nil
 }

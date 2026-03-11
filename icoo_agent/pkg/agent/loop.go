@@ -302,6 +302,19 @@ func (l *Loop) runLLMIteration(
 	messages []providers.ChatMessage,
 	msg bus.InboundMessage,
 ) (string, int, error) {
+	// Check if provider is configured
+	if l.provider == nil && l.fallbackChain == nil {
+		l.logger.With("name", "【智能体】").Error("未配置AI提供商")
+		return "", 0, fmt.Errorf("未配置AI提供商，请在设置中配置默认模型")
+	}
+
+	// Get the provider to use
+	provider := l.GetDefaultProvider()
+	if provider == nil {
+		l.logger.With("name", "【智能体】").Error("无法获取有效的AI提供商")
+		return "", 0, fmt.Errorf("无法获取有效的AI提供商")
+	}
+
 	iteration := 0
 	currentMessages := messages
 
@@ -310,7 +323,7 @@ func (l *Loop) runLLMIteration(
 
 		// Build request
 		req := providers.ChatRequest{
-			Model:    l.provider.GetDefaultModel(),
+			Model:    provider.GetDefaultModel(),
 			Messages: currentMessages,
 		}
 
@@ -324,7 +337,7 @@ func (l *Loop) runLLMIteration(
 			"message_count", len(currentMessages))
 
 		// Send to provider
-		resp, err := l.provider.Chat(ctx, req)
+		resp, err := provider.Chat(ctx, req)
 		if err != nil {
 			l.logger.With("name", "【智能体】").Error("LLM请求失败", "error", err, "iteration", iteration)
 			return "", iteration, fmt.Errorf("LLM请求失败: %w", err)

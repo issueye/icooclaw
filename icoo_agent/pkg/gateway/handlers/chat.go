@@ -249,7 +249,7 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 			req.SessionID,
 		)
 		if err != nil {
-			h.writeSSE(w, "error", map[string]string{"error": err.Error()})
+			h.writeSSE(w, "error", map[string]string{"error": "处理消息失败: " + err.Error()})
 			flusher.Flush()
 			return
 		}
@@ -259,6 +259,10 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 			"session_id": req.SessionID,
 			"content":    response,
 		})
+		flusher.Flush()
+	} else {
+		// No agent loop configured
+		h.writeSSE(w, "error", map[string]string{"error": "服务未配置：缺少智能体"})
 		flusher.Flush()
 	}
 
