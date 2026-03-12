@@ -1,4 +1,4 @@
-package builtin
+package web
 
 import (
 	"context"
@@ -41,10 +41,12 @@ func (t *HTTPTool) Parameters() map[string]any {
 		"url": map[string]any{
 			"type":        "string",
 			"description": "请求的 URL",
+			"required":    true,
 		},
 		"method": map[string]any{
 			"type":        "string",
 			"description": "HTTP 方法 (GET, POST, PUT, DELETE)",
+			"required":    true,
 		},
 		"headers": map[string]any{
 			"type":        "object",
@@ -120,4 +122,14 @@ func (t *HTTPTool) Execute(ctx context.Context, args map[string]any) *tools.Resu
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return &tools.Result{Success: true, Content: string(resultJSON)}
+}
+
+func flattenHeaders(headers http.Header) map[string]string {
+	result := make(map[string]string)
+	for key, values := range headers {
+		if len(values) > 0 {
+			result[key] = values[0]
+		}
+	}
+	return result
 }

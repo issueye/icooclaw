@@ -435,6 +435,10 @@ func (l *Loop) runLLMIteration(
 			return "", iteration, fmt.Errorf("%s", errMsg)
 		}
 
+		l.logger.With("name", "【智能体】").Debug("LLM响应已接收",
+			slog.Any("response", resp),
+		)
+
 		// Handle tool calls
 		if len(resp.ToolCalls) > 0 {
 			l.logger.With("name", "【智能体】").Info("正在处理工具调用",
@@ -489,10 +493,14 @@ func (l *Loop) executeToolCall(
 	msg bus.InboundMessage,
 ) (string, error) {
 	toolName := tc.Function.Name
-	l.logger.With("name", "【智能体】").Info("正在执行工具",
-		"tool", toolName,
-		"channel", msg.Channel,
-		"session_id", msg.SessionID)
+	l.logger.With("name", "【智能体】").
+		Info(
+			"正在执行工具",
+			slog.Any("tool", toolName),
+			slog.Any("channel", msg.Channel),
+			slog.String("session_id", msg.SessionID),
+			slog.String("arguments", tc.Function.Arguments),
+		)
 
 	// Parse arguments
 	var args map[string]any
@@ -725,6 +733,13 @@ func (l *Loop) runLLMIterationStream(
 			// Collect content
 			collectedContent += chunk
 			collectedReasoning += reasoning
+
+			l.logger.With("name", "【智能体】").Debug("LLM流式响应已接收",
+				slog.String("content", chunk),
+				slog.String("reasoning", reasoning),
+				slog.Any("tool_calls", toolCalls),
+				"iteration", iteration,
+			)
 
 			// Collect tool calls
 			if len(toolCalls) > 0 {

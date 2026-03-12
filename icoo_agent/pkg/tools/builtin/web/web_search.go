@@ -1,4 +1,4 @@
-package builtin
+package web
 
 import (
 	"context"
@@ -42,6 +42,7 @@ func (t *WebSearchTool) Parameters() map[string]any {
 		"query": map[string]any{
 			"type":        "string",
 			"description": "搜索查询",
+			"required":    true,
 		},
 		"max_results": map[string]any{
 			"type":        "integer",
