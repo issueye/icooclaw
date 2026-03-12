@@ -293,6 +293,7 @@ func (t *Tool) createTask(args map[string]any) *tools.Result {
 			Description: task.Description,
 			Enabled:     task.Enabled,
 			Handler: func(ctx context.Context) error {
+				t.logger.Info("执行任务", "task_id", task.ID, "task_name", task.Name)
 				// 发送一条 outbound 消息
 				msg := bus.InboundMessage{
 					Channel:   consts.WEBSOCKET,
