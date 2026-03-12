@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	icooclawErrors "icooclaw/pkg/errors"
 )
@@ -31,10 +32,18 @@ func NewSkillStorage(db *gorm.DB) *SkillStorage {
 	return &SkillStorage{db: db}
 }
 
-// SaveSkill saves a skill configuration.
+// SaveSkill saves a skill configuration (creates or updates based on name).
 func (s *SkillStorage) SaveSkill(sk *Skill) error {
-	result := s.db.Create(sk)
-	return result.Error
+	return s.db.Table(sk.TableName()).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "name"}},
+		DoUpdates: clause.AssignmentColumns([]string{"description", "enabled", "version", "path", "updated_at"}),
+	}).Create(map[string]interface{}{
+		"name":        sk.Name,
+		"description": sk.Description,
+		"enabled":     sk.Enabled,
+		"version":     sk.Version,
+		"path":        sk.Path,
+	}).Error
 }
 
 // GetSkill gets a skill by name.

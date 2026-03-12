@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"icooclaw/pkg/storage"
-	"icooclaw/pkg/tools"
 )
 
 // Skill represents a skill that can be activated.
@@ -17,6 +17,15 @@ type Skill struct {
 	Description string
 	Path        string // 技能路径 默认 workspace/.skills/<name>-<version>/
 }
+
+// cacheEntry represents a cached skill with expiration time.
+type cacheEntry struct {
+	skill     *Skill
+	expiresAt time.Time
+}
+
+// Default cache TTL (5 minutes)
+const defaultCacheTTL = 5 * time.Minute
 
 // Loader loads skills from storage.
 type Loader interface {
@@ -29,7 +38,8 @@ type DefaultLoader struct {
 	storage *storage.Storage
 	logger  *slog.Logger
 	mu      sync.RWMutex
-	cache   map[string]*Skill
+	cache   map[string]*cacheEntry
+	cacheTTL time.Duration
 }
 
 // NewLoader creates a new skill loader.
@@ -38,21 +48,46 @@ func NewLoader(s *storage.Storage, logger *slog.Logger) *DefaultLoader {
 		logger = slog.Default()
 	}
 	return &DefaultLoader{
-		storage: s,
-		logger:  logger,
-		cache:   make(map[string]*Skill),
+		storage:  s,
+		logger:   logger,
+		cache:    make(map[string]*cacheEntry),
+		cacheTTL: defaultCacheTTL,
 	}
+}
+
+// NewLoaderWithTTL creates a new skill loader with custom cache TTL.
+func NewLoaderWithTTL(s *storage.Storage, logger *slog.Logger, ttl time.Duration) *DefaultLoader {
+	l := NewLoader(s, logger)
+	l.cacheTTL = ttl
+	return l
 }
 
 // Load loads a skill by name.
 func (l *DefaultLoader) Load(ctx context.Context, name string) (*Skill, error) {
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	// Check cache first
 	l.mu.RLock()
-	if sk, ok := l.cache[name]; ok {
-		l.mu.RUnlock()
-		return sk, nil
+	if entry, ok := l.cache[name]; ok {
+		if time.Now().Before(entry.expiresAt) {
+			l.mu.RUnlock()
+			return entry.skill, nil
+		}
+		// Cache entry expired, will be refreshed below
 	}
 	l.mu.RUnlock()
+
+	// Check context again before storage operation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
 	// Load from storage
 	sk, err := l.storage.Skill().GetSkill(name)
@@ -67,9 +102,12 @@ func (l *DefaultLoader) Load(ctx context.Context, name string) (*Skill, error) {
 		Path:        sk.Path,
 	}
 
-	// Cache it
+	// Cache it with expiration
 	l.mu.Lock()
-	l.cache[name] = skill
+	l.cache[name] = &cacheEntry{
+		skill:     skill,
+		expiresAt: time.Now().Add(l.cacheTTL),
+	}
 	l.mu.Unlock()
 
 	return skill, nil
@@ -77,6 +115,13 @@ func (l *DefaultLoader) Load(ctx context.Context, name string) (*Skill, error) {
 
 // List lists all skills.
 func (l *DefaultLoader) List(ctx context.Context) ([]*Skill, error) {
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	skills, err := l.storage.Skill().ListEnabledSkills()
 	if err != nil {
 		return nil, err
@@ -101,49 +146,34 @@ func (l *DefaultLoader) Refresh() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.cache = make(map[string]*Skill)
+	l.cache = make(map[string]*cacheEntry)
 	return nil
 }
 
-// Executor executes skills.
-type Executor struct {
-	loader Loader
-	tools  *tools.Registry
-	logger *slog.Logger
-}
-
-// NewExecutor creates a new skill executor.
-func NewExecutor(loader Loader, registry *tools.Registry, logger *slog.Logger) *Executor {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Executor{
-		loader: loader,
-		tools:  registry,
-		logger: logger,
-	}
+// SetCacheTTL updates the cache TTL.
+func (l *DefaultLoader) SetCacheTTL(ttl time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.cacheTTL = ttl
 }
 
 // Manager manages skill registration and execution.
 type Manager struct {
-	loader   Loader
-	executor *Executor
-	storage  *storage.Storage
-	logger   *slog.Logger
-	mu       sync.RWMutex
+	loader  Loader
+	storage *storage.Storage
+	logger  *slog.Logger
+	mu      sync.RWMutex
 }
 
 // NewManager creates a new skill manager.
-func NewManager(s *storage.Storage, registry *tools.Registry, logger *slog.Logger) *Manager {
+func NewManager(s *storage.Storage, logger *slog.Logger) *Manager {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	loader := NewLoader(s, logger)
 	return &Manager{
-		loader:   loader,
-		executor: NewExecutor(loader, registry, logger),
-		storage:  s,
-		logger:   logger,
+		loader:  NewLoader(s, logger),
+		storage: s,
+		logger:  logger,
 	}
 }
 
@@ -159,7 +189,6 @@ func (m *Manager) ListSkills(ctx context.Context) ([]*Skill, error) {
 
 // CreateSkill creates a new skill.
 func (m *Manager) CreateSkill(skill *Skill) error {
-
 	return m.storage.Skill().SaveSkill(&storage.Skill{
 		Name:        skill.Name,
 		Description: skill.Description,
