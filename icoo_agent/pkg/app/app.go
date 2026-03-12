@@ -15,6 +15,7 @@ import (
 	"icooclaw/pkg/scheduler"
 	schedulerTool "icooclaw/pkg/scheduler/tool"
 	"icooclaw/pkg/skill"
+	skillTool "icooclaw/pkg/skill/tool"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
 	"icooclaw/pkg/tools/builtin"
@@ -64,8 +65,12 @@ func (a *App) InitTool() {
 	builtin.RegisterBuiltinTools(a.ToolRegistry)
 
 	// 注册定时任务
-	schedulerTool := schedulerTool.NewTool(a.Storage.Task(), a.Scheduler, a.Logger)
-	a.ToolRegistry.Register(schedulerTool)
+	schedulerTl := schedulerTool.NewTool(a.Storage.Task(), a.Scheduler, a.MessageBus, a.Logger)
+	a.ToolRegistry.Register(schedulerTl)
+
+	// 注册技能工具
+	skilltl := skillTool.NewInstallTool(a.Cfg.Agent.Workspace, a.Storage.Skill())
+	a.ToolRegistry.Register(skilltl)
 }
 
 // InitProvider 初始化提供商工厂

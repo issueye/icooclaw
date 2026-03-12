@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"time"
 
+	"icooclaw/pkg/bus"
+	"icooclaw/pkg/channels/consts"
 	"icooclaw/pkg/scheduler"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
@@ -18,10 +20,11 @@ type Tool struct {
 	scheduler *scheduler.Scheduler
 	store     *storage.TaskStorage
 	logger    *slog.Logger
+	bus       *bus.MessageBus
 }
 
 // NewTool creates a new scheduler tool.
-func NewTool(store *storage.TaskStorage, scheduler *scheduler.Scheduler, logger *slog.Logger) *Tool {
+func NewTool(store *storage.TaskStorage, scheduler *scheduler.Scheduler, bus *bus.MessageBus, logger *slog.Logger) *Tool {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -29,6 +32,7 @@ func NewTool(store *storage.TaskStorage, scheduler *scheduler.Scheduler, logger 
 		store:     store,
 		scheduler: scheduler,
 		logger:    logger,
+		bus:       bus,
 	}
 }
 
@@ -288,6 +292,21 @@ func (t *Tool) createTask(args map[string]any) *tools.Result {
 			Schedule:    task.CronExpr,
 			Description: task.Description,
 			Enabled:     task.Enabled,
+			Handler: func(ctx context.Context) error {
+				// 发送一条 outbound 消息
+				msg := bus.InboundMessage{
+					Channel:   consts.WEBSOCKET,
+					SessionID: "",
+					Text:      task.Description,
+					Timestamp: time.Now(),
+					Metadata: map[string]any{
+						"task_id":   task.ID,
+						"task_name": task.Name,
+					},
+				}
+				t.bus.PublishInbound(context.Background(), msg)
+				return nil
+			},
 		}
 		if err := t.scheduler.AddTask(schedTask); err != nil {
 			t.logger.Warn("添加任务到调度器失败", "task_id", task.ID, "error", err)
