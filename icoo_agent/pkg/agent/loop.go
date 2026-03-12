@@ -850,49 +850,77 @@ func (l *Loop) runLLMIterationStream(
 
 // mergeToolCalls 合并流式响应中的工具调用。
 // 在流式响应中，工具调用分块传输，使用 index 作为标识符（存储在 ID 中为 "stream_index:N"）。
-// 此函数按流式 ID 合并它们，并在需要时生成正确的 ID。
+// 此函数按 index 合并它们，并在需要时生成正确的 ID。
 func (l *Loop) mergeToolCalls(toolCalls []providers.ToolCall) []providers.ToolCall {
 	if len(toolCalls) == 0 {
 		return nil
 	}
 
-	// Merge by ID (which contains stream_index or real ID)
-	merged := make(map[string]*providers.ToolCall)
+	// 按 index 分组
+	// indexToCall 存储每个 index 对应的合并后工具调用
+	indexToCall := make(map[int]*providers.ToolCall)
+	// realIDToIndex 记录真实 ID 对应的 index（用于关联）
+	realIDToIndex := make(map[string]int)
+	// nextIndex 用于给没有 index 的工具调用分配临时 index
+	nextIndex := 0
+
 	for _, tc := range toolCalls {
-		key := tc.ID
-		if key == "" {
+		var idx int
+		var found bool
+
+		if isStreamIndexID(tc.ID) {
+			// 从 "stream_index:N" 提取 index
+			fmt.Sscanf(tc.ID, "stream_index:%d", &idx)
+			found = true
+		} else if tc.ID != "" {
+			// 检查是否已经记录过这个真实 ID
+			if i, ok := realIDToIndex[tc.ID]; ok {
+				idx = i
+				found = true
+			} else {
+				// 新的真实 ID，分配一个新的 index
+				idx = nextIndex
+				nextIndex++
+				realIDToIndex[tc.ID] = idx
+				found = true
+			}
+		}
+
+		if !found {
 			continue
 		}
 
-		if existing, ok := merged[key]; ok {
-			// Merge pieces
+		if existing, ok := indexToCall[idx]; ok {
+			// 合并内容
 			if tc.Function.Name != "" {
 				existing.Function.Name = tc.Function.Name
 			}
+			if tc.Function.Arguments != "" {
+				existing.Function.Arguments += tc.Function.Arguments
+			}
+			// 记录真实 ID
 			if tc.ID != "" && !isStreamIndexID(tc.ID) {
-				// Real ID, update it
 				existing.ID = tc.ID
 			}
-			existing.Function.Arguments += tc.Function.Arguments
 		} else {
-			// Create new entry
+			// 创建新条目
 			copy := tc
-			merged[key] = &copy
+			indexToCall[idx] = &copy
 		}
 	}
 
-	// Convert to result and fix IDs
-	result := make([]providers.ToolCall, 0, len(merged))
-	for _, tc := range merged {
-		// Skip tool calls without a name (invalid/incomplete)
+	// 转换为结果
+	result := make([]providers.ToolCall, 0, len(indexToCall))
+	for _, tc := range indexToCall {
+		// 跳过没有名称的工具调用
 		if tc.Function.Name == "" {
 			l.logger.Warn("跳过无效工具调用：缺少工具名称", "id", tc.ID)
 			continue
 		}
 
-		// Generate a proper ID if it's still a stream index ID
+		// 生成 ID（如果还是 stream_index ID 或为空）
 		id := tc.ID
-		if isStreamIndexID(id) {
+		if isStreamIndexID(id) || id == "" {
 			id = fmt.Sprintf("call_%s_%d", tc.Function.Name, time.Now().UnixNano())
 		}
 
