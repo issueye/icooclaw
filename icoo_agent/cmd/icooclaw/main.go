@@ -182,6 +182,7 @@ func runStart(cmd *cobra.Command, args []string) {
 	slog.Info("代理已停止")
 }
 
+// runGateway 启动网关服务
 func runGateway(cmd *cobra.Command, args []string) {
 	// 创建应用实例
 	app := NewApp()
@@ -189,8 +190,8 @@ func runGateway(cmd *cobra.Command, args []string) {
 	defer app.Close()
 	// 初始化
 	app.Init()
-	// 运行
-	app.Run()
+	// 运行网关服务
+	app.RunGateway()
 
 	slog.Info("网关服务已停止")
 }

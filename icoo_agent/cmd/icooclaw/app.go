@@ -127,6 +127,9 @@ func (a *App) InitConfig() {
 		slog.Error("创建数据库目录失败", "error", err)
 		os.Exit(1)
 	}
+
+	// 设置配置实例
+	a.Cfg = cfg
 }
 
 func (a *App) InitLog() {
@@ -215,18 +218,23 @@ func (a *App) Init() {
 	a.InitChannel()
 	// 初始化代理
 	a.InitAgent()
+	// 初始化网关服务器
+	a.InitGateway()
 }
 
-func (a *App) Run() {
+// RunGateway 运行网关服务
+func (a *App) RunGateway() {
 	// 启动渠道管理器
 	go func() {
-		if err := a.ChannelManager.StartAll(a.Ctx); err != nil {
+		err := a.ChannelManager.StartAll(a.Ctx)
+		if err != nil {
 			slog.Error("渠道管理器错误", "error", err)
 		}
 	}()
 
 	// 启动网关服务器
-	if err := a.Gw.Start(); err != nil && err != http.ErrServerClosed {
+	err := a.Gw.Start()
+	if err != nil && err != http.ErrServerClosed {
 		slog.Error("网关服务错误", "error", err)
 		os.Exit(1)
 	}
@@ -242,12 +250,14 @@ func (a *App) Run() {
 		// 关闭渠道管理器
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
-		if err := a.ChannelManager.StopAll(shutdownCtx); err != nil {
+		err := a.ChannelManager.StopAll(shutdownCtx)
+		if err != nil {
 			slog.Error("关闭渠道管理器失败", "error", err)
 		}
 
 		// 关闭网关服务器
-		if err := a.Gw.Shutdown(shutdownCtx); err != nil {
+		err = a.Gw.Shutdown(shutdownCtx)
+		if err != nil {
 			slog.Error("网关服务关闭失败", "error", err)
 		}
 
@@ -265,8 +275,12 @@ func (a *App) Run() {
 
 func (a *App) Close() {
 	// 取消上下文
-	a.Cancel()
+	if a.Cancel != nil {
+		a.Cancel()
+	}
 
 	// 关闭存储
-	a.Storage.Close()
+	if a.Storage != nil {
+		a.Storage.Close()
+	}
 }
