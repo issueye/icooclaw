@@ -25,6 +25,17 @@ const (
 	defaultResponse          = "处理完成，但没有响应内容。"
 )
 
+// StreamChunk represents a chunk of streaming response.
+type StreamChunk struct {
+	Content   string `json:"content"`
+	Reasoning string `json:"reasoning,omitempty"`
+	Done      bool   `json:"done"`
+	Error     error  `json:"error,omitempty"`
+}
+
+// StreamCallback is called for each chunk in a streaming response.
+type StreamCallback func(chunk StreamChunk) error
+
 // Loop represents the main agent processing loop.
 type Loop struct {
 	bus            *bus.MessageBus
@@ -484,4 +495,247 @@ func (l *Loop) RegisterTool(tool tools.Tool) {
 // SetChannelManager sets the channel manager.
 func (l *Loop) SetChannelManager(cm *channels.Manager) {
 	l.channelManager = cm
+}
+
+// ProcessStreamWithChannel processes a message with streaming response.
+func (l *Loop) ProcessStreamWithChannel(
+	ctx context.Context,
+	content, sessionID, channel, _ string,
+	callback StreamCallback,
+) error {
+	msg := bus.InboundMessage{
+		Channel:   channel,
+		SessionID: sessionID,
+		Sender: bus.SenderInfo{
+			ID: "stream",
+		},
+		Text:      content,
+		Timestamp: time.Now(),
+	}
+
+	return l.processStreamWithAgent(ctx, "default", msg, callback)
+}
+
+// processStreamWithAgent processes a message with streaming response.
+func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg bus.InboundMessage, callback StreamCallback) error {
+	l.logger.With("name", "【智能体】").Info("使用代理处理(流式)",
+		"agent", agentName,
+		"channel", msg.Channel,
+		"session_id", msg.SessionID)
+
+	// 1. Build session key
+	sessionKey := consts.GetSessionKey(msg.Channel, msg.SessionID)
+
+	// 2. Load memory/history
+	var history []providers.ChatMessage
+	if l.memory != nil {
+		mem, err := l.memory.Load(ctx, sessionKey)
+		if err != nil {
+			l.logger.With("name", "【智能体】").Warn("加载记忆失败", "error", err, "session_key", sessionKey)
+		} else {
+			history = mem
+		}
+	}
+
+	// 3. Build messages
+	messages := l.buildMessages(history, msg)
+
+	// 4. Save user message to memory
+	if l.memory != nil {
+		if err := l.memory.Save(ctx, sessionKey, "user", msg.Text); err != nil {
+			l.logger.With("name", "【智能体】").Warn("保存用户消息失败", "error", err)
+		}
+	}
+
+	// 5. Run LLM iteration loop with streaming
+	finalContent, iteration, err := l.runLLMIterationStream(ctx, messages, msg, callback)
+	if err != nil {
+		return err
+	}
+
+	// 6. Handle empty response
+	if finalContent == "" {
+		finalContent = defaultResponse
+	}
+
+	// 7. Save final assistant message to memory
+	if l.memory != nil {
+		if err := l.memory.Save(ctx, sessionKey, "assistant", finalContent); err != nil {
+			l.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
+		}
+	}
+
+	// 8. Send final done chunk
+	if callback != nil {
+		if err := callback(StreamChunk{Content: "", Done: true}); err != nil {
+			return err
+		}
+	}
+
+	l.logger.With("name", "【智能体】").Info("流式响应已完成",
+		"agent", agentName,
+		"session_key", sessionKey,
+		"iterations", iteration,
+		"content_length", len(finalContent))
+
+	return nil
+}
+
+// runLLMIterationStream runs the LLM iteration loop with streaming response.
+func (l *Loop) runLLMIterationStream(
+	ctx context.Context,
+	messages []providers.ChatMessage,
+	msg bus.InboundMessage,
+	callback StreamCallback,
+) (string, int, error) {
+	// Check if provider is configured
+	if l.provider == nil && l.fallbackChain == nil {
+		l.logger.With("name", "【智能体】").Error("未配置AI提供商")
+		return "", 0, fmt.Errorf("未配置AI提供商，请在设置中配置默认模型")
+	}
+
+	// Get the provider to use
+	provider := l.GetDefaultProvider()
+	if provider == nil {
+		l.logger.With("name", "【智能体】").Error("无法获取有效的AI提供商")
+		return "", 0, fmt.Errorf("无法获取有效的AI提供商")
+	}
+
+	iteration := 0
+	currentMessages := messages
+	var finalContent string
+
+	for iteration < l.maxToolIterations {
+		iteration++
+
+		// Build request
+		req := providers.ChatRequest{
+			Model:    provider.GetDefaultModel(),
+			Messages: currentMessages,
+		}
+
+		// Add tools if available
+		if toolDefs := l.tools.ToProviderDefs(); len(toolDefs) > 0 {
+			req.Tools = l.convertToolDefinitions(toolDefs)
+		}
+
+		l.logger.With("name", "【智能体】").Debug("正在发送流式请求到LLM",
+			"iteration", iteration,
+			"message_count", len(currentMessages))
+
+		// Collect tool calls during streaming
+		var collectedToolCalls []providers.ToolCall
+		var collectedContent string
+		var collectedReasoning string
+
+		// Send streaming request
+		err := provider.ChatStream(ctx, req, func(chunk string, reasoning string, toolCalls []providers.ToolCall, done bool) error {
+			// Collect content
+			collectedContent += chunk
+			collectedReasoning += reasoning
+
+			// Collect tool calls
+			if len(toolCalls) > 0 {
+				collectedToolCalls = append(collectedToolCalls, toolCalls...)
+			}
+
+			// Send chunk to callback (only content chunks, not done signal)
+			if callback != nil && chunk != "" {
+				if err := callback(StreamChunk{
+					Content:   chunk,
+					Reasoning: reasoning,
+					Done:      false,
+				}); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			l.logger.With("name", "【智能体】").Error("LLM流式请求失败", "error", err, "iteration", iteration)
+			errMsg := fmt.Sprintf("LLM请求失败: %v", err)
+			if errors.Is(err, context.DeadlineExceeded) {
+				errMsg = "请求超时，AI服务响应时间过长，请稍后重试"
+			}
+			return "", iteration, fmt.Errorf("%s", errMsg)
+		}
+
+		// Handle tool calls
+		if len(collectedToolCalls) > 0 {
+			l.logger.With("name", "【智能体】").Info("正在处理工具调用(流式)",
+				"count", len(collectedToolCalls),
+				"iteration", iteration)
+
+			// Merge tool calls with same ID
+			mergedToolCalls := l.mergeToolCalls(collectedToolCalls)
+
+			// Add assistant message with tool calls
+			assistantMsg := providers.ChatMessage{
+				Role:      "assistant",
+				Content:   collectedContent,
+				ToolCalls: mergedToolCalls,
+			}
+			currentMessages = append(currentMessages, assistantMsg)
+
+			// Execute each tool call
+			for _, tc := range mergedToolCalls {
+				toolResult, err := l.executeToolCall(ctx, tc, msg)
+				if err != nil {
+					toolResult = fmt.Sprintf("错误: %v", err)
+				}
+
+				// Add tool result message
+				currentMessages = append(currentMessages, providers.ChatMessage{
+					Role:       "tool",
+					Content:    toolResult,
+					ToolCallID: tc.ID,
+				})
+			}
+
+			// Continue to next iteration for LLM to process tool results
+			continue
+		}
+
+		// No tool calls, we have the final response
+		finalContent = collectedContent
+		l.logger.With("name", "【智能体】").Debug("LLM流式响应已完成",
+			"iteration", iteration,
+			"content_length", len(finalContent))
+
+		return finalContent, iteration, nil
+	}
+
+	// Max iterations reached
+	l.logger.With("name", "【智能体】").Warn("已达到最大工具迭代次数",
+		"iterations", l.maxToolIterations)
+
+	return "", iteration, fmt.Errorf("已达到最大工具迭代次数 (%d)", l.maxToolIterations)
+}
+
+// mergeToolCalls merges tool calls with the same ID (for streaming responses).
+func (l *Loop) mergeToolCalls(toolCalls []providers.ToolCall) []providers.ToolCall {
+	if len(toolCalls) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]*providers.ToolCall)
+	for _, tc := range toolCalls {
+		if existing, ok := merged[tc.ID]; ok {
+			// Merge arguments (they come in pieces during streaming)
+			existing.Function.Arguments += tc.Function.Arguments
+		} else {
+			// Create a copy
+			copy := tc
+			merged[tc.ID] = &copy
+		}
+	}
+
+	result := make([]providers.ToolCall, 0, len(merged))
+	for _, tc := range merged {
+		result = append(result, *tc)
+	}
+
+	return result
 }

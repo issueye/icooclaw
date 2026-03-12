@@ -364,16 +364,51 @@ func (m *Manager) ProcessStreamMessage(ctx context.Context, client *Client, msg 
 	}
 
 	// Check if agent loop is available
-	if m.agentLoop == nil && m.bus == nil {
-		sendStreamError("服务未配置：缺少智能体或消息总线")
+	if m.agentLoop == nil {
+		sendStreamError("服务未配置：缺少智能体")
 		return nil
 	}
 
-	// For now, use the same logic as ProcessMessage
-	// In a real implementation, this would use streaming LLM responses
-	err := m.ProcessMessage(ctx, client, msg)
+	// Use the new streaming method from agent loop
+	err := m.agentLoop.ProcessStreamWithChannel(
+		ctx,
+		msg.Content,
+		msg.SessionID,
+		consts.WEBSOCKET,
+		msg.SessionID,
+		func(chunk agent.StreamChunk) error {
+			// Send chunk message to client
+			if chunk.Content != "" || chunk.Reasoning != "" {
+				data := map[string]interface{}{
+					"content": chunk.Content,
+				}
+				if chunk.Reasoning != "" {
+					data["reasoning"] = chunk.Reasoning
+				}
+				client.SendJSON(map[string]interface{}{
+					"type":      "chunk",
+					"data":      data,
+					"timestamp": time.Now().Unix(),
+				})
+			}
+
+			// Send end message when done
+			if chunk.Done {
+				client.SendJSON(map[string]interface{}{
+					"type":      "end",
+					"timestamp": time.Now().Unix(),
+				})
+			}
+
+			return nil
+		},
+	)
+
 	if err != nil {
-		// Send error event (ProcessMessage already sent error response, but we also send error for consistency)
+		m.logger.With("name", "【网关服务】").Error("流式处理消息失败",
+			"error", err,
+			"client_id", client.ID,
+			"session_id", msg.SessionID)
 		sendStreamError("处理消息失败: " + err.Error())
 		return err
 	}

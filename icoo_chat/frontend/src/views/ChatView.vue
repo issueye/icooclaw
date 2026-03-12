@@ -189,7 +189,15 @@ onMessage((msg) => {
       }
       break;
     case "chunk":
+      // 处理流式内容块
       chatStore.appendToLastAI(msg.data?.content || "");
+      // 处理推理内容（DeepSeek 等模型支持）
+      if (msg.data?.reasoning) {
+        chatStore.updateThinking(
+          (chatStore.currentSession?.messages?.slice(-1)[0]?.thinking || "") +
+          msg.data.reasoning
+        );
+      }
       scrollToBottom();
       break;
     case "thinking":
@@ -253,6 +261,7 @@ function sendPendingChatMessage() {
     type: "chat",
     session_id: wsSessionId,
     content: pendingChatContent,
+    stream: true, // 启用流式响应
   });
 
   if (!sent) {
@@ -301,11 +310,12 @@ async function sendMessage(text) {
   const wsSessionId = chatStore.getWsSessionId(chatStore.currentSessionId);
 
   if (wsSessionId) {
-    // 已有会话，直接发送聊天消息
+    // 已有会话，直接发送聊天消息（启用流式响应）
     const sent = send({
       type: "chat",
       session_id: wsSessionId, // 后端需要这个字段进行校验
       content: text,
+      stream: true, // 启用流式响应
     });
 
     if (!sent) {
