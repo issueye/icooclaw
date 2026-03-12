@@ -31,6 +31,8 @@ const DEF_GATEWAY_HOST = "0.0.0.0"
 // DEFAULT_MODEL_KEY 默认模型键名
 const DEFAULT_MODEL_KEY = "agent.default_model"
 
+const SKILL_DIR = "skills"
+
 // ProviderType represents a provider type.
 type ProviderType string
 

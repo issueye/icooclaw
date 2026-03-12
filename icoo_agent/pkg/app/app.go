@@ -38,7 +38,7 @@ type App struct {
 	DefaultProvider providers.Provider    // 默认提供商
 	ToolRegistry    *tools.Registry       // 工具注册表
 	MemoryLoader    *memory.DefaultLoader // 记忆加载器
-	SkillLoader     *skill.DefaultLoader  // skill 加载加载器
+	SkillLoader     skill.Loader          // skill 加载加载器
 	AgentLoop       *agent.Loop           // 代理循环
 	AgentRegistry   *agent.AgentRegistry  // 代理注册表
 	ChannelManager  *channels.Manager     // 渠道管理器
@@ -103,7 +103,7 @@ func (a *App) InitMemory() {
 
 // InitSkill 初始化 skill 加载器
 func (a *App) InitSkill() {
-	a.SkillLoader = skill.NewLoader(a.Storage, slog.Default())
+	a.SkillLoader = skill.NewLoader(a.Cfg.Agent.Workspace, a.Storage, slog.Default())
 }
 
 func (a *App) InitStorage() {
@@ -252,11 +252,7 @@ func (a *App) RunGateway() {
 	}()
 
 	// 启动任务调度器
-	go func() {
-		if err := a.Scheduler.Start(a.Ctx); err != nil {
-			slog.Error("任务调度器错误", "error", err)
-		}
-	}()
+	a.Scheduler.Start()
 
 	// 启动网关服务器
 	err := a.Gw.Start()
