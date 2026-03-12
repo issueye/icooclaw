@@ -5,28 +5,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"icooclaw/pkg/agent"
 	"icooclaw/pkg/bus"
-	"icooclaw/pkg/channels"
 	"icooclaw/pkg/config"
-	"icooclaw/pkg/consts"
-	"icooclaw/pkg/gateway"
-	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/memory"
 	"icooclaw/pkg/providers"
-	"icooclaw/pkg/skill"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
-	"icooclaw/pkg/tools/builtin"
 
 	// Import channel implementations to register their factories
 	_ "icooclaw/pkg/channels/dingtalk"
@@ -130,30 +121,30 @@ func runStart(cmd *cobra.Command, args []string) {
 	}
 
 	// Initialize agent instance
-	agentInstance := agent.NewAgentInstance(agent.AgentConfig{
+	agentInstance := agent.NewInstance(agent.AgentConfig{
 		Name:              "default",
 		Model:             cfg.Agent.DefaultModel,
 		MaxToolIterations: 20,
 	},
-		agent.WithAgentBus(messageBus),
-		agent.WithAgentStorage(store),
-		agent.WithAgentTools(toolRegistry),
-		agent.WithAgentMemory(memLoader),
-		agent.WithAgentLogger(slog.Default()),
+		agent.WithBus(messageBus),
+		agent.WithStorage(store),
+		agent.WithTools(toolRegistry),
+		agent.WithMemory(memLoader),
+		agent.WithLogger(slog.Default()),
 	)
 
 	if defaultProvider != nil {
-		agentInstance = agent.NewAgentInstance(agent.AgentConfig{
+		agentInstance = agent.NewInstance(agent.AgentConfig{
 			Name:              "default",
 			Model:             cfg.Agent.DefaultModel,
 			MaxToolIterations: 20,
 		},
-			agent.WithAgentBus(messageBus),
-			agent.WithAgentStorage(store),
-			agent.WithAgentTools(toolRegistry),
-			agent.WithAgentMemory(memLoader),
-			agent.WithAgentProvider(defaultProvider),
-			agent.WithAgentLogger(slog.Default()),
+			agent.WithBus(messageBus),
+			agent.WithStorage(store),
+			agent.WithTools(toolRegistry),
+			agent.WithMemory(memLoader),
+			agent.WithProvider(defaultProvider),
+			agent.WithLogger(slog.Default()),
 		)
 	}
 
@@ -192,156 +183,14 @@ func runStart(cmd *cobra.Command, args []string) {
 }
 
 func runGateway(cmd *cobra.Command, args []string) {
-	// 加载配置
-	cfg, err := config.Load(cfgFile)
-	if err != nil {
-		slog.Error("加载配置失败", "error", err)
-		os.Exit(1)
-	}
-
-	// 确保目录存在
-	if err := cfg.EnsureWorkspace(); err != nil {
-		slog.Error("创建工作目录失败", "error", err)
-		os.Exit(1)
-	}
-	if err := cfg.EnsureDatabasePath(); err != nil {
-		slog.Error("创建数据库目录失败", "error", err)
-		os.Exit(1)
-	}
-
-	// 设置日志
-	setupLogging(cfg)
-
-	slog.Info("正在启动网关服务", "version", version)
-
-	// 初始化存储
-	dbPath, _ := cfg.GetDatabasePath()
-	store, err := storage.New(cfg.Mode, dbPath)
-	if err != nil {
-		slog.Error("初始化存储失败", "error", err)
-		os.Exit(1)
-	}
-	defer store.Close()
-
-	// 初始化消息总线
-	messageBus := bus.NewMessageBus(bus.DefaultConfig())
-
-	// 初始化提供商工厂
-	providerFactory := providers.NewFactory(store)
-
-	// 初始化工具注册表
-	toolRegistry := tools.NewRegistry()
-
-	// 注册内置工具
-	registerBuiltinTools(toolRegistry)
-
-	// 初始化记忆加载器
-	memLoader := memory.NewLoader(store, 100, slog.Default())
-
-	// 初始化 skill 加载器
-	skillLoader := skill.NewLoader(store, slog.Default())
-
-	// 获取默认提供商
-	var defaultProvider providers.Provider
-	defaultModel, err := store.Param().Get(consts.DEFAULT_MODEL_KEY)
-	if err != nil || defaultModel == nil || defaultModel.Value == "" {
-		slog.Warn("未找到默认模型，需要配置", "key", consts.DEFAULT_MODEL_KEY)
-	} else {
-		arrs := strings.Split(defaultModel.Value, "/")
-		if len(arrs) != 2 {
-			slog.Warn("默认模型格式错误，需要配置", "model", defaultModel.Value)
-			return
-		}
-
-		slog.Info("默认模型", "model", defaultModel.Value)
-		defaultProvider, err = providerFactory.Get(arrs[0])
-		if err != nil {
-			slog.Warn("未找到默认提供商，需要配置", "provider", arrs[0])
-		}
-	}
-
-	// 初始化代理循环
-	agentLoop := agent.NewLoop(
-		agent.WithLoopBus(messageBus),
-		agent.WithLoopProvider(defaultProvider),
-		agent.WithLoopProviderFactory(providerFactory),
-		agent.WithLoopTools(toolRegistry),
-		agent.WithLoopMemory(memLoader),
-		agent.WithLoopSkills(skillLoader),
-		agent.WithLoopStorage(store),
-		agent.WithLoopLogger(slog.Default()),
-	)
-
-	// 初始化代理注册表
-	agentRegistry := agent.NewAgentRegistry(slog.Default())
-
-	// 设置上下文取消
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// 初始化渠道管理器
-	channelManager := channels.NewManager(messageBus, store, slog.Default())
-	if err := channelManager.InitChannels(ctx); err != nil {
-		slog.Warn("初始化渠道失败", "error", err)
-	}
-
-	// 创建网关服务器配置
-	serverCfg := gateway.DefaultServerConfig()
-	if cfg.Gateway.Port > 0 {
-		serverCfg.Addr = fmt.Sprintf(":%d", cfg.Gateway.Port)
-	}
-
-	// 创建网关服务器
-	gw := gateway.NewServer(serverCfg, store, slog.Default()).
-		WithWebSocket(websocket.DefaultManagerConfig()).
-		WithSSE().
-		WithBus(messageBus).
-		WithAgentLoop(agentLoop).
-		WithAgentRegistry(agentRegistry).
-		Setup()
-
-	// 处理关闭信号
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		slog.Info("正在关闭网关服务...")
-
-		// 关闭渠道管理器
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer shutdownCancel()
-		if err := channelManager.StopAll(shutdownCtx); err != nil {
-			slog.Error("关闭渠道管理器失败", "error", err)
-		}
-
-		// 关闭网关服务器
-		if err := gw.Shutdown(shutdownCtx); err != nil {
-			slog.Error("网关服务关闭失败", "error", err)
-		}
-
-		cancel()
-	}()
-
-	// 在后台启动代理循环
-	go func() {
-		if err := agentLoop.Run(ctx); err != nil && err != context.Canceled {
-			slog.Error("代理循环错误", "error", err)
-		}
-	}()
-
-	// 启动渠道管理器
-	go func() {
-		if err := channelManager.StartAll(ctx); err != nil {
-			slog.Error("渠道管理器错误", "error", err)
-		}
-	}()
-
-	// 启动网关服务器
-	if err := gw.Start(); err != nil && err != http.ErrServerClosed {
-		slog.Error("网关服务错误", "error", err)
-		os.Exit(1)
-	}
+	// 创建应用实例
+	app := NewApp()
+	// 关闭
+	defer app.Close()
+	// 初始化
+	app.Init()
+	// 运行
+	app.Run()
 
 	slog.Info("网关服务已停止")
 }
@@ -374,10 +223,4 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
-}
-
-// registerBuiltinTools registers built-in tools to the registry.
-func registerBuiltinTools(registry *tools.Registry) {
-	builtin.RegisterBuiltinTools(registry)
-	slog.Info("内置工具注册完成", "count", registry.Count())
 }

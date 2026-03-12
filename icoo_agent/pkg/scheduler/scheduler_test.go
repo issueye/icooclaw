@@ -204,7 +204,7 @@ func TestSchedulerTool(t *testing.T) {
 	}
 	_ = s.AddTask(task)
 
-	tool := NewSchedulerTool(s, nil)
+	tool := NewTool(s, nil)
 
 	if tool.Name() != "scheduler" {
 		t.Errorf("Expected name 'scheduler', got %s", tool.Name())

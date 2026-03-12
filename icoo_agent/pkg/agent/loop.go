@@ -167,7 +167,7 @@ func (l *Loop) GetDefaultProvider() providers.Provider {
 // 返回提供商、模型名称和错误。
 func (l *Loop) GetDynamicProvider() (providers.Provider, string, error) {
 	if l.providerFactory == nil || l.storage == nil {
-		return nil, "", fmt.Errorf("provider factory or storage not configured")
+		return nil, "", fmt.Errorf("未配置提供商工厂或存储")
 	}
 
 	// Get default model from storage
@@ -293,10 +293,10 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 		"channel", msg.Channel,
 		"session_id", msg.SessionID)
 
-	// 1. Build session key (format: channel:sessionID)
+	// 1. Build session key (format: channel:sessionID) 构建会话键。
 	sessionKey := consts.GetSessionKey(msg.Channel, msg.SessionID)
 
-	// 2. Load memory/history
+	// 2. Load memory/history 加载记忆历史记录。
 	var history []providers.ChatMessage
 	if l.memory != nil {
 		mem, err := l.memory.Load(ctx, sessionKey)
@@ -307,35 +307,35 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 		}
 	}
 
-	// 3. Build messages
+	// 3. Build messages 构建消息列表。
 	messages := l.buildMessages(history, msg)
 
-	// 4. Save user message to memory
+	// 4. Save user message to memory 保存用户消息到记忆中。
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, consts.RoleUser.ToString(), msg.Text); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存用户消息失败", "error", err)
 		}
 	}
 
-	// 5. Run LLM iteration loop with tool calling
+	// 5. Run LLM iteration loop with tool calling 运行 LLM 迭代循环，支持工具调用。
 	finalContent, iteration, err := l.runLLMIteration(ctx, messages, msg)
 	if err != nil {
 		return "", err
 	}
 
-	// 6. Handle empty response
+	// 6. Handle empty response 处理空响应。
 	if finalContent == "" {
 		finalContent = defaultResponse
 	}
 
-	// 7. Save final assistant message to memory
+	// 7. Save final assistant message to memory 保存助手助手消息到记忆中。
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, consts.RoleAssistant.ToString(), finalContent); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
 		}
 	}
 
-	// 8. Log response
+	// 8. Log response 记录响应。
 	l.logger.With("name", "【智能体】").Info("响应已生成",
 		"agent", agentName,
 		"session_key", sessionKey,
@@ -349,7 +349,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 func (l *Loop) buildMessages(history []providers.ChatMessage, msg bus.InboundMessage) []providers.ChatMessage {
 	messages := make([]providers.ChatMessage, 0, len(history)+2)
 
-	// Add system prompt
+	// Add system prompt 添加系统提示词。
 	systemPrompt := l.systemPrompt
 	if systemPrompt == "" {
 		systemPrompt = "你是一个有帮助的AI助手。"
@@ -359,10 +359,10 @@ func (l *Loop) buildMessages(history []providers.ChatMessage, msg bus.InboundMes
 		Content: systemPrompt,
 	})
 
-	// Add history
+	// Add history 添加会话历史记录。
 	messages = append(messages, history...)
 
-	// Add user message
+	// Add user message 添加用户消息。
 	messages = append(messages, providers.ChatMessage{
 		Role:    consts.RoleUser.ToString(),
 		Content: msg.Text,
@@ -603,10 +603,10 @@ func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg
 		"channel", msg.Channel,
 		"session_id", msg.SessionID)
 
-	// 1. Build session key (format: channel:sessionID)
+	// 1. Build session key (format: channel:sessionID) 会话键用于在会话中唯一标识一个会话，用于存储和检索会话状态。
 	sessionKey := consts.GetSessionKey(msg.Channel, msg.SessionID)
 
-	// 2. Load memory/history
+	// 2. Load memory/history 从记忆中加载会话历史记录。
 	var history []providers.ChatMessage
 	if l.memory != nil {
 		mem, err := l.memory.Load(ctx, sessionKey)
@@ -617,35 +617,35 @@ func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg
 		}
 	}
 
-	// 3. Build messages
+	// 3. Build messages 构建 LLM 请求的消息列表。
 	messages := l.buildMessages(history, msg)
 
-	// 4. Save user message to memory
+	// 4. Save user message to memory 保存用户消息到记忆中。
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, consts.RoleUser.ToString(), msg.Text); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存用户消息失败", "error", err)
 		}
 	}
 
-	// 5. Run LLM iteration loop with streaming
+	// 5. Run LLM iteration loop with streaming 运行 LLM 迭代循环，支持流式响应。
 	finalContent, iteration, err := l.runLLMIterationStream(ctx, messages, msg, callback)
 	if err != nil {
 		return err
 	}
 
-	// 6. Handle empty response
+	// 6. Handle empty response 处理空响应。
 	if finalContent == "" {
 		finalContent = defaultResponse
 	}
 
-	// 7. Save final assistant message to memory
+	// 7. Save final assistant message to memory 保存助手消息到记忆中。
 	if l.memory != nil {
 		if err := l.memory.Save(ctx, sessionKey, consts.RoleAssistant.ToString(), finalContent); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
 		}
 	}
 
-	// 8. Send final done chunk
+	// 8. Send final done chunk 发送最终完成块。
 	if callback != nil {
 		if err := callback(StreamChunk{Content: "", Done: true}); err != nil {
 			return err

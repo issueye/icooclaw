@@ -2,7 +2,6 @@
 package agent
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -17,18 +16,18 @@ import (
 
 // AgentConfig holds configuration for an agent instance.
 type AgentConfig struct {
-	Name             string
-	SystemPrompt     string
-	Model            string
-	MaxTokens        int
-	Temperature      float64
+	Name              string
+	SystemPrompt      string
+	Model             string
+	MaxTokens         int
+	Temperature       float64
 	MaxToolIterations int
 }
 
-// AgentInstance represents a configured agent instance.
+// Instance represents a configured agent instance.
 // It holds agent-specific configuration and state, while delegating
 // message processing to the Loop.
-type AgentInstance struct {
+type Instance struct {
 	config AgentConfig
 
 	// Core dependencies
@@ -45,9 +44,9 @@ type AgentInstance struct {
 	logger *slog.Logger
 }
 
-// NewAgentInstance creates a new AgentInstance.
-func NewAgentInstance(config AgentConfig, opts ...AgentOption) *AgentInstance {
-	a := &AgentInstance{
+// NewInstance creates a new Instance.
+func NewInstance(config AgentConfig, opts ...AgentOption) *Instance {
+	a := &Instance{
 		config: config,
 		tools:  tools.NewRegistry(),
 		logger: slog.Default(),
@@ -61,82 +60,82 @@ func NewAgentInstance(config AgentConfig, opts ...AgentOption) *AgentInstance {
 }
 
 // AgentOption is a functional option for AgentInstance.
-type AgentOption func(*AgentInstance)
+type AgentOption func(*Instance)
 
-// WithAgentProvider sets the provider.
-func WithAgentProvider(p providers.Provider) AgentOption {
-	return func(a *AgentInstance) { a.provider = p }
+// WithProvider sets the provider.
+func WithProvider(p providers.Provider) AgentOption {
+	return func(a *Instance) { a.provider = p }
 }
 
-// WithAgentTools sets the tools registry.
-func WithAgentTools(t *tools.Registry) AgentOption {
-	return func(a *AgentInstance) { a.tools = t }
+// WithTools sets the tools registry.
+func WithTools(t *tools.Registry) AgentOption {
+	return func(a *Instance) { a.tools = t }
 }
 
-// WithAgentMemory sets the memory loader.
-func WithAgentMemory(m memory.Loader) AgentOption {
-	return func(a *AgentInstance) { a.memory = m }
+// WithMemory sets the memory loader.
+func WithMemory(m memory.Loader) AgentOption {
+	return func(a *Instance) { a.memory = m }
 }
 
-// WithAgentSkills sets the skill loader.
-func WithAgentSkills(s skill.Loader) AgentOption {
-	return func(a *AgentInstance) { a.skills = s }
+// WithSkills sets the skill loader.
+func WithSkills(s skill.Loader) AgentOption {
+	return func(a *Instance) { a.skills = s }
 }
 
-// WithAgentStorage sets the storage.
-func WithAgentStorage(s *storage.Storage) AgentOption {
-	return func(a *AgentInstance) { a.storage = s }
+// WithStorage sets the storage.
+func WithStorage(s *storage.Storage) AgentOption {
+	return func(a *Instance) { a.storage = s }
 }
 
-// WithAgentBus sets the message bus.
-func WithAgentBus(b *bus.MessageBus) AgentOption {
-	return func(a *AgentInstance) { a.bus = b }
+// WithBus sets the message bus.
+func WithBus(b *bus.MessageBus) AgentOption {
+	return func(a *Instance) { a.bus = b }
 }
 
-// WithAgentLogger sets the logger.
-func WithAgentLogger(l *slog.Logger) AgentOption {
-	return func(a *AgentInstance) { a.logger = l }
+// WithLogger sets the logger.
+func WithLogger(l *slog.Logger) AgentOption {
+	return func(a *Instance) { a.logger = l }
 }
 
 // Name returns the agent name.
-func (a *AgentInstance) Name() string {
+func (a *Instance) Name() string {
 	return a.config.Name
 }
 
 // Config returns the agent configuration.
-func (a *AgentInstance) Config() AgentConfig {
+func (a *Instance) Config() AgentConfig {
 	return a.config
 }
 
 // Tools returns the tools registry.
-func (a *AgentInstance) Tools() *tools.Registry {
+func (a *Instance) Tools() *tools.Registry {
 	return a.tools
 }
 
 // Provider returns the provider.
-func (a *AgentInstance) Provider() providers.Provider {
+func (a *Instance) Provider() providers.Provider {
 	return a.provider
 }
 
 // Memory returns the memory loader.
-func (a *AgentInstance) Memory() memory.Loader {
+func (a *Instance) Memory() memory.Loader {
 	return a.memory
 }
 
 // RegisterTool registers a tool with this agent.
-func (a *AgentInstance) RegisterTool(tool tools.Tool) {
+func (a *Instance) RegisterTool(tool tools.Tool) {
 	a.tools.Register(tool)
 }
 
 // GetSessionKey returns a session key for the given channel and session ID.
 // Format: channel:sessionID
-func (a *AgentInstance) GetSessionKey(channel, sessionID string) string {
+func (a *Instance) GetSessionKey(channel, sessionID string) string {
 	return fmt.Sprintf("%s:%s", channel, sessionID)
 }
 
 // AgentRegistry manages multiple agent instances.
 type AgentRegistry struct {
-	agents   map[string]*AgentInstance
+	agents   map[string]*Instance
 	defaults *AgentConfig
 	mu       sync.RWMutex
 	logger   *slog.Logger
@@ -148,13 +147,13 @@ func NewAgentRegistry(logger *slog.Logger) *AgentRegistry {
 		logger = slog.Default()
 	}
 	return &AgentRegistry{
-		agents: make(map[string]*AgentInstance),
+		agents: make(map[string]*Instance),
 		logger: logger,
 	}
 }
 
 // Register registers an agent instance.
-func (r *AgentRegistry) Register(agent *AgentInstance) {
+func (r *AgentRegistry) Register(agent *Instance) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -163,7 +162,7 @@ func (r *AgentRegistry) Register(agent *AgentInstance) {
 }
 
 // Get gets an agent by name.
-func (r *AgentRegistry) Get(name string) (*AgentInstance, bool) {
+func (r *AgentRegistry) Get(name string) (*Instance, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -172,7 +171,7 @@ func (r *AgentRegistry) Get(name string) (*AgentInstance, bool) {
 }
 
 // GetDefault returns the default agent.
-func (r *AgentRegistry) GetDefault() *AgentInstance {
+func (r *AgentRegistry) GetDefault() *Instance {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -213,76 +212,4 @@ func (r *AgentRegistry) GetDefaults() *AgentConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.defaults
-}
-
-// --- Legacy Agent type for backward compatibility ---
-
-// Agent represents an AI agent (legacy type for backward compatibility).
-// Deprecated: Use AgentInstance and Loop instead.
-type Agent = AgentInstance
-
-// Option is a functional option for Agent (legacy).
-// Deprecated: Use AgentOption instead.
-type Option = AgentOption
-
-// WithProvider sets the provider (legacy).
-// Deprecated: Use WithAgentProvider instead.
-var WithProvider = WithAgentProvider
-
-// WithTools sets the tools registry (legacy).
-// Deprecated: Use WithAgentTools instead.
-var WithTools = WithAgentTools
-
-// WithMemory sets the memory loader (legacy).
-// Deprecated: Use WithAgentMemory instead.
-var WithMemory = WithAgentMemory
-
-// WithSkills sets the skill loader (legacy).
-// Deprecated: Use WithAgentSkills instead.
-var WithSkills = WithAgentSkills
-
-// WithStorage sets the storage (legacy).
-// Deprecated: Use WithAgentStorage instead.
-var WithStorage = WithAgentStorage
-
-// WithBus sets the message bus (legacy).
-// Deprecated: Use WithAgentBus instead.
-var WithBus = WithAgentBus
-
-// WithLogger sets the logger (legacy).
-// Deprecated: Use WithAgentLogger instead.
-var WithLogger = WithAgentLogger
-
-// New creates a new Agent (legacy).
-// Deprecated: Use NewAgentInstance instead.
-func New(name string, opts ...Option) *Agent {
-	return NewAgentInstance(AgentConfig{Name: name}, opts...)
-}
-
-// --- Helper functions ---
-
-// BuildSystemPrompt builds a system prompt from various sources.
-func BuildSystemPrompt(basePrompt string, skills []string, skillLoader skill.Loader) string {
-	if skillLoader == nil || len(skills) == 0 {
-		return basePrompt
-	}
-
-	ctx := context.Background()
-	var skillPrompts string
-
-	for _, skillName := range skills {
-		skill, err := skillLoader.Load(ctx, skillName)
-		if err != nil {
-			continue
-		}
-		if skill.Prompt != "" {
-			skillPrompts += "\n\n## " + skillName + "\n" + skill.Prompt
-		}
-	}
-
-	if skillPrompts != "" {
-		return basePrompt + "\n\n# Skills" + skillPrompts
-	}
-
-	return basePrompt
 }

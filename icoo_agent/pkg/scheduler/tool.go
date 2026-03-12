@@ -11,31 +11,31 @@ import (
 )
 
 // SchedulerTool provides a tool for managing scheduled tasks.
-type SchedulerTool struct {
+type Tool struct {
 	scheduler *Scheduler
 	logger    *slog.Logger
 }
 
-// NewSchedulerTool creates a new scheduler tool.
-func NewSchedulerTool(scheduler *Scheduler, logger *slog.Logger) *SchedulerTool {
-	return &SchedulerTool{
+// NewTool creates a new scheduler tool.
+func NewTool(scheduler *Scheduler, logger *slog.Logger) *Tool {
+	return &Tool{
 		scheduler: scheduler,
 		logger:    logger,
 	}
 }
 
 // Name returns the tool name.
-func (t *SchedulerTool) Name() string {
+func (t *Tool) Name() string {
 	return "scheduler"
 }
 
 // Description returns the tool description.
-func (t *SchedulerTool) Description() string {
+func (t *Tool) Description() string {
 	return "管理定时任务。列出、启用、禁用或按需运行任务。"
 }
 
 // Parameters returns the tool parameters.
-func (t *SchedulerTool) Parameters() map[string]any {
+func (t *Tool) Parameters() map[string]any {
 	return map[string]any{
 		"action": map[string]any{
 			"type":        "string",
@@ -49,7 +49,7 @@ func (t *SchedulerTool) Parameters() map[string]any {
 }
 
 // Execute executes the scheduler tool.
-func (t *SchedulerTool) Execute(ctx context.Context, args map[string]any) *tools.Result {
+func (t *Tool) Execute(ctx context.Context, args map[string]any) *tools.Result {
 	action, _ := args["action"].(string)
 	taskID, _ := args["task_id"].(string)
 
@@ -70,7 +70,7 @@ func (t *SchedulerTool) Execute(ctx context.Context, args map[string]any) *tools
 	}
 }
 
-func (t *SchedulerTool) listTasks() *tools.Result {
+func (t *Tool) listTasks() *tools.Result {
 	tasks := t.scheduler.ListTasks()
 
 	var result string
@@ -92,7 +92,7 @@ func (t *SchedulerTool) listTasks() *tools.Result {
 	return &tools.Result{Success: true, Content: result}
 }
 
-func (t *SchedulerTool) runTask(taskID string) *tools.Result {
+func (t *Tool) runTask(taskID string) *tools.Result {
 	if taskID == "" {
 		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 task_id")}
 	}
@@ -104,7 +104,7 @@ func (t *SchedulerTool) runTask(taskID string) *tools.Result {
 	return &tools.Result{Success: true, Content: fmt.Sprintf("任务 %s 已触发", taskID)}
 }
 
-func (t *SchedulerTool) enableTask(taskID string) *tools.Result {
+func (t *Tool) enableTask(taskID string) *tools.Result {
 	if taskID == "" {
 		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 task_id")}
 	}
@@ -116,7 +116,7 @@ func (t *SchedulerTool) enableTask(taskID string) *tools.Result {
 	return &tools.Result{Success: true, Content: fmt.Sprintf("任务 %s 已启用", taskID)}
 }
 
-func (t *SchedulerTool) disableTask(taskID string) *tools.Result {
+func (t *Tool) disableTask(taskID string) *tools.Result {
 	if taskID == "" {
 		return &tools.Result{Success: false, Error: fmt.Errorf("需要提供 task_id")}
 	}
@@ -129,6 +129,6 @@ func (t *SchedulerTool) disableTask(taskID string) *tools.Result {
 }
 
 // RegisterSchedulerTool registers the scheduler tool.
-func RegisterSchedulerTool(registry *tools.Registry, scheduler *Scheduler, logger *slog.Logger) {
-	registry.Register(NewSchedulerTool(scheduler, logger))
+func RegisterTool(registry *tools.Registry, scheduler *Scheduler, logger *slog.Logger) {
+	registry.Register(NewTool(scheduler, logger))
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	icooclawErrors "icooclaw/pkg/errors"
 )
@@ -12,12 +11,11 @@ import (
 // Skill represents a skill configuration.
 type Skill struct {
 	Model
-	Name        string `gorm:"column:name;type:varchar(100);uniqueIndex;not null;comment:技能名称" json:"name"`
-	Description string `gorm:"column:description;type:text;comment:技能描述" json:"description"`
-	Prompt      string `gorm:"column:prompt;type:text;comment:提示词模板" json:"prompt"`
-	Tools       string `gorm:"column:tools;type:text;comment:工具列表(JSON数组)" json:"tools"` // JSON array of tool names
-	Config      string `gorm:"column:config;type:text;comment:配置(JSON格式)" json:"config"` // JSON config
-	Enabled     bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`
+	Name        string `gorm:"column:name;type:varchar(100);uniqueIndex;not null;comment:技能名称" json:"name"` // 技能名称
+	Description string `gorm:"column:description;type:text;comment:技能描述" json:"description"`                // 技能描述
+	Enabled     bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`     // 是否启用
+	Version     string `gorm:"column:version;type:varchar(10);default:1.0.0;comment:版本号" json:"version"`    // 版本号
+	Path        string `gorm:"column:path;type:text;comment:技能路径" json:"path"`                              // 技能路径 默认 workspace/.skills/<name>-<version>/
 }
 
 // TableName returns the table name for Skill.
@@ -35,10 +33,7 @@ func NewSkillStorage(db *gorm.DB) *SkillStorage {
 
 // SaveSkill saves a skill configuration.
 func (s *SkillStorage) SaveSkill(sk *Skill) error {
-	result := s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "name"}},
-		DoUpdates: clause.AssignmentColumns([]string{"description", "prompt", "tools", "config", "enabled"}),
-	}).Create(sk)
+	result := s.db.Create(sk)
 	return result.Error
 }
 
@@ -91,7 +86,7 @@ type QuerySkill struct {
 }
 
 type ResQuerySkill struct {
-	Page    Page   `json:"page"`
+	Page    Page    `json:"page"`
 	Records []Skill `json:"records"`
 }
 

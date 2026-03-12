@@ -3,7 +3,6 @@ package skill
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -16,9 +15,7 @@ import (
 type Skill struct {
 	Name        string
 	Description string
-	Prompt      string
-	Tools       []string
-	Config      map[string]any
+	Path        string // 技能路径 默认 workspace/.skills/<name>-<version>/
 }
 
 // Loader loads skills from storage.
@@ -67,18 +64,7 @@ func (l *DefaultLoader) Load(ctx context.Context, name string) (*Skill, error) {
 	skill := &Skill{
 		Name:        sk.Name,
 		Description: sk.Description,
-		Prompt:      sk.Prompt,
-		Config:      make(map[string]any),
-	}
-
-	// Parse tools
-	if sk.Tools != "" {
-		json.Unmarshal([]byte(sk.Tools), &skill.Tools)
-	}
-
-	// Parse config
-	if sk.Config != "" {
-		json.Unmarshal([]byte(sk.Config), &skill.Config)
+		Path:        sk.Path,
 	}
 
 	// Cache it
@@ -101,16 +87,7 @@ func (l *DefaultLoader) List(ctx context.Context) ([]*Skill, error) {
 		skill := &Skill{
 			Name:        sk.Name,
 			Description: sk.Description,
-			Prompt:      sk.Prompt,
-			Config:      make(map[string]any),
-		}
-
-		if sk.Tools != "" {
-			json.Unmarshal([]byte(sk.Tools), &skill.Tools)
-		}
-
-		if sk.Config != "" {
-			json.Unmarshal([]byte(sk.Config), &skill.Config)
+			Path:        sk.Path,
 		}
 
 		result = append(result, skill)
@@ -145,35 +122,6 @@ func NewExecutor(loader Loader, registry *tools.Registry, logger *slog.Logger) *
 		tools:  registry,
 		logger: logger,
 	}
-}
-
-// GetPrompt returns the skill prompt.
-func (e *Executor) GetPrompt(ctx context.Context, name string) (string, error) {
-	skill, err := e.loader.Load(ctx, name)
-	if err != nil {
-		return "", err
-	}
-	return skill.Prompt, nil
-}
-
-// GetTools returns the tools for a skill.
-func (e *Executor) GetTools(ctx context.Context, name string) ([]tools.Tool, error) {
-	skill, err := e.loader.Load(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]tools.Tool, 0, len(skill.Tools))
-	for _, toolName := range skill.Tools {
-		tool, err := e.tools.Get(toolName)
-		if err != nil {
-			e.logger.Warn("tool not found for skill", "skill", name, "tool", toolName)
-			continue
-		}
-		result = append(result, tool)
-	}
-
-	return result, nil
 }
 
 // Manager manages skill registration and execution.
@@ -211,15 +159,11 @@ func (m *Manager) ListSkills(ctx context.Context) ([]*Skill, error) {
 
 // CreateSkill creates a new skill.
 func (m *Manager) CreateSkill(skill *Skill) error {
-	toolsJSON, _ := json.Marshal(skill.Tools)
-	configJSON, _ := json.Marshal(skill.Config)
 
 	return m.storage.Skill().SaveSkill(&storage.Skill{
 		Name:        skill.Name,
 		Description: skill.Description,
-		Prompt:      skill.Prompt,
-		Tools:       string(toolsJSON),
-		Config:      string(configJSON),
+		Path:        skill.Path,
 		Enabled:     true,
 	})
 }
@@ -252,14 +196,4 @@ func (m *Manager) DisableSkill(name string) error {
 	}
 	skill.Enabled = false
 	return m.storage.Skill().SaveSkill(skill)
-}
-
-// GetPrompt gets the prompt for a skill.
-func (m *Manager) GetPrompt(ctx context.Context, name string) (string, error) {
-	return m.executor.GetPrompt(ctx, name)
-}
-
-// GetTools gets the tools for a skill.
-func (m *Manager) GetTools(ctx context.Context, name string) ([]tools.Tool, error) {
-	return m.executor.GetTools(ctx, name)
 }
