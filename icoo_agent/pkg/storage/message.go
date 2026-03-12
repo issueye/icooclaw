@@ -10,10 +10,13 @@ import (
 // Message represents a chat message.
 type Message struct {
 	Model
-	SessionID string          `gorm:"column:session_id;type:char(36);not null;index;comment:会话ID" json:"session_id"`
-	Role      consts.RoleType `gorm:"column:role;type:varchar(50);not null;comment:角色(user/assistant/system)" json:"role"`
-	Content   string          `gorm:"column:content;type:text;not null;comment:消息内容" json:"content"`
-	Metadata  string          `gorm:"column:metadata;type:text;comment:元数据(JSON格式)" json:"metadata"`
+	SessionID  string          `gorm:"column:session_id;type:char(36);not null;index;comment:会话ID" json:"session_id"`
+	Role       consts.RoleType `gorm:"column:role;type:varchar(50);not null;comment:角色(user/assistant/system)" json:"role"`
+	Content    string          `gorm:"column:content;type:text;not null;comment:消息内容" json:"content"`
+	ToolName   string          `gorm:"column:tool_name;type:varchar(50);comment:工具名称" json:"tool_name"`
+	ToolArgs   string          `gorm:"column:tool_args;type:text;comment:工具参数(JSON格式)" json:"tool_args"`
+	ToolResult string          `gorm:"column:tool_result;type:text;comment:工具执行结果(JSON格式)" json:"tool_result"`
+	Metadata   string          `gorm:"column:metadata;type:text;comment:元数据(JSON格式)" json:"metadata"`
 }
 
 // TableName returns the table name for Message.

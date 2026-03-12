@@ -9,6 +9,7 @@ const (
 	RoleAgent      RoleType = "agent"
 	RoleSystem     RoleType = "system"
 	RoleAssistant  RoleType = "assistant"
+	RoleTool       RoleType = "tool"
 	RoleToolCall   RoleType = "tool_call"
 	RoleToolResult RoleType = "tool_result"
 )

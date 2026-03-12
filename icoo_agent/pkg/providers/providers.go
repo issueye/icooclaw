@@ -132,9 +132,18 @@ func parseStreamChunk(data string) (content string, reasoning string, toolCalls 
 	var chunk struct {
 		Choices []struct {
 			Delta struct {
-				Content   string     `json:"content"`
-				Reasoning string     `json:"reasoning_content"`
-				ToolCalls []ToolCall `json:"tool_calls"`
+				Content   string `json:"content"`
+				Reasoning string `json:"reasoning_content"`
+				// ToolCalls in streaming format uses index instead of id
+				ToolCalls []struct {
+					Index int    `json:"index"`
+					ID    string `json:"id"`
+					Type  string `json:"type"`
+					Function struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				} `json:"tool_calls"`
 			} `json:"delta"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -146,7 +155,33 @@ func parseStreamChunk(data string) (content string, reasoning string, toolCalls 
 
 	if len(chunk.Choices) > 0 {
 		done = chunk.Choices[0].FinishReason != ""
-		return chunk.Choices[0].Delta.Content, chunk.Choices[0].Delta.Reasoning, chunk.Choices[0].Delta.ToolCalls, done, nil
+
+		// Convert streaming tool calls to ToolCall format
+		// We use ID field to store index temporarily for merging
+		var calls []ToolCall
+		for _, tc := range chunk.Choices[0].Delta.ToolCalls {
+			// Create a unique key for merging: use index as part of ID
+			// Format: "stream_index:N" where N is the index
+			streamID := fmt.Sprintf("stream_index:%d", tc.Index)
+			if tc.ID != "" {
+				// If we have a real ID, use it but remember the index
+				streamID = tc.ID
+			}
+
+			calls = append(calls, ToolCall{
+				ID:   streamID,
+				Type: tc.Type,
+				Function: struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				}{
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				},
+			})
+		}
+
+		return chunk.Choices[0].Delta.Content, chunk.Choices[0].Delta.Reasoning, calls, done, nil
 	}
 
 	return "", "", nil, false, nil

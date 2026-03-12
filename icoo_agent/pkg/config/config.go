@@ -15,11 +15,12 @@ import (
 // Only basic configuration is stored in config file.
 // Dynamic configuration is stored in SQLite database.
 type Config struct {
-	Agent    AgentConfig    `mapstructure:"agent"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Gateway  GatewayConfig  `mapstructure:"gateway"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
-	Channels ChannelsConfig `mapstructure:"channels"`
+	Mode     string         `mapstructure:"mode"`     // 模式 debug 或 release
+	Agent    AgentConfig    `mapstructure:"agent"`    // 基本智能体配置
+	Database DatabaseConfig `mapstructure:"database"` // 数据库配置
+	Gateway  GatewayConfig  `mapstructure:"gateway"`  // 网关配置
+	Logging  LoggingConfig  `mapstructure:"logging"`  // 日志配置
+	Channels ChannelsConfig `mapstructure:"channels"` // 渠道配置
 }
 
 // AgentConfig contains basic agent configuration.
@@ -141,6 +142,7 @@ func Load(path string) (*Config, error) {
 
 // setDefaults sets default values in viper.
 func setDefaults(v *viper.Viper, cfg *Config) {
+	v.SetDefault("mode", cfg.Mode)
 	v.SetDefault("agent.workspace", cfg.Agent.Workspace)
 	v.SetDefault("agent.default_model", cfg.Agent.DefaultModel)
 	v.SetDefault("agent.default_provider", cfg.Agent.DefaultProvider)

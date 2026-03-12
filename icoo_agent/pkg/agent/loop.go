@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,7 +26,7 @@ const (
 	defaultResponse          = "处理完成，但没有响应内容。"
 )
 
-// StreamChunk represents a chunk of streaming response.
+// StreamChunk 表示流式响应的一个数据块。
 type StreamChunk struct {
 	Content   string `json:"content"`
 	Reasoning string `json:"reasoning,omitempty"`
@@ -33,21 +34,22 @@ type StreamChunk struct {
 	Error     error  `json:"error,omitempty"`
 }
 
-// StreamCallback is called for each chunk in a streaming response.
+// StreamCallback 流式响应的回调函数，每个数据块都会调用一次。
 type StreamCallback func(chunk StreamChunk) error
 
-// Loop represents the main agent processing loop.
+// Loop 表示主要的智能体处理循环。
 type Loop struct {
-	bus            *bus.MessageBus
-	provider       providers.Provider
-	fallbackChain  *providers.FallbackChain
-	tools          *tools.Registry
-	memory         memory.Loader
-	skills         skill.Loader
-	storage        *storage.Storage
-	channelManager *channels.Manager
+	bus             *bus.MessageBus
+	provider        providers.Provider
+	providerFactory *providers.Factory
+	fallbackChain   *providers.FallbackChain
+	tools           *tools.Registry
+	memory          memory.Loader
+	skills          skill.Loader
+	storage         *storage.Storage
+	channelManager  *channels.Manager
 
-	// Configuration
+	// Configuration 配置项
 	maxToolIterations int
 	systemPrompt      string
 
@@ -57,7 +59,7 @@ type Loop struct {
 	logger *slog.Logger
 }
 
-// NewLoop creates a new agent loop.
+// NewLoop 创建一个新的智能体循环。
 func NewLoop(opts ...LoopOption) *Loop {
 	l := &Loop{
 		tools:             tools.NewRegistry(),
@@ -72,55 +74,60 @@ func NewLoop(opts ...LoopOption) *Loop {
 	return l
 }
 
-// LoopOption is a functional option for Loop.
+// LoopOption 智能体循环的函数式选项。
 type LoopOption func(*Loop)
 
-// WithLoopBus sets the message bus.
+// WithLoopBus 设置消息总线。
 func WithLoopBus(b *bus.MessageBus) LoopOption {
 	return func(l *Loop) { l.bus = b }
 }
 
-// WithLoopProvider sets the provider.
+// WithLoopProvider 设置提供商。
 func WithLoopProvider(p providers.Provider) LoopOption {
 	return func(l *Loop) { l.provider = p }
 }
 
-// WithLoopFallbackChain sets the fallback chain.
+// WithLoopProviderFactory 设置提供商工厂，用于动态获取提供商。
+func WithLoopProviderFactory(f *providers.Factory) LoopOption {
+	return func(l *Loop) { l.providerFactory = f }
+}
+
+// WithLoopFallbackChain 设置降级链。
 func WithLoopFallbackChain(fc *providers.FallbackChain) LoopOption {
 	return func(l *Loop) { l.fallbackChain = fc }
 }
 
-// WithLoopTools sets the tools registry.
+// WithLoopTools 设置工具注册表。
 func WithLoopTools(t *tools.Registry) LoopOption {
 	return func(l *Loop) { l.tools = t }
 }
 
-// WithLoopMemory sets the memory loader.
+// WithLoopMemory 设置记忆加载器。
 func WithLoopMemory(m memory.Loader) LoopOption {
 	return func(l *Loop) { l.memory = m }
 }
 
-// WithLoopSkills sets the skill loader.
+// WithLoopSkills 设置技能加载器。
 func WithLoopSkills(s skill.Loader) LoopOption {
 	return func(l *Loop) { l.skills = s }
 }
 
-// WithLoopStorage sets the storage.
+// WithLoopStorage 设置存储。
 func WithLoopStorage(s *storage.Storage) LoopOption {
 	return func(l *Loop) { l.storage = s }
 }
 
-// WithLoopChannelManager sets the channel manager.
+// WithLoopChannelManager 设置渠道管理器。
 func WithLoopChannelManager(cm *channels.Manager) LoopOption {
 	return func(l *Loop) { l.channelManager = cm }
 }
 
-// WithLoopLogger sets the logger.
+// WithLoopLogger 设置日志器。
 func WithLoopLogger(log *slog.Logger) LoopOption {
 	return func(l *Loop) { l.logger = log }
 }
 
-// WithLoopMaxToolIterations sets the maximum tool iterations.
+// WithLoopMaxToolIterations 设置最大工具迭代次数。
 func WithLoopMaxToolIterations(n int) LoopOption {
 	return func(l *Loop) {
 		if n > 0 {
@@ -129,23 +136,79 @@ func WithLoopMaxToolIterations(n int) LoopOption {
 	}
 }
 
-// WithLoopSystemPrompt sets the system prompt.
+// WithLoopSystemPrompt 设置系统提示词。
 func WithLoopSystemPrompt(prompt string) LoopOption {
 	return func(l *Loop) { l.systemPrompt = prompt }
 }
 
-// GetDefaultProvider returns the default provider.
+// GetDefaultProvider 获取默认提供商。
+// 首先检查直接设置的提供商，然后尝试从工厂获取（使用存储中的默认模型配置）。
 func (l *Loop) GetDefaultProvider() providers.Provider {
 	// Return the provider if set
 	if l.provider != nil {
 		return l.provider
 	}
 
+	// Try to get provider from factory using default model config
+	if l.providerFactory != nil && l.storage != nil {
+		provider, model, err := l.GetDynamicProvider()
+		if err == nil && provider != nil {
+			l.logger.Debug("动态获取Provider成功", "provider", provider.GetName(), "model", model)
+			return provider
+		}
+		l.logger.Debug("动态获取Provider失败，使用fallback", "error", err)
+	}
+
 	// Return the fallback chain
 	return l.fallbackChain
 }
 
-// Run starts the agent loop.
+// GetDynamicProvider 从存储配置动态获取提供商。
+// 返回提供商、模型名称和错误。
+func (l *Loop) GetDynamicProvider() (providers.Provider, string, error) {
+	if l.providerFactory == nil || l.storage == nil {
+		return nil, "", fmt.Errorf("provider factory or storage not configured")
+	}
+
+	// Get default model from storage
+	defaultModel, err := l.storage.Param().Get(consts.DEFAULT_MODEL_KEY)
+	if err != nil || defaultModel == nil || defaultModel.Value == "" {
+		return nil, "", fmt.Errorf("默认模型未配置")
+	}
+
+	// Parse provider/model format (e.g., "openai/gpt-4o")
+	parts := splitProviderModel(defaultModel.Value)
+	if len(parts) != 2 {
+		return nil, "", fmt.Errorf("默认模型格式错误: %s", defaultModel.Value)
+	}
+
+	providerName, modelName := parts[0], parts[1]
+
+	// Get provider from factory
+	provider, err := l.providerFactory.Get(providerName)
+	if err != nil {
+		return nil, "", fmt.Errorf("获取Provider失败: %w", err)
+	}
+
+	return provider, modelName, nil
+}
+
+// splitProviderModel 分割模型字符串，格式为 "provider/model"。
+func splitProviderModel(modelStr string) []string {
+	idx := -1
+	for i := 0; i < len(modelStr); i++ {
+		if modelStr[i] == '/' {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return nil
+	}
+	return []string{modelStr[:idx], modelStr[idx+1:]}
+}
+
+// Run 启动智能体循环。
 func (l *Loop) Run(ctx context.Context) error {
 	l.running.Store(true)
 	defer l.running.Store(false)
@@ -196,12 +259,12 @@ func (l *Loop) Run(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the agent loop.
+// Stop 停止智能体循环。
 func (l *Loop) Stop() {
 	l.running.Store(false)
 }
 
-// processMessage processes an inbound message.
+// processMessage 处理入站消息。
 func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {
 	l.logger.With("name", "【智能体】").Info("正在处理消息",
 		"channel", msg.Channel,
@@ -222,8 +285,8 @@ func (l *Loop) processMessage(ctx context.Context, msg bus.InboundMessage) (stri
 	return l.processWithAgent(ctx, binding.AgentName, msg)
 }
 
-// processWithAgent processes a message with a specific agent.
-// This is the core message processing logic, similar to PicoClaw's runAgentLoop.
+// processWithAgent 使用指定智能体处理消息。
+// 这是核心消息处理逻辑，类似于 PicoClaw 的 runAgentLoop。
 func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.InboundMessage) (string, error) {
 	l.logger.With("name", "【智能体】").Info("使用代理处理",
 		"agent", agentName,
@@ -249,7 +312,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 
 	// 4. Save user message to memory
 	if l.memory != nil {
-		if err := l.memory.Save(ctx, sessionKey, "user", msg.Text); err != nil {
+		if err := l.memory.Save(ctx, sessionKey, consts.RoleUser.ToString(), msg.Text); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存用户消息失败", "error", err)
 		}
 	}
@@ -267,7 +330,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 
 	// 7. Save final assistant message to memory
 	if l.memory != nil {
-		if err := l.memory.Save(ctx, sessionKey, "assistant", finalContent); err != nil {
+		if err := l.memory.Save(ctx, sessionKey, consts.RoleAssistant.ToString(), finalContent); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
 		}
 	}
@@ -282,7 +345,7 @@ func (l *Loop) processWithAgent(ctx context.Context, agentName string, msg bus.I
 	return finalContent, nil
 }
 
-// buildMessages builds the message list for the LLM request.
+// buildMessages 构建 LLM 请求的消息列表。
 func (l *Loop) buildMessages(history []providers.ChatMessage, msg bus.InboundMessage) []providers.ChatMessage {
 	messages := make([]providers.ChatMessage, 0, len(history)+2)
 
@@ -292,7 +355,7 @@ func (l *Loop) buildMessages(history []providers.ChatMessage, msg bus.InboundMes
 		systemPrompt = "你是一个有帮助的AI助手。"
 	}
 	messages = append(messages, providers.ChatMessage{
-		Role:    "system",
+		Role:    consts.RoleSystem.ToString(),
 		Content: systemPrompt,
 	})
 
@@ -301,21 +364,21 @@ func (l *Loop) buildMessages(history []providers.ChatMessage, msg bus.InboundMes
 
 	// Add user message
 	messages = append(messages, providers.ChatMessage{
-		Role:    "user",
+		Role:    consts.RoleUser.ToString(),
 		Content: msg.Text,
 	})
 
 	return messages
 }
 
-// runLLMIteration runs the LLM iteration loop with tool calling.
+// runLLMIteration 运行 LLM 迭代循环，支持工具调用。
 func (l *Loop) runLLMIteration(
 	ctx context.Context,
 	messages []providers.ChatMessage,
 	msg bus.InboundMessage,
 ) (string, int, error) {
 	// Check if provider is configured
-	if l.provider == nil && l.fallbackChain == nil {
+	if l.provider == nil && l.fallbackChain == nil && l.providerFactory == nil {
 		l.logger.With("name", "【智能体】").Error("未配置AI提供商")
 		return "", 0, fmt.Errorf("未配置AI提供商，请在设置中配置默认模型")
 	}
@@ -327,6 +390,18 @@ func (l *Loop) runLLMIteration(
 		return "", 0, fmt.Errorf("无法获取有效的AI提供商")
 	}
 
+	// Get model name (try dynamic first, then fallback to provider default)
+	modelName := ""
+	if l.providerFactory != nil && l.storage != nil {
+		_, model, err := l.GetDynamicProvider()
+		if err == nil {
+			modelName = model
+		}
+	}
+	if modelName == "" {
+		modelName = provider.GetDefaultModel()
+	}
+
 	iteration := 0
 	currentMessages := messages
 
@@ -335,7 +410,7 @@ func (l *Loop) runLLMIteration(
 
 		// Build request
 		req := providers.ChatRequest{
-			Model:    provider.GetDefaultModel(),
+			Model:    modelName,
 			Messages: currentMessages,
 		}
 
@@ -368,7 +443,7 @@ func (l *Loop) runLLMIteration(
 
 			// Add assistant message with tool calls
 			assistantMsg := providers.ChatMessage{
-				Role:      "assistant",
+				Role:      consts.RoleAssistant.ToString(),
 				Content:   resp.Content,
 				ToolCalls: resp.ToolCalls,
 			}
@@ -383,7 +458,7 @@ func (l *Loop) runLLMIteration(
 
 				// Add tool result message
 				currentMessages = append(currentMessages, providers.ChatMessage{
-					Role:       "tool",
+					Role:       consts.RoleTool.ToString(),
 					Content:    toolResult,
 					ToolCallID: tc.ID,
 				})
@@ -407,7 +482,7 @@ func (l *Loop) runLLMIteration(
 	return "", iteration, fmt.Errorf("已达到最大工具迭代次数 (%d)", l.maxToolIterations)
 }
 
-// executeToolCall executes a tool call and returns the result.
+// executeToolCall 执行工具调用并返回结果。
 func (l *Loop) executeToolCall(
 	ctx context.Context,
 	tc providers.ToolCall,
@@ -436,10 +511,15 @@ func (l *Loop) executeToolCall(
 		return "", result.Error
 	}
 
+	// 打印工具执行结果
+	l.logger.With("name", "【智能体】").Info("工具执行结果",
+		"tool", toolName,
+		"result", result.Content)
+
 	return result.Content, nil
 }
 
-// convertToolDefinitions converts tools.ToolDefinition to providers.Tool.
+// convertToolDefinitions 将 tools.ToolDefinition 转换为 providers.Tool。
 func (l *Loop) convertToolDefinitions(defs []tools.ToolDefinition) []providers.Tool {
 	tools := make([]providers.Tool, 0, len(defs))
 	for _, def := range defs {
@@ -455,13 +535,13 @@ func (l *Loop) convertToolDefinitions(defs []tools.ToolDefinition) []providers.T
 	return tools
 }
 
-// IsRunning returns true if the loop is running.
+// IsRunning 返回循环是否正在运行。
 func (l *Loop) IsRunning() bool {
 	return l.running.Load()
 }
 
-// ProcessDirect processes a message directly without going through the bus.
-// This is useful for CLI or API interactions.
+// ProcessDirect 直接处理消息，不经过消息总线。
+// 适用于 CLI 或 API 交互。
 func (l *Loop) ProcessDirect(
 	ctx context.Context,
 	content, sessionID string,
@@ -469,7 +549,7 @@ func (l *Loop) ProcessDirect(
 	return l.ProcessDirectWithChannel(ctx, content, sessionID, "cli", sessionID)
 }
 
-// ProcessDirectWithChannel processes a message directly with specific channel/sessionID.
+// ProcessDirectWithChannel 直接处理消息，指定渠道和会话ID。
 func (l *Loop) ProcessDirectWithChannel(
 	ctx context.Context,
 	content, sessionID, channel, _ string,
@@ -487,17 +567,17 @@ func (l *Loop) ProcessDirectWithChannel(
 	return l.processWithAgent(ctx, "default", msg)
 }
 
-// RegisterTool registers a tool with the loop's tool registry.
+// RegisterTool 向循环的工具注册表注册工具。
 func (l *Loop) RegisterTool(tool tools.Tool) {
 	l.tools.Register(tool)
 }
 
-// SetChannelManager sets the channel manager.
+// SetChannelManager 设置渠道管理器。
 func (l *Loop) SetChannelManager(cm *channels.Manager) {
 	l.channelManager = cm
 }
 
-// ProcessStreamWithChannel processes a message with streaming response.
+// ProcessStreamWithChannel 处理消息并返回流式响应。
 func (l *Loop) ProcessStreamWithChannel(
 	ctx context.Context,
 	content, sessionID, channel, _ string,
@@ -516,14 +596,14 @@ func (l *Loop) ProcessStreamWithChannel(
 	return l.processStreamWithAgent(ctx, "default", msg, callback)
 }
 
-// processStreamWithAgent processes a message with streaming response.
+// processStreamWithAgent 使用流式响应处理消息。
 func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg bus.InboundMessage, callback StreamCallback) error {
 	l.logger.With("name", "【智能体】").Info("使用代理处理(流式)",
 		"agent", agentName,
 		"channel", msg.Channel,
 		"session_id", msg.SessionID)
 
-	// 1. Build session key
+	// 1. Build session key (format: channel:sessionID)
 	sessionKey := consts.GetSessionKey(msg.Channel, msg.SessionID)
 
 	// 2. Load memory/history
@@ -542,7 +622,7 @@ func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg
 
 	// 4. Save user message to memory
 	if l.memory != nil {
-		if err := l.memory.Save(ctx, sessionKey, "user", msg.Text); err != nil {
+		if err := l.memory.Save(ctx, sessionKey, consts.RoleUser.ToString(), msg.Text); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存用户消息失败", "error", err)
 		}
 	}
@@ -560,7 +640,7 @@ func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg
 
 	// 7. Save final assistant message to memory
 	if l.memory != nil {
-		if err := l.memory.Save(ctx, sessionKey, "assistant", finalContent); err != nil {
+		if err := l.memory.Save(ctx, sessionKey, consts.RoleAssistant.ToString(), finalContent); err != nil {
 			l.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
 		}
 	}
@@ -581,7 +661,7 @@ func (l *Loop) processStreamWithAgent(ctx context.Context, agentName string, msg
 	return nil
 }
 
-// runLLMIterationStream runs the LLM iteration loop with streaming response.
+// runLLMIterationStream 运行 LLM 迭代循环，支持流式响应。
 func (l *Loop) runLLMIterationStream(
 	ctx context.Context,
 	messages []providers.ChatMessage,
@@ -589,7 +669,7 @@ func (l *Loop) runLLMIterationStream(
 	callback StreamCallback,
 ) (string, int, error) {
 	// Check if provider is configured
-	if l.provider == nil && l.fallbackChain == nil {
+	if l.provider == nil && l.fallbackChain == nil && l.providerFactory == nil {
 		l.logger.With("name", "【智能体】").Error("未配置AI提供商")
 		return "", 0, fmt.Errorf("未配置AI提供商，请在设置中配置默认模型")
 	}
@@ -601,6 +681,18 @@ func (l *Loop) runLLMIterationStream(
 		return "", 0, fmt.Errorf("无法获取有效的AI提供商")
 	}
 
+	// Get model name (try dynamic first, then fallback to provider default)
+	modelName := ""
+	if l.providerFactory != nil && l.storage != nil {
+		_, model, err := l.GetDynamicProvider()
+		if err == nil {
+			modelName = model
+		}
+	}
+	if modelName == "" {
+		modelName = provider.GetDefaultModel()
+	}
+
 	iteration := 0
 	currentMessages := messages
 	var finalContent string
@@ -610,7 +702,7 @@ func (l *Loop) runLLMIterationStream(
 
 		// Build request
 		req := providers.ChatRequest{
-			Model:    provider.GetDefaultModel(),
+			Model:    modelName,
 			Messages: currentMessages,
 		}
 
@@ -671,11 +763,38 @@ func (l *Loop) runLLMIterationStream(
 			// Merge tool calls with same ID
 			mergedToolCalls := l.mergeToolCalls(collectedToolCalls)
 
+			// Validate tool calls before adding to messages
+			validToolCalls := make([]providers.ToolCall, 0, len(mergedToolCalls))
+			for _, tc := range mergedToolCalls {
+				// Skip tool calls with empty name
+				if tc.Function.Name == "" {
+					l.logger.Warn("跳过无效工具调用：缺少工具名称", "id", tc.ID)
+					continue
+				}
+				// Ensure arguments is valid JSON or empty object
+				if tc.Function.Arguments == "" {
+					tc.Function.Arguments = "{}"
+				} else if !isValidJSON(tc.Function.Arguments) {
+					l.logger.Warn("工具调用参数不是有效JSON，尝试修复",
+						"name", tc.Function.Name,
+						"arguments", tc.Function.Arguments)
+					// Try to fix common issues
+					tc.Function.Arguments = fixJSONArguments(tc.Function.Arguments)
+				}
+				validToolCalls = append(validToolCalls, tc)
+			}
+
+			if len(validToolCalls) == 0 {
+				// No valid tool calls, treat as normal response
+				finalContent = collectedContent
+				return finalContent, iteration, nil
+			}
+
 			// Add assistant message with tool calls
 			assistantMsg := providers.ChatMessage{
-				Role:      "assistant",
+				Role:      consts.RoleAssistant.ToString(),
 				Content:   collectedContent,
-				ToolCalls: mergedToolCalls,
+				ToolCalls: validToolCalls,
 			}
 			currentMessages = append(currentMessages, assistantMsg)
 
@@ -688,7 +807,7 @@ func (l *Loop) runLLMIterationStream(
 
 				// Add tool result message
 				currentMessages = append(currentMessages, providers.ChatMessage{
-					Role:       "tool",
+					Role:       consts.RoleTool.ToString(),
 					Content:    toolResult,
 					ToolCallID: tc.ID,
 				})
@@ -714,28 +833,123 @@ func (l *Loop) runLLMIterationStream(
 	return "", iteration, fmt.Errorf("已达到最大工具迭代次数 (%d)", l.maxToolIterations)
 }
 
-// mergeToolCalls merges tool calls with the same ID (for streaming responses).
+// mergeToolCalls 合并流式响应中的工具调用。
+// 在流式响应中，工具调用分块传输，使用 index 作为标识符（存储在 ID 中为 "stream_index:N"）。
+// 此函数按流式 ID 合并它们，并在需要时生成正确的 ID。
 func (l *Loop) mergeToolCalls(toolCalls []providers.ToolCall) []providers.ToolCall {
 	if len(toolCalls) == 0 {
 		return nil
 	}
 
+	// Merge by ID (which contains stream_index or real ID)
 	merged := make(map[string]*providers.ToolCall)
 	for _, tc := range toolCalls {
-		if existing, ok := merged[tc.ID]; ok {
-			// Merge arguments (they come in pieces during streaming)
+		key := tc.ID
+		if key == "" {
+			continue
+		}
+
+		if existing, ok := merged[key]; ok {
+			// Merge pieces
+			if tc.Function.Name != "" {
+				existing.Function.Name = tc.Function.Name
+			}
+			if tc.ID != "" && !isStreamIndexID(tc.ID) {
+				// Real ID, update it
+				existing.ID = tc.ID
+			}
 			existing.Function.Arguments += tc.Function.Arguments
 		} else {
-			// Create a copy
+			// Create new entry
 			copy := tc
-			merged[tc.ID] = &copy
+			merged[key] = &copy
 		}
 	}
 
+	// Convert to result and fix IDs
 	result := make([]providers.ToolCall, 0, len(merged))
 	for _, tc := range merged {
-		result = append(result, *tc)
+		// Skip tool calls without a name (invalid/incomplete)
+		if tc.Function.Name == "" {
+			l.logger.Warn("跳过无效工具调用：缺少工具名称", "id", tc.ID)
+			continue
+		}
+
+		// Generate a proper ID if it's still a stream index ID
+		id := tc.ID
+		if isStreamIndexID(id) {
+			id = fmt.Sprintf("call_%s_%d", tc.Function.Name, time.Now().UnixNano())
+		}
+
+		result = append(result, providers.ToolCall{
+			ID:   id,
+			Type: "function",
+			Function: struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			}{
+				Name:      tc.Function.Name,
+				Arguments: tc.Function.Arguments,
+			},
+		})
 	}
 
+	l.logger.Debug("合并工具调用完成",
+		"input_count", len(toolCalls),
+		"output_count", len(result))
+
 	return result
+}
+
+// isStreamIndexID 检查 ID 是否为临时的流式索引 ID。
+func isStreamIndexID(id string) bool {
+	return len(id) > 12 && id[:12] == "stream_index"
+}
+
+// isValidJSON 检查字符串是否为有效的 JSON。
+func isValidJSON(s string) bool {
+	var js interface{}
+	return json.Unmarshal([]byte(s), &js) == nil
+}
+
+// fixJSONArguments 尝试修复流式响应中不完整的 JSON 参数。
+func fixJSONArguments(s string) string {
+	s = strings.TrimSpace(s)
+
+	// If empty, return empty object
+	if s == "" {
+		return "{}"
+	}
+
+	// Try to parse as-is first
+	if isValidJSON(s) {
+		return s
+	}
+
+	// Common fixes for incomplete streaming JSON
+
+	// Fix unclosed string
+	if strings.Count(s, "\"")%2 == 1 {
+		s += "\""
+	}
+
+	// Fix unclosed braces
+	openBraces := strings.Count(s, "{") - strings.Count(s, "}")
+	for i := 0; i < openBraces; i++ {
+		s += "}"
+	}
+
+	// Fix unclosed brackets
+	openBrackets := strings.Count(s, "[") - strings.Count(s, "]")
+	for i := 0; i < openBrackets; i++ {
+		s += "]"
+	}
+
+	// Try again
+	if isValidJSON(s) {
+		return s
+	}
+
+	// Last resort: return empty object
+	return "{}"
 }

@@ -23,12 +23,14 @@ import (
 	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/memory"
 	"icooclaw/pkg/providers"
+	"icooclaw/pkg/skill"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
+	"icooclaw/pkg/tools/builtin"
 
 	// Import channel implementations to register their factories
-	_ "icooclaw/pkg/channels/feishu"
 	_ "icooclaw/pkg/channels/dingtalk"
+	_ "icooclaw/pkg/channels/feishu"
 )
 
 var (
@@ -101,7 +103,7 @@ func runStart(cmd *cobra.Command, args []string) {
 
 	// Initialize storage
 	dbPath, _ := cfg.GetDatabasePath()
-	store, err := storage.New(dbPath)
+	store, err := storage.New(cfg.Mode, dbPath)
 	if err != nil {
 		slog.Error("初始化存储失败", "error", err)
 		os.Exit(1)
@@ -214,7 +216,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 
 	// 初始化存储
 	dbPath, _ := cfg.GetDatabasePath()
-	store, err := storage.New(dbPath)
+	store, err := storage.New(cfg.Mode, dbPath)
 	if err != nil {
 		slog.Error("初始化存储失败", "error", err)
 		os.Exit(1)
@@ -230,8 +232,14 @@ func runGateway(cmd *cobra.Command, args []string) {
 	// 初始化工具注册表
 	toolRegistry := tools.NewRegistry()
 
+	// 注册内置工具
+	registerBuiltinTools(toolRegistry)
+
 	// 初始化记忆加载器
 	memLoader := memory.NewLoader(store, 100, slog.Default())
+
+	// 初始化 skill 加载器
+	skillLoader := skill.NewLoader(store, slog.Default())
 
 	// 获取默认提供商
 	var defaultProvider providers.Provider
@@ -256,8 +264,10 @@ func runGateway(cmd *cobra.Command, args []string) {
 	agentLoop := agent.NewLoop(
 		agent.WithLoopBus(messageBus),
 		agent.WithLoopProvider(defaultProvider),
+		agent.WithLoopProviderFactory(providerFactory),
 		agent.WithLoopTools(toolRegistry),
 		agent.WithLoopMemory(memLoader),
+		agent.WithLoopSkills(skillLoader),
 		agent.WithLoopStorage(store),
 		agent.WithLoopLogger(slog.Default()),
 	)
@@ -364,4 +374,10 @@ func parseLogLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// registerBuiltinTools registers built-in tools to the registry.
+func registerBuiltinTools(registry *tools.Registry) {
+	builtin.RegisterBuiltinTools(registry)
+	slog.Info("内置工具注册完成", "count", registry.Count())
 }

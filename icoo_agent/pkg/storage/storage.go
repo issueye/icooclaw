@@ -70,16 +70,18 @@ func (s *Storage) Task() *TaskStorage {
 }
 
 // New creates a new Storage instance.
-func New(path string) (*Storage, error) {
+func New(mode string, path string) (*Storage, error) {
 	db, err := gorm.Open(sqlite.Open(path+"?_journal_mode=WAL&_busy_timeout=5000"), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Enable debug mode
-	db = db.Debug()
+	// 开启调试模式
+	if mode == "debug" {
+		db = db.Debug()
+	}
 
-	// Get underlying sql.DB for connection pool settings
+	// Get underlying sql.DB 获取数据库连接池设置
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get underlying db: %w", err)

@@ -185,14 +185,15 @@ func (r *Registry) ExecuteWithContext(
 	channel, sessionID string,
 	asyncCallback AsyncCallback,
 ) *Result {
-	r.logger.Info("tool execution started",
+	r.logger.With("name", "【智能体】").Info("工具执行开始",
 		"tool", name,
 		"channel", channel,
 		"session_id", sessionID)
 
 	tool, err := r.Get(name)
 	if err != nil {
-		r.logger.Error("tool not found", "tool", name)
+		r.logger.With("name", "【智能体】").Error("工具不存在",
+			"tool", name)
 		return &Result{
 			Success: false,
 			Error:   fmt.Errorf("tool %q not found", name),
@@ -208,7 +209,8 @@ func (r *Registry) ExecuteWithContext(
 
 	// Check for async execution
 	if asyncExec, ok := tool.(AsyncExecutor); ok && asyncCallback != nil {
-		r.logger.Debug("executing async tool", "tool", name)
+		r.logger.With("name", "【智能体】").Info("异步执行工具",
+			"tool", name)
 		result = asyncExec.ExecuteAsync(ctx, args, asyncCallback)
 	} else {
 		result = tool.Execute(ctx, args)
@@ -217,12 +219,12 @@ func (r *Registry) ExecuteWithContext(
 
 	// Log based on result type
 	if result.Error != nil {
-		r.logger.Error("tool execution failed",
+		r.logger.With("name", "【智能体】").Error("工具执行失败",
 			"tool", name,
 			"duration_ms", duration.Milliseconds(),
 			"error", result.Error)
 	} else {
-		r.logger.Info("tool execution completed",
+		r.logger.With("name", "【智能体】").Info("工具执行完成",
 			"tool", name,
 			"duration_ms", duration.Milliseconds(),
 			"result_length", len(result.Content))
