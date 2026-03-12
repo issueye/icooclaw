@@ -12,6 +12,8 @@ import (
 	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/memory"
 	"icooclaw/pkg/providers"
+	"icooclaw/pkg/scheduler"
+	schedulerTool "icooclaw/pkg/scheduler/tool"
 	"icooclaw/pkg/skill"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
@@ -28,6 +30,7 @@ import (
 type App struct {
 	Ctx             context.Context       // 上下文
 	Cancel          context.CancelFunc    // 上下文取消函数
+	Logger          *slog.Logger          // 日志记录器
 	Cfg             *config.Config        // 配置
 	Storage         *storage.Storage      // 存储实例
 	MessageBus      *bus.MessageBus       // 消息总线
@@ -40,6 +43,7 @@ type App struct {
 	AgentRegistry   *agent.AgentRegistry  // 代理注册表
 	ChannelManager  *channels.Manager     // 渠道管理器
 	Gw              *gateway.Server       // 网关服务器
+	Scheduler       *scheduler.Scheduler  // 任务调度器
 }
 
 func NewApp() *App {
@@ -58,6 +62,10 @@ func (a *App) InitTool() {
 
 	// 注册内置工具
 	builtin.RegisterBuiltinTools(a.ToolRegistry)
+
+	// 注册定时任务
+	schedulerTool := schedulerTool.NewTool(a.Storage.Task(), a.Scheduler, a.Logger)
+	a.ToolRegistry.Register(schedulerTool)
 }
 
 // InitProvider 初始化提供商工厂
@@ -134,7 +142,7 @@ func (a *App) InitConfig(cfgFile string) error {
 	return nil
 }
 
-func (a *App) InitLog() {
+func (a *App) InitLog() *slog.Logger {
 	opts := &slog.HandlerOptions{
 		Level: parseLogLevel(a.Cfg.Logging.Level),
 	}
@@ -146,7 +154,10 @@ func (a *App) InitLog() {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 
-	slog.SetDefault(slog.New(handler))
+	logger := slog.New(handler)
+
+	slog.SetDefault(logger)
+	return logger
 }
 
 func (a *App) InitAgent() {
@@ -205,7 +216,9 @@ func (a *App) Init(path string) error {
 		return err
 	}
 	// 初始化日志
-	a.InitLog()
+	a.Logger = a.InitLog()
+	// 初始化任务调度器
+	a.Scheduler = scheduler.NewScheduler(a.Logger)
 	// 初始化存储
 	a.InitStorage()
 	// 初始化消息总线
@@ -235,6 +248,13 @@ func (a *App) RunGateway() {
 		err := a.ChannelManager.StartAll(a.Ctx)
 		if err != nil {
 			slog.Error("渠道管理器错误", "error", err)
+		}
+	}()
+
+	// 启动任务调度器
+	go func() {
+		if err := a.Scheduler.Start(a.Ctx); err != nil {
+			slog.Error("任务调度器错误", "error", err)
 		}
 	}()
 
