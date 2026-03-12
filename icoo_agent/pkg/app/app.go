@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -111,25 +111,27 @@ func (a *App) InitStorage() {
 }
 
 // InitConfig 初始化配置
-func (a *App) InitConfig() {
+func (a *App) InitConfig(cfgFile string) error {
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		slog.Error("加载配置失败", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	// 确保目录存在
 	if err := cfg.EnsureWorkspace(); err != nil {
 		slog.Error("创建工作目录失败", "error", err)
-		os.Exit(1)
+		return err
 	}
 	if err := cfg.EnsureDatabasePath(); err != nil {
 		slog.Error("创建数据库目录失败", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	// 设置配置实例
 	a.Cfg = cfg
+
+	return nil
 }
 
 func (a *App) InitLog() {
@@ -195,11 +197,13 @@ func (a *App) InitGateway() {
 		Setup()
 }
 
-func (a *App) Init() {
+func (a *App) Init(path string) error {
 	// 初始化上下文
 	a.Ctx, a.Cancel = context.WithCancel(context.Background())
 	// 初始化配置
-	a.InitConfig()
+	if err := a.InitConfig(path); err != nil {
+		return err
+	}
 	// 初始化日志
 	a.InitLog()
 	// 初始化存储
@@ -220,6 +224,8 @@ func (a *App) Init() {
 	a.InitAgent()
 	// 初始化网关服务器
 	a.InitGateway()
+
+	return nil
 }
 
 // RunGateway 运行网关服务
@@ -282,5 +288,20 @@ func (a *App) Close() {
 	// 关闭存储
 	if a.Storage != nil {
 		a.Storage.Close()
+	}
+}
+
+func parseLogLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }

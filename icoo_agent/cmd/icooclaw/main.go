@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"icooclaw/pkg/agent"
+	"icooclaw/pkg/app"
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/config"
 	"icooclaw/pkg/memory"
@@ -185,11 +186,14 @@ func runStart(cmd *cobra.Command, args []string) {
 // runGateway 启动网关服务
 func runGateway(cmd *cobra.Command, args []string) {
 	// 创建应用实例
-	app := NewApp()
+	app := app.NewApp()
 	// 关闭
 	defer app.Close()
 	// 初始化
-	app.Init()
+	if err := app.Init(cfgFile); err != nil {
+		slog.Error("初始化失败", "error", err)
+		os.Exit(1)
+	}
 	// 运行网关服务
 	app.RunGateway()
 
