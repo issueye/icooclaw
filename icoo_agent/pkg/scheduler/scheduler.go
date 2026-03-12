@@ -4,6 +4,9 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"icooclaw/pkg/bus"
+	"icooclaw/pkg/channels/consts"
+	"icooclaw/pkg/storage"
 	"log/slog"
 	"sync"
 	"time"
@@ -39,11 +42,13 @@ type Scheduler struct {
 	results chan TaskResult
 	logger  *slog.Logger
 	mu      sync.RWMutex
+	storage *storage.TaskStorage
+	bus     *bus.MessageBus
 	running bool
 }
 
 // NewScheduler creates a new scheduler.
-func NewScheduler(logger *slog.Logger) *Scheduler {
+func NewScheduler(storage *storage.TaskStorage, bus *bus.MessageBus, logger *slog.Logger) *Scheduler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -53,6 +58,8 @@ func NewScheduler(logger *slog.Logger) *Scheduler {
 		tasks:   make(map[string]*Task),
 		results: make(chan TaskResult, 100),
 		logger:  logger,
+		storage: storage,
+		bus:     bus,
 	}
 }
 
@@ -178,6 +185,40 @@ func (s *Scheduler) RunTask(id string) error {
 	}
 
 	go s.executeTask(task)
+	return nil
+}
+
+func (s *Scheduler) LoadTasks() error {
+	tasks, err := s.storage.GetAll()
+	if err != nil {
+		return fmt.Errorf("加载任务失败: %w", err)
+	}
+
+	for _, task := range tasks {
+		s.tasks[task.ID] = &Task{
+			ID:          task.ID,
+			Name:        task.Name,
+			Schedule:    task.CronExpr,
+			Description: task.Description,
+			Enabled:     task.Enabled,
+			Handler: func(ctx context.Context) error {
+				s.logger.Info("执行任务", "task_id", task.ID, "task_name", task.Name)
+				// 发送一条 outbound 消息
+				msg := bus.InboundMessage{
+					Channel:   consts.WEBSOCKET,
+					SessionID: "",
+					Text:      task.Description,
+					Timestamp: time.Now(),
+					Metadata: map[string]any{
+						"task_id":   task.ID,
+						"task_name": task.Name,
+					},
+				}
+				s.bus.PublishInbound(context.Background(), msg)
+				return nil
+			},
+		}
+	}
 	return nil
 }
 

@@ -222,12 +222,12 @@ func (a *App) Init(path string) error {
 	}
 	// 初始化日志
 	a.Logger = a.InitLog()
-	// 初始化任务调度器
-	a.Scheduler = scheduler.NewScheduler(a.Logger)
 	// 初始化存储
 	a.InitStorage()
 	// 初始化消息总线
 	a.InitBus()
+	// 初始化任务调度器
+	a.Scheduler = scheduler.NewScheduler(a.Storage.Task(), a.MessageBus, a.Logger)
 	// 初始化工具
 	a.InitTool()
 	// 初始化记忆加载器
