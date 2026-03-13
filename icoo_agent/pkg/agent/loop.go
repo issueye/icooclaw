@@ -42,7 +42,6 @@ type Loop struct {
 	bus             *bus.MessageBus
 	provider        providers.Provider
 	providerFactory *providers.Factory
-	fallbackChain   *providers.FallbackChain
 	tools           *tools.Registry
 	memory          memory.Loader
 	skills          skill.Loader
@@ -92,11 +91,6 @@ func WithLoopProviderFactory(f *providers.Factory) LoopOption {
 	return func(l *Loop) { l.providerFactory = f }
 }
 
-// WithLoopFallbackChain 设置降级链。
-func WithLoopFallbackChain(fc *providers.FallbackChain) LoopOption {
-	return func(l *Loop) { l.fallbackChain = fc }
-}
-
 // WithLoopTools 设置工具注册表。
 func WithLoopTools(t *tools.Registry) LoopOption {
 	return func(l *Loop) { l.tools = t }
@@ -139,28 +133,6 @@ func WithLoopMaxToolIterations(n int) LoopOption {
 // WithLoopSystemPrompt 设置系统提示词。
 func WithLoopSystemPrompt(prompt string) LoopOption {
 	return func(l *Loop) { l.systemPrompt = prompt }
-}
-
-// GetDefaultProvider 获取默认提供商。
-// 首先检查直接设置的提供商，然后尝试从工厂获取（使用存储中的默认模型配置）。
-func (l *Loop) GetDefaultProvider() providers.Provider {
-	// Return the provider if set
-	if l.provider != nil {
-		return l.provider
-	}
-
-	// Try to get provider from factory using default model config
-	if l.providerFactory != nil && l.storage != nil {
-		provider, model, err := l.GetDynamicProvider()
-		if err == nil && provider != nil {
-			l.logger.Debug("动态获取Provider成功", "provider", provider.GetName(), "model", model)
-			return provider
-		}
-		l.logger.Debug("动态获取Provider失败，使用fallback", "error", err)
-	}
-
-	// Return the fallback chain
-	return l.fallbackChain
 }
 
 // GetDynamicProvider 从存储配置动态获取提供商。
@@ -226,7 +198,10 @@ func (l *Loop) Run(ctx context.Context) error {
 				continue
 			}
 
-			// Process message in a separate goroutine
+			// 记录收到的消息
+			l.logger.Info("收到消息", "channel", msg.Channel, "session_id", msg.SessionID, "sender", msg.Sender.ID)
+
+			// 处理消息
 			go func() {
 				response, err := l.processMessage(ctx, msg)
 				if err != nil {
@@ -377,29 +352,9 @@ func (l *Loop) runLLMIteration(
 	messages []providers.ChatMessage,
 	msg bus.InboundMessage,
 ) (string, int, error) {
-	// Check if provider is configured
-	if l.provider == nil && l.fallbackChain == nil && l.providerFactory == nil {
-		l.logger.With("name", "【智能体】").Error("未配置AI提供商")
-		return "", 0, fmt.Errorf("未配置AI提供商，请在设置中配置默认模型")
-	}
-
-	// Get the provider to use
-	provider := l.GetDefaultProvider()
-	if provider == nil {
-		l.logger.With("name", "【智能体】").Error("无法获取有效的AI提供商")
-		return "", 0, fmt.Errorf("无法获取有效的AI提供商")
-	}
-
-	// Get model name (try dynamic first, then fallback to provider default)
-	modelName := ""
-	if l.providerFactory != nil && l.storage != nil {
-		_, model, err := l.GetDynamicProvider()
-		if err == nil {
-			modelName = model
-		}
-	}
-	if modelName == "" {
-		modelName = provider.GetDefaultModel()
+	provider, modelName, err := l.GetDynamicProvider()
+	if err != nil {
+		return "", 0, err
 	}
 
 	iteration := 0
@@ -408,13 +363,13 @@ func (l *Loop) runLLMIteration(
 	for iteration < l.maxToolIterations {
 		iteration++
 
-		// Build request
+		// Build request 构建请求
 		req := providers.ChatRequest{
 			Model:    modelName,
 			Messages: currentMessages,
 		}
 
-		// Add tools if available
+		// Add tools if available 添加工具如果可用
 		if toolDefs := l.tools.ToProviderDefs(); len(toolDefs) > 0 {
 			req.Tools = l.convertToolDefinitions(toolDefs)
 		}
@@ -423,7 +378,7 @@ func (l *Loop) runLLMIteration(
 			"iteration", iteration,
 			"message_count", len(currentMessages))
 
-		// Send to provider
+		// Send to provider 发送到提供商
 		resp, err := provider.Chat(ctx, req)
 		if err != nil {
 			l.logger.With("name", "【智能体】").Error("LLM请求失败", "error", err, "iteration", iteration)
@@ -676,29 +631,9 @@ func (l *Loop) runLLMIterationStream(
 	msg bus.InboundMessage,
 	callback StreamCallback,
 ) (string, int, error) {
-	// Check if provider is configured
-	if l.provider == nil && l.fallbackChain == nil && l.providerFactory == nil {
-		l.logger.With("name", "【智能体】").Error("未配置AI提供商")
-		return "", 0, fmt.Errorf("未配置AI提供商，请在设置中配置默认模型")
-	}
-
-	// Get the provider to use
-	provider := l.GetDefaultProvider()
-	if provider == nil {
-		l.logger.With("name", "【智能体】").Error("无法获取有效的AI提供商")
-		return "", 0, fmt.Errorf("无法获取有效的AI提供商")
-	}
-
-	// Get model name (try dynamic first, then fallback to provider default)
-	modelName := ""
-	if l.providerFactory != nil && l.storage != nil {
-		_, model, err := l.GetDynamicProvider()
-		if err == nil {
-			modelName = model
-		}
-	}
-	if modelName == "" {
-		modelName = provider.GetDefaultModel()
+	provider, modelName, err := l.GetDynamicProvider()
+	if err != nil {
+		return "", 0, err
 	}
 
 	iteration := 0
@@ -708,13 +643,13 @@ func (l *Loop) runLLMIterationStream(
 	for iteration < l.maxToolIterations {
 		iteration++
 
-		// Build request
+		// 构建请求
 		req := providers.ChatRequest{
 			Model:    modelName,
 			Messages: currentMessages,
 		}
 
-		// Add tools if available
+		// 添加工具调用如果可用
 		if toolDefs := l.tools.ToProviderDefs(); len(toolDefs) > 0 {
 			req.Tools = l.convertToolDefinitions(toolDefs)
 		}
@@ -723,14 +658,14 @@ func (l *Loop) runLLMIterationStream(
 			"iteration", iteration,
 			"message_count", len(currentMessages))
 
-		// Collect tool calls during streaming
+		// 收集工具调用
 		var collectedToolCalls []providers.ToolCall
 		var collectedContent string
 		var collectedReasoning string
 
-		// Send streaming request
+		// 发送流式请求
 		err := provider.ChatStream(ctx, req, func(chunk string, reasoning string, toolCalls []providers.ToolCall, done bool) error {
-			// Collect content
+			// 收集内容
 			collectedContent += chunk
 			collectedReasoning += reasoning
 
@@ -741,12 +676,12 @@ func (l *Loop) runLLMIterationStream(
 				"iteration", iteration,
 			)
 
-			// Collect tool calls
+			// 收集工具调用
 			if len(toolCalls) > 0 {
 				collectedToolCalls = append(collectedToolCalls, toolCalls...)
 			}
 
-			// Send chunk to callback (only content chunks, not done signal)
+			// 发送内容块到回调函数（仅发送内容块，不发送完成信号）
 			if callback != nil && chunk != "" {
 				if err := callback(StreamChunk{
 					Content:   chunk,
@@ -769,43 +704,43 @@ func (l *Loop) runLLMIterationStream(
 			return "", iteration, fmt.Errorf("%s", errMsg)
 		}
 
-		// Handle tool calls
+		// 处理工具调用
 		if len(collectedToolCalls) > 0 {
 			l.logger.With("name", "【智能体】").Info("正在处理工具调用(流式)",
 				"count", len(collectedToolCalls),
 				"iteration", iteration)
 
-			// Merge tool calls with same ID
+			// 合并相同ID的工具调用
 			mergedToolCalls := l.mergeToolCalls(collectedToolCalls)
 
-			// Validate tool calls before adding to messages
+			// 验证工具调用是否有效
 			validToolCalls := make([]providers.ToolCall, 0, len(mergedToolCalls))
 			for _, tc := range mergedToolCalls {
-				// Skip tool calls with empty name
+				// 跳过空名称的工具调用
 				if tc.Function.Name == "" {
 					l.logger.Warn("跳过无效工具调用：缺少工具名称", "id", tc.ID)
 					continue
 				}
-				// Ensure arguments is valid JSON or empty object
+				// 确保参数是有效的JSON或空对象
 				if tc.Function.Arguments == "" {
 					tc.Function.Arguments = "{}"
 				} else if !isValidJSON(tc.Function.Arguments) {
 					l.logger.Warn("工具调用参数不是有效JSON，尝试修复",
 						"name", tc.Function.Name,
 						"arguments", tc.Function.Arguments)
-					// Try to fix common issues
+					// 尝试修复常见的JSON问题，如缺少引号或空格
 					tc.Function.Arguments = fixJSONArguments(tc.Function.Arguments)
 				}
 				validToolCalls = append(validToolCalls, tc)
 			}
 
 			if len(validToolCalls) == 0 {
-				// No valid tool calls, treat as normal response
+				// 没有有效工具调用，作为普通响应处理
 				finalContent = collectedContent
 				return finalContent, iteration, nil
 			}
 
-			// Add assistant message with tool calls
+			// 添加助手消息，包含工具调用
 			assistantMsg := providers.ChatMessage{
 				Role:      consts.RoleAssistant.ToString(),
 				Content:   collectedContent,
@@ -813,14 +748,14 @@ func (l *Loop) runLLMIterationStream(
 			}
 			currentMessages = append(currentMessages, assistantMsg)
 
-			// Execute each tool call
-			for _, tc := range mergedToolCalls {
+			// 执行每个工具调用
+			for _, tc := range validToolCalls {
 				toolResult, err := l.executeToolCall(ctx, tc, msg)
 				if err != nil {
 					toolResult = fmt.Sprintf("错误: %v", err)
 				}
 
-				// Add tool result message
+				// 添加工具调用结果消息
 				currentMessages = append(currentMessages, providers.ChatMessage{
 					Role:       consts.RoleTool.ToString(),
 					Content:    toolResult,
@@ -828,11 +763,11 @@ func (l *Loop) runLLMIterationStream(
 				})
 			}
 
-			// Continue to next iteration for LLM to process tool results
+			// 继续下一个迭代，让LLM处理工具调用结果
 			continue
 		}
 
-		// No tool calls, we have the final response
+		// 没有工具调用，我们有最终响应了
 		finalContent = collectedContent
 		l.logger.With("name", "【智能体】").Debug("LLM流式响应已完成",
 			"iteration", iteration,
@@ -841,7 +776,7 @@ func (l *Loop) runLLMIterationStream(
 		return finalContent, iteration, nil
 	}
 
-	// Max iterations reached
+	// reached 最大工具迭代次数已达到
 	l.logger.With("name", "【智能体】").Warn("已达到最大工具迭代次数",
 		"iterations", l.maxToolIterations)
 

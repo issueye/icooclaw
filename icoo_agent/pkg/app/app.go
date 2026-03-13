@@ -29,22 +29,22 @@ import (
 )
 
 type App struct {
-	Ctx             context.Context       // 上下文
-	Cancel          context.CancelFunc    // 上下文取消函数
-	Logger          *slog.Logger          // 日志记录器
-	Cfg             *config.Config        // 配置
-	Storage         *storage.Storage      // 存储实例
-	MessageBus      *bus.MessageBus       // 消息总线
-	ProviderFactory *providers.Factory    // 提供商工厂
-	DefaultProvider providers.Provider    // 默认提供商
-	ToolRegistry    *tools.Registry       // 工具注册表
-	MemoryLoader    *memory.DefaultLoader // 记忆加载器
-	SkillLoader     skill.Loader          // skill 加载加载器
-	AgentLoop       *agent.Loop           // 代理循环
-	AgentRegistry   *agent.AgentRegistry  // 代理注册表
-	ChannelManager  *channels.Manager     // 渠道管理器
-	Gw              *gateway.Server       // 网关服务器
-	Scheduler       *scheduler.Scheduler  // 任务调度器
+	Ctx             context.Context      // 上下文
+	Cancel          context.CancelFunc   // 上下文取消函数
+	Logger          *slog.Logger         // 日志记录器
+	Cfg             *config.Config       // 配置
+	Storage         *storage.Storage     // 存储实例
+	MessageBus      *bus.MessageBus      // 消息总线
+	ProviderFactory *providers.Factory   // 提供商工厂
+	DefaultProvider providers.Provider   // 默认提供商
+	ToolRegistry    *tools.Registry      // 工具注册表
+	MemoryLoader    memory.Loader        // 记忆加载器
+	SkillLoader     skill.Loader         // skill 加载加载器
+	AgentLoop       *agent.Loop          // 代理循环
+	AgentRegistry   *agent.AgentRegistry // 代理注册表
+	ChannelManager  *channels.Manager    // 渠道管理器
+	Gw              *gateway.Server      // 网关服务器
+	Scheduler       *scheduler.Scheduler // 任务调度器
 }
 
 func NewApp() *App {
@@ -111,6 +111,7 @@ func (a *App) InitSkill() {
 	a.SkillLoader = skill.NewLoader(a.Cfg.Agent.Workspace, a.Storage, slog.Default())
 }
 
+// InitStorage 初始化存储
 func (a *App) InitStorage() {
 	dbPath, _ := a.Cfg.GetDatabasePath()
 	store, err := storage.New(a.Cfg.Mode, dbPath)
@@ -147,6 +148,7 @@ func (a *App) InitConfig(cfgFile string) error {
 	return nil
 }
 
+// InitLog 初始化日志记录器
 func (a *App) InitLog() *slog.Logger {
 	opts := &slog.HandlerOptions{
 		Level: parseLogLevel(a.Cfg.Logging.Level),
@@ -165,6 +167,7 @@ func (a *App) InitLog() *slog.Logger {
 	return logger
 }
 
+// InitAgent 初始化智能体循环
 func (a *App) InitAgent() {
 	// 初始化代理循环
 	agentLoop := agent.NewLoop(
@@ -175,11 +178,11 @@ func (a *App) InitAgent() {
 		agent.WithLoopMemory(a.MemoryLoader),
 		agent.WithLoopSkills(a.SkillLoader),
 		agent.WithLoopStorage(a.Storage),
-		agent.WithLoopLogger(slog.Default()),
+		agent.WithLoopLogger(a.Logger),
 	)
 
 	// 初始化代理注册表
-	a.AgentRegistry = agent.NewAgentRegistry(slog.Default())
+	a.AgentRegistry = agent.NewAgentRegistry(a.Logger)
 	a.AgentLoop = agentLoop
 }
 

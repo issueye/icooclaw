@@ -7,85 +7,91 @@ import (
 	"icooclaw/pkg/providers"
 )
 
-// AgentHooks defines hooks for agent lifecycle events.
+// AgentHooks 定义智能体生命周期事件的钩子接口。
 type AgentHooks interface {
-	// OnMessageReceived is called when a message is received.
+	// OnStart 当智能体启动时调用。
+	OnStart(ctx context.Context, channel string, sessionID string) error
+
+	// OnStop 当智能体停止时调用。
+	OnStop(ctx context.Context, channel string, sessionID string) error
+
+	// OnMessageReceived 当收到消息时调用。
 	OnMessageReceived(ctx context.Context, channel, sessionID, text string) error
 
-	// OnMessageSent is called when a message is sent.
+	// OnMessageSent 当发送消息时调用。
 	OnMessageSent(ctx context.Context, channel, sessionID, text string) error
 
-	// OnToolCall is called when a tool is invoked.
+	// OnToolCall 当调用工具时调用。
 	OnToolCall(ctx context.Context, toolName string, args map[string]any) error
 
-	// OnToolResult is called when a tool returns a result.
+	// OnToolResult 当工具调用结果时调用。
 	OnToolResult(ctx context.Context, toolName string, result string, err error) error
 
-	// OnError is called when an error occurs.
+	// OnError 当错误发生时调用。
 	OnError(ctx context.Context, err error, context map[string]any) error
 }
 
-// ProviderHooks defines hooks for provider events.
+// ProviderHooks 定义提供程序事件的钩子接口。
 type ProviderHooks interface {
-	// OnRequest is called before a provider request.
+	// OnRequest 当提供程序请求时调用。
 	OnRequest(ctx context.Context, provider string, req *providers.ChatRequest) error
 
-	// OnResponse is called after a provider response.
+	// OnResponse 当提供程序响应时调用。
 	OnResponse(ctx context.Context, provider string, resp *providers.ChatResponse) error
 
-	// OnStreamChunk is called for each streaming chunk.
+	// OnStreamChunk 当提供程序响应流时调用。
 	OnStreamChunk(ctx context.Context, provider string, chunk string) error
 
-	// OnFailover is called when a failover occurs.
+	// OnFailover 当提供程序故障时调用。
 	OnFailover(ctx context.Context, fromProvider, toProvider string, reason error) error
 }
 
-// ReActHooks defines hooks for ReAct loop events.
+// ReActHooks 定义ReAct循环事件的钩子接口。
 type ReActHooks interface {
-	// OnThought is called when the agent thinks.
+	// OnThought 当智能体思考时调用。
 	OnThought(ctx context.Context, thought string) error
 
-	// OnAction is called when the agent takes an action.
+	// OnAction 当智能体执行操作时调用。
 	OnAction(ctx context.Context, action string, args map[string]any) error
 
-	// OnObservation is called when an observation is made.
+	// OnObservation 当智能体观察时调用。
 	OnObservation(ctx context.Context, observation string) error
 
-	// OnFinalAnswer is called when the final answer is ready.
+	// OnFinalAnswer 当智能体完成时调用。
 	OnFinalAnswer(ctx context.Context, answer string) error
 }
 
-// ChannelHooks defines hooks for channel events.
+// ChannelHooks 定义通道事件的钩子接口。
 type ChannelHooks interface {
-	// OnChannelStart is called when a channel starts.
+	// OnChannelStart 当通道启动时调用。
 	OnChannelStart(ctx context.Context, channel string) error
 
-	// OnChannelStop is called when a channel stops.
+	// OnChannelStop 当通道停止时调用。
 	OnChannelStop(ctx context.Context, channel string) error
 
-	// OnMessageInbound is called for inbound messages.
+	// OnMessageInbound 当通道收到消息时调用。
 	OnMessageInbound(ctx context.Context, channel string, msg any) error
 
-	// OnMessageOutbound is called for outbound messages.
+	// OnMessageOutbound 当通道发送消息时调用。
 	OnMessageOutbound(ctx context.Context, channel string, msg any) error
 }
 
-// MemoryHooks defines hooks for memory events.
+// MemoryHooks 定义内存事件的钩子接口。
 type MemoryHooks interface {
-	// OnMemoryLoad is called when memory is loaded.
+	// OnMemoryLoad 当内存加载时调用。
 	OnMemoryLoad(ctx context.Context, sessionKey string, count int) error
 
-	// OnMemorySave is called when memory is saved.
+	// OnMemorySave 当内存保存时调用。
 	OnMemorySave(ctx context.Context, sessionKey, role, content string) error
 
-	// OnMemoryClear is called when memory is cleared.
+	// OnMemoryClear 当内存清除时调用。
 	OnMemoryClear(ctx context.Context, sessionKey string) error
 
-	// OnSummary is called when a summary is generated.
+	// OnSummary 当生成摘要时调用。
 	OnSummary(ctx context.Context, sessionKey string, summary string) error
 }
 
-// CompositeHooks combines multiple hooks.
+// CompositeHooks 组合钩子接口。
 type CompositeHooks struct {
 	agentHooks    []AgentHooks
 	providerHooks []ProviderHooks

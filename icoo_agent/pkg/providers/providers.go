@@ -17,20 +17,20 @@ import (
 
 // BaseProvider provides common functionality for providers.
 type BaseProvider struct {
-	name         string
-	apiKey       string
-	apiBase      string
-	defaultModel string
-	httpClient   *http.Client
+	name       string
+	apiKey     string
+	apiBase    string
+	model      string
+	httpClient *http.Client
 }
 
 // NewBaseProvider creates a new BaseProvider.
-func NewBaseProvider(name, apiKey, apiBase, defaultModel string) *BaseProvider {
+func NewBaseProvider(name, apiKey, apiBase, model string) *BaseProvider {
 	return &BaseProvider{
-		name:         name,
-		apiKey:       apiKey,
-		apiBase:      apiBase,
-		defaultModel: defaultModel,
+		name:    name,
+		apiKey:  apiKey,
+		apiBase: apiBase,
+		model:   model,
 		httpClient: &http.Client{
 			Timeout: 300 * time.Second, // 5 minutes for long LLM responses
 		},
@@ -42,9 +42,14 @@ func (p *BaseProvider) GetName() string {
 	return p.name
 }
 
-// GetDefaultModel returns the default model.
-func (p *BaseProvider) GetDefaultModel() string {
-	return p.defaultModel
+// GetModel 获取当前使用的模型
+func (p *BaseProvider) GetModel() string {
+	return p.model
+}
+
+// SetModel 设置当前使用的模型
+func (p *BaseProvider) SetModel(model string) {
+	p.model = model
 }
 
 // doRequest performs an HTTP request.
@@ -136,9 +141,9 @@ func parseStreamChunk(data string) (content string, reasoning string, toolCalls 
 				Reasoning string `json:"reasoning_content"`
 				// ToolCalls in streaming format uses index instead of id
 				ToolCalls []struct {
-					Index int    `json:"index"`
-					ID    string `json:"id"`
-					Type  string `json:"type"`
+					Index    int    `json:"index"`
+					ID       string `json:"id"`
+					Type     string `json:"type"`
 					Function struct {
 						Name      string `json:"name"`
 						Arguments string `json:"arguments"`

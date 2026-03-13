@@ -127,22 +127,12 @@ func (r *Registry) LoadFromConfig(configs []*storage.Provider) error {
 	return nil
 }
 
-// GetDefaultModel returns the default model for a provider.
-func (r *Registry) GetDefaultModel(name string) (string, error) {
-	provider, err := r.Get(name)
-	if err != nil {
-		return "", err
-	}
-
-	return provider.GetDefaultModel(), nil
-}
-
 // ProviderInfo contains information about a provider.
 type ProviderInfo struct {
-	Name         string              `json:"name"`
-	Type         consts.ProviderType `json:"type"`
-	DefaultModel string              `json:"default_model"`
-	Models       []string            `json:"models,omitempty"`
+	Name   string              `json:"name"`
+	Type   consts.ProviderType `json:"type"`
+	Model  string              `json:"model"`
+	Models []string            `json:"models,omitempty"`
 }
 
 // GetInfo returns information about a provider.
@@ -153,9 +143,9 @@ func (r *Registry) GetInfo(name string) (*ProviderInfo, error) {
 	}
 
 	return &ProviderInfo{
-		Name:         name,
-		Type:         consts.ProviderType(provider.GetName()),
-		DefaultModel: provider.GetDefaultModel(),
+		Name:  name,
+		Type:  consts.ProviderType(provider.GetName()),
+		Model: provider.GetModel(),
 	}, nil
 }
 
@@ -167,9 +157,9 @@ func (r *Registry) ListInfo() []*ProviderInfo {
 	infos := make([]*ProviderInfo, 0, len(r.providers))
 	for name, provider := range r.providers {
 		infos = append(infos, &ProviderInfo{
-			Name:         name,
-			Type:         consts.ProviderType(provider.GetName()),
-			DefaultModel: provider.GetDefaultModel(),
+			Name:  name,
+			Type:  consts.ProviderType(provider.GetName()),
+			Model: provider.GetModel(),
 		})
 	}
 

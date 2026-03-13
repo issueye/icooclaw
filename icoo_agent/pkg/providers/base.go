@@ -69,17 +69,16 @@ type StreamCallback func(chunk string, reasoning string, toolCalls []ToolCall, d
 
 // Provider is the interface for LLM providers.
 type Provider interface {
-	// Chat sends a chat request and returns the response.
+	// Chat 发送一个聊天请求并返回响应
 	Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error)
-
-	// ChatStream sends a chat request and streams the response.
+	// ChatStream 发送一个流式聊天请求并返回响应
 	ChatStream(ctx context.Context, req ChatRequest, callback StreamCallback) error
-
-	// GetDefaultModel returns the default model for this provider.
-	GetDefaultModel() string
-
-	// GetName returns the provider name.
+	// GetName 获取提供者的名称
 	GetName() string
+	// GetModel 获取当前使用的模型
+	GetModel() string
+	// SetModel 设置当前使用的模型
+	SetModel(model string)
 }
 
 // ProviderConfig represents provider configuration.
