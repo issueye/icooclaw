@@ -185,7 +185,8 @@ func (h *TaskHandler) ToggleEnabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.Task().ToggleEnabled(id)
+	// 切换任务状态
+	task, err := h.storage.Task().ToggleEnabled(id)
 	if err != nil {
 		h.logger.Error("切换任务状态失败", "error", err)
 		http.Error(w, "切换任务状态失败", http.StatusInternalServerError)
@@ -193,7 +194,33 @@ func (h *TaskHandler) ToggleEnabled(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 切换调度器任务状态
+	if task.Enabled {
+		// 如果任务已启用，检查是否已存在调度器任务
+		schedulerTask, err := h.storage.Task().GetByID(id)
+		if err != nil {
+			h.logger.Error("获取调度器任务失败", slog.Any("id", id), slog.Any("error", err.Error()))
+			http.Error(w, "获取调度器任务失败", http.StatusInternalServerError)
+			return
+		}
 
+		// 如果任务不存在，添加到调度器
+		if schedulerTask == nil {
+			// 任务不存在，添加到调度器
+			schedulerTask := &scheduler.Task{
+				ID:          task.ID,
+				Name:        task.Name,
+				Schedule:    task.CronExpr,
+				Enabled:     task.Enabled,
+				Description: task.Description,
+			}
+			h.schedule.AddTask(schedulerTask)
+		}
+	} else {
+		// 如果任务已禁用，删除调度器任务
+		h.schedule.RemoveTask(task.ID)
+	}
+
+	// 返回响应
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,
 		Message: "任务状态切换成功",

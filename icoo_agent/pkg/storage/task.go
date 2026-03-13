@@ -105,15 +105,19 @@ func (s *TaskStorage) GetEnabled() ([]Task, error) {
 	return tasks, nil
 }
 
-// ToggleEnabled toggles a task's enabled status.
-func (s *TaskStorage) ToggleEnabled(id string) error {
+// ToggleEnabled 切换任务状态.
+func (s *TaskStorage) ToggleEnabled(id string) (*Task, error) {
 	var t Task
 	result := s.db.Where("id = ?", id).First(&t)
 	if result.Error != nil {
-		return fmt.Errorf("failed to get task: %w", result.Error)
+		return nil, fmt.Errorf("获取任务失败: %w", result.Error)
 	}
 	t.Enabled = !t.Enabled
-	return s.db.Save(&t).Error
+	err := s.db.Save(&t).Error
+	if err != nil {
+		return nil, fmt.Errorf("切换任务状态失败: %w", err)
+	}
+	return &t, nil
 }
 
 // Page gets tasks with pagination.
