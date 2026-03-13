@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"icooclaw/pkg/bus"
-	"icooclaw/pkg/channels/consts"
 	"icooclaw/pkg/scheduler"
 	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
@@ -169,7 +168,6 @@ func (t *Tool) listTasks(args map[string]any) *tools.Result {
 			}
 			output += fmt.Sprintf("**%s** (`%s`)\n", task.Name, task.ID)
 			output += fmt.Sprintf("  - 调度: `%s`\n", task.CronExpr)
-			output += fmt.Sprintf("  - 处理器: %s\n", task.Handler)
 			if task.Description != "" {
 				output += fmt.Sprintf("  - 描述: %s\n", task.Description)
 			}
@@ -210,7 +208,6 @@ func (t *Tool) getTask(args map[string]any) *tools.Result {
 
 	output := fmt.Sprintf("**%s** (`%s`)\n", task.Name, task.ID)
 	output += fmt.Sprintf("- 调度: `%s`\n", task.CronExpr)
-	output += fmt.Sprintf("- 处理器: %s\n", task.Handler)
 	output += fmt.Sprintf("- 状态: %s\n", status)
 	if task.Description != "" {
 		output += fmt.Sprintf("- 描述: %s\n", task.Description)
@@ -242,17 +239,16 @@ func (t *Tool) createTask(args map[string]any) *tools.Result {
 		return tools.ErrorResult("需要提供 cron_expr 参数")
 	}
 
-	handler, _ := args["handler"].(string)
-	if handler == "" {
-		return tools.ErrorResult("需要提供 handler 参数")
-	}
-
 	// Validate cron expression
 	if err := t.validateCronExpr(cronExpr); err != nil {
 		return tools.ErrorResult(fmt.Sprintf("无效的 Cron 表达式: %v", err))
 	}
 
 	description, _ := args["description"].(string)
+	if description == "" {
+		return tools.ErrorResult("需要提供 description 参数")
+	}
+
 	params, _ := args["params"].(string)
 	enabled := true
 	if e, ok := args["enabled"]; ok {
@@ -274,8 +270,8 @@ func (t *Tool) createTask(args map[string]any) *tools.Result {
 	task := &storage.Task{
 		Name:        name,
 		Description: description,
+		Channel:     "default", // 默认通道
 		CronExpr:    cronExpr,
-		Handler:     handler,
 		Params:      params,
 		Enabled:     enabled,
 	}
@@ -292,30 +288,15 @@ func (t *Tool) createTask(args map[string]any) *tools.Result {
 			Schedule:    task.CronExpr,
 			Description: task.Description,
 			Enabled:     task.Enabled,
-			Handler: func(ctx context.Context) error {
-				t.logger.Info("执行任务", "task_id", task.ID, "task_name", task.Name)
-				// 发送一条 outbound 消息
-				msg := bus.InboundMessage{
-					Channel:   consts.WEBSOCKET,
-					SessionID: "",
-					Text:      task.Description,
-					Timestamp: time.Now(),
-					Metadata: map[string]any{
-						"task_id":   task.ID,
-						"task_name": task.Name,
-					},
-				}
-				t.bus.PublishInbound(context.Background(), msg)
-				return nil
-			},
+			Params:      task.Params,
 		}
 		if err := t.scheduler.AddTask(schedTask); err != nil {
 			t.logger.Warn("添加任务到调度器失败", "task_id", task.ID, "error", err)
 		}
 	}
 
-	output := fmt.Sprintf("✅ 任务创建成功\n\n**%s** (`%s`)\n- 调度: `%s`\n- 处理器: %s\n- 状态: %s",
-		task.Name, task.ID, task.CronExpr, task.Handler, map[bool]string{true: "已启用", false: "已禁用"}[task.Enabled])
+	output := fmt.Sprintf("✅ 任务创建成功\n\n**%s** (`%s`)\n- 调度: `%s`\n- 通道名称: %s\n- 状态: %s",
+		task.Name, task.ID, task.CronExpr, task.Channel, map[bool]string{true: "已启用", false: "已禁用"}[task.Enabled])
 
 	return tools.SuccessResult(output)
 }
@@ -345,9 +326,6 @@ func (t *Tool) updateTask(args map[string]any) *tools.Result {
 			return tools.ErrorResult(fmt.Sprintf("无效的 Cron 表达式: %v", err))
 		}
 		task.CronExpr = cronExpr
-	}
-	if handler, ok := args["handler"].(string); ok && handler != "" {
-		task.Handler = handler
 	}
 	if params, ok := args["params"].(string); ok {
 		if params != "" && !json.Valid([]byte(params)) {
@@ -391,8 +369,8 @@ func (t *Tool) updateTask(args map[string]any) *tools.Result {
 		status = "❌ 已禁用"
 	}
 
-	output := fmt.Sprintf("✅ 任务更新成功\n\n**%s** (`%s`)\n- 调度: `%s`\n- 处理器: %s\n- 状态: %s",
-		task.Name, task.ID, task.CronExpr, task.Handler, status)
+	output := fmt.Sprintf("✅ 任务更新成功\n\n**%s** (`%s`)\n- 调度: `%s`\n- 通道名称: %s\n- 状态: %s",
+		task.Name, task.ID, task.CronExpr, task.Channel, status)
 
 	return tools.SuccessResult(output)
 }

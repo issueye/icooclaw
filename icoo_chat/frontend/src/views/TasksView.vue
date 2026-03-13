@@ -83,7 +83,7 @@
       :title="editingTask ? '编辑任务' : '新建任务'"
       size="md"
       :loading="saving"
-      :confirm-disabled="!taskForm.name || !taskForm.cron_expr || !taskForm.handler"
+      :confirm-disabled="!taskForm.name || !taskForm.cron_expr || !taskForm.channel"
       confirm-text="保存"
       loading-text="保存中..."
       @confirm="saveTask"
@@ -121,11 +121,11 @@
         </div>
 
         <div>
-          <label class="block text-sm text-text-secondary mb-2">处理器</label>
+          <label class="block text-sm text-text-secondary mb-2">通道</label>
           <input
-            v-model="taskForm.handler"
+            v-model="taskForm.channel"
             type="text"
-            placeholder="请输入处理器名称"
+            placeholder="请输入通道名称"
             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
           />
         </div>
@@ -181,7 +181,7 @@ const taskForm = reactive({
   name: "",
   description: "",
   cron_expr: "",
-  handler: "",
+  channel: "",
   params: "",
   enabled: true,
 });
@@ -233,7 +233,7 @@ function editTask(task) {
   taskForm.name = task.name || "";
   taskForm.description = task.description || "";
   taskForm.cron_expr = task.cron_expr || "";
-  taskForm.handler = task.handler || "";
+  taskForm.channel = task.channel || "";
   taskForm.params = task.params || "";
   taskForm.enabled = task.enabled !== false;
   showAddDialog.value = true;
@@ -246,7 +246,7 @@ function resetForm() {
   taskForm.name = "";
   taskForm.description = "";
   taskForm.cron_expr = "";
-  taskForm.handler = "";
+  taskForm.channel = "";
   taskForm.params = "";
   taskForm.enabled = true;
 }
@@ -296,8 +296,8 @@ function closeDialog() {
  * 保存任务
  */
 async function saveTask() {
-  if (!taskForm.name || !taskForm.cron_expr || !taskForm.handler) {
-    alert("请填写完整信息（任务名称、Cron表达式、处理器为必填项）");
+  if (!taskForm.name || !taskForm.cron_expr || !taskForm.channel) {
+    alert("请填写完整信息（任务名称、Cron表达式、通道为必填项）");
     return;
   }
 
@@ -318,7 +318,7 @@ async function saveTask() {
       name: taskForm.name,
       description: taskForm.description,
       cron_expr: taskForm.cron_expr,
-      handler: taskForm.handler,
+      channel: taskForm.channel,
       params: taskForm.params,
       enabled: taskForm.enabled,
     };

@@ -86,6 +86,8 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Schedule:    req.CronExpr,
 		Enabled:     req.Enabled,
 		Description: req.Description,
+		Params:      req.Params,
+		Channel:     req.Channel,
 	}
 	h.schedule.AddTask(task)
 
@@ -118,6 +120,8 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Schedule:    req.CronExpr,
 		Enabled:     req.Enabled,
 		Description: req.Description,
+		Params:      req.Params,
+		Channel:     req.Channel,
 	}
 	// 先删除旧任务，再添加新任务
 	h.schedule.RemoveTask(req.ID)
@@ -212,6 +216,8 @@ func (h *TaskHandler) ToggleEnabled(w http.ResponseWriter, r *http.Request) {
 				Schedule:    task.CronExpr,
 				Enabled:     task.Enabled,
 				Description: task.Description,
+				Params:      task.Params,
+				Channel:     task.Channel,
 			}
 			h.schedule.AddTask(schedulerTask)
 		}

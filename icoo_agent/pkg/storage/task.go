@@ -10,14 +10,14 @@ import (
 // Task represents a scheduled task.
 type Task struct {
 	Model
-	Name        string `gorm:"column:name;type:varchar(100);not null;comment:任务名称" json:"name"`
-	Description string `gorm:"column:description;type:text;comment:任务描述" json:"description"`
-	CronExpr    string `gorm:"column:cron_expr;type:varchar(100);comment:Cron表达式" json:"cron_expr"`
-	Handler     string `gorm:"column:handler;type:varchar(100);not null;comment:处理器名称" json:"handler"`
-	Params      string `gorm:"column:params;type:text;comment:参数(JSON格式)" json:"params"`
-	Enabled     bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"`
-	LastRunAt   string `gorm:"column:last_run_at;type:datetime;comment:最后执行时间" json:"last_run_at"`
-	NextRunAt   string `gorm:"column:next_run_at;type:datetime;comment:下次执行时间" json:"next_run_at"`
+	Name        string `gorm:"column:name;type:varchar(100);not null;comment:任务名称" json:"name"`         // 任务名称
+	Description string `gorm:"column:description;type:text;comment:任务描述" json:"description"`            // 任务描述
+	Channel     string `gorm:"column:channel;type:varchar(100);comment:通道名称" json:"channel"`            // 发送消息的通道名称
+	CronExpr    string `gorm:"column:cron_expr;type:varchar(100);comment:Cron表达式" json:"cron_expr"`     // Cron表达式
+	Params      string `gorm:"column:params;type:text;comment:参数(JSON格式)" json:"params"`                // 任务参数
+	Enabled     bool   `gorm:"column:enabled;type:tinyint(1);default:true;comment:是否启用" json:"enabled"` // 是否任务已启用
+	LastRunAt   string `gorm:"column:last_run_at;type:datetime;comment:最后执行时间" json:"last_run_at"`      // 上次运行时间
+	NextRunAt   string `gorm:"column:next_run_at;type:datetime;comment:下次执行时间" json:"next_run_at"`      // 下次运行时间
 }
 
 // TableName returns the table name for Task.

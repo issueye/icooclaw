@@ -16,23 +16,24 @@ import (
 
 // Task 定时任务.
 type Task struct {
-	ID          string
-	Name        string
-	Schedule    string
-	Description string
-	Handler     func(ctx context.Context) error
-	Enabled     bool
-	LastRun     time.Time
-	NextRun     time.Time
-	EntryID     cron.EntryID
+	ID          string       // 任务ID
+	Name        string       // 任务名称
+	Schedule    string       // 任务调度表达式
+	Description string       // 任务描述
+	Params      string       // 任务参数
+	Channel     string       // 任务通道名称
+	Enabled     bool         // 是否任务已启用
+	LastRun     time.Time    // 上次运行时间
+	NextRun     time.Time    // 下次运行时间
+	EntryID     cron.EntryID // 任务条目ID
 }
 
 // TaskResult 任务执行结果。
 type TaskResult struct {
-	TaskID    string
-	StartTime time.Time
-	EndTime   time.Time
-	Error     error
+	TaskID    string    // 任务ID
+	StartTime time.Time // 开始时间
+	EndTime   time.Time // 结束时间
+	Error     error     // 错误信息
 }
 
 // Scheduler 定时任务调度器.
@@ -201,22 +202,7 @@ func (s *Scheduler) LoadTasks() error {
 			Schedule:    task.CronExpr,
 			Description: task.Description,
 			Enabled:     task.Enabled,
-			Handler: func(ctx context.Context) error {
-				s.logger.Info("执行任务", "task_id", task.ID, "task_name", task.Name)
-				// 发送一条 outbound 消息
-				msg := bus.InboundMessage{
-					Channel:   consts.WEBSOCKET,
-					SessionID: "",
-					Text:      task.Description,
-					Timestamp: time.Now(),
-					Metadata: map[string]any{
-						"task_id":   task.ID,
-						"task_name": task.Name,
-					},
-				}
-				s.bus.PublishInbound(context.Background(), msg)
-				return nil
-			},
+			Params:      task.Params,
 		}
 	}
 	return nil
@@ -272,8 +258,20 @@ func (s *Scheduler) executeTask(task *Task) {
 	startTime := time.Now()
 	s.logger.Debug("正在执行任务", "id", task.ID, "name", task.Name)
 
-	ctx := context.Background()
-	err := task.Handler(ctx)
+	// 执行任务
+	s.logger.Info("执行任务", "task_id", task.ID, "task_name", task.Name)
+	// 发送一条 outbound 消息
+	msg := bus.InboundMessage{
+		Channel:   consts.WEBSOCKET,
+		SessionID: "",
+		Text:      task.Description + " " + task.Params,
+		Timestamp: time.Now(),
+		Metadata: map[string]any{
+			"task_id":   task.ID,
+			"task_name": task.Name,
+		},
+	}
+	s.bus.PublishInbound(context.Background(), msg)
 
 	endTime := time.Now()
 	task.LastRun = endTime
@@ -289,19 +287,13 @@ func (s *Scheduler) executeTask(task *Task) {
 		TaskID:    task.ID,
 		StartTime: startTime,
 		EndTime:   endTime,
-		Error:     err,
+		Error:     nil,
 	}
 
 	select {
 	case s.results <- result:
 	default:
 		s.logger.Warn("结果通道已满，丢弃结果", "task_id", task.ID)
-	}
-
-	if err != nil {
-		s.logger.Error("任务执行失败", "id", task.ID, "error", err)
-	} else {
-		s.logger.Debug("任务执行成功", "id", task.ID, "duration", endTime.Sub(startTime))
 	}
 }
 
