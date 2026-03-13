@@ -10,6 +10,7 @@ import (
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/gateway/sse"
 	"icooclaw/pkg/gateway/websocket"
+	"icooclaw/pkg/scheduler"
 	"icooclaw/pkg/storage"
 
 	"github.com/go-chi/chi/v5"
@@ -23,6 +24,7 @@ type Server struct {
 	storage  *storage.Storage
 	logger   *slog.Logger
 	handlers *Handlers
+	schedule *scheduler.Scheduler
 
 	// New components
 	wsManager     *websocket.Manager
@@ -53,20 +55,26 @@ func DefaultServerConfig() *ServerConfig {
 }
 
 // NewServer creates a new gateway server.
-func NewServer(cfg *ServerConfig, store *storage.Storage, logger *slog.Logger) *Server {
+func NewServer(
+	cfg *ServerConfig,
+	logger *slog.Logger,
+	store *storage.Storage,
+	schedule *scheduler.Scheduler,
+) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	r := chi.NewRouter()
 	s := &Server{
-		router:  r,
-		storage: store,
-		logger:  logger,
+		router:   r,
+		storage:  store,
+		logger:   logger,
+		schedule: schedule,
 	}
 
 	// Create handlers
-	s.handlers = NewHandlers(logger, store)
+	s.handlers = NewHandlers(logger, store, schedule)
 
 	// Setup middleware
 	s.setupMiddleware()

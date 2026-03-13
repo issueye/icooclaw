@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"icooclaw/pkg/storage"
 )
@@ -55,17 +54,14 @@ type SkillsLoader struct {
 	builtinSkills   string // builtin skills
 }
 
-// Default cache TTL (5 minutes)
-const defaultCacheTTL = 5 * time.Minute
-
-// Loader loads skills from storage.
+// Loader 加载技能接口。
 type Loader interface {
 	LoadMetadata(ctx context.Context, name string) (*Metadata, error) // 加载元数据
 	LoadInfo(ctx context.Context, name string) (*Info, error)         // 加载详细信息
 	List(ctx context.Context) ([]*Info, error)                        // 列出所有技能
 }
 
-// DefaultLoader is the default skill loader.
+// DefaultLoader 默认技能加载器。
 type DefaultLoader struct {
 	workspace string
 	storage   *storage.Storage
@@ -73,7 +69,7 @@ type DefaultLoader struct {
 	mu        sync.RWMutex
 }
 
-// NewLoader creates a new skill loader.
+// NewLoader 创建一个新的技能加载器。
 func NewLoader(workspace string, s *storage.Storage, logger *slog.Logger) *DefaultLoader {
 	if logger == nil {
 		logger = slog.Default()
@@ -111,6 +107,7 @@ func (l *DefaultLoader) LoadMetadata(ctx context.Context, name string) (*Metadat
 	return skill, nil
 }
 
+// LoadInfo 加载技能详细信息
 func (l *DefaultLoader) LoadInfo(ctx context.Context, name string) (*Info, error) {
 	// 加载技能详细信息
 	info, err := l.ReadSkill(ctx, name, "")
@@ -154,6 +151,7 @@ func (l *DefaultLoader) List(ctx context.Context) ([]*Info, error) {
 	return result, nil
 }
 
+// ReadSkill 从工作区中读取技能文件。
 func (l *DefaultLoader) ReadSkill(ctx context.Context, name string, version string) (*Info, error) {
 	// 从工作区中获取技能信息
 	path := filepath.Join(l.workspace, ".skills", version, name)
@@ -175,7 +173,7 @@ func (l *DefaultLoader) ReadSkill(ctx context.Context, name string, version stri
 	return info, nil
 }
 
-// Manager manages skill registration and execution.
+// Manager 管理技能注册和执行。
 type Manager struct {
 	loader  Loader
 	storage *storage.Storage

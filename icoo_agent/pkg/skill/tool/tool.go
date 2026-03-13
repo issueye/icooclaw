@@ -84,6 +84,7 @@ func (t *InstallTool) Execute(ctx context.Context, args map[string]any) *tools.R
 	return tools.SuccessResult("安装成功")
 }
 
+// InstallFromGitHub 从 GitHub 安装技能。
 func (t *InstallTool) InstallFromGitHub(ctx context.Context, repo string) error {
 	skillDir := filepath.Join(t.workspace, consts.SKILL_DIR, filepath.Base(repo))
 

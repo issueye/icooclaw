@@ -3,10 +3,8 @@ package gateway
 import (
 	"log/slog"
 
-	"icooclaw/pkg/agent"
-	"icooclaw/pkg/bus"
 	"icooclaw/pkg/gateway/handlers"
-	"icooclaw/pkg/gateway/websocket"
+	"icooclaw/pkg/scheduler"
 	"icooclaw/pkg/storage"
 
 	"github.com/go-chi/chi/v5"
@@ -14,6 +12,7 @@ import (
 
 // Handlers 封装所有处理器
 type Handlers struct {
+	Schedule *scheduler.Scheduler
 	Common   *handlers.CommonHandler
 	Session  *handlers.SessionHandler
 	Message  *handlers.MessageHandler
@@ -30,14 +29,15 @@ type Handlers struct {
 }
 
 // NewHandlers 创建所有处理器
-func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
+func NewHandlers(logger *slog.Logger, storage *storage.Storage, schedule *scheduler.Scheduler) *Handlers {
 	return &Handlers{
+		Schedule: schedule,
 		Common:   handlers.NewCommonHandler(logger),
 		Session:  handlers.NewSessionHandler(logger, storage),
 		Message:  handlers.NewMessageHandler(logger, storage),
 		MCP:      handlers.NewMCPHandler(logger, storage),
 		Memory:   handlers.NewMemoryHandler(logger, storage),
-		Task:     handlers.NewTaskHandler(logger, storage),
+		Task:     handlers.NewTaskHandler(logger, storage, schedule),
 		Provider: handlers.NewProviderHandler(logger, storage),
 		Skill:    handlers.NewSkillHandler(logger, storage),
 		Channel:  handlers.NewChannelHandler(logger, storage),
@@ -48,32 +48,6 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage) *Handlers {
 	}
 }
 
-// NewHandlersWithComponents creates handlers with all components.
-func NewHandlersWithComponents(
-	logger *slog.Logger,
-	storage *storage.Storage,
-	wsManager *websocket.Manager,
-	bus *bus.MessageBus,
-	agentLoop *agent.Loop,
-	agentRegistry *agent.AgentRegistry,
-) *Handlers {
-	return &Handlers{
-		Common:   handlers.NewCommonHandler(logger),
-		Session:  handlers.NewSessionHandler(logger, storage),
-		Message:  handlers.NewMessageHandler(logger, storage),
-		MCP:      handlers.NewMCPHandler(logger, storage),
-		Memory:   handlers.NewMemoryHandler(logger, storage),
-		Task:     handlers.NewTaskHandler(logger, storage),
-		Provider: handlers.NewProviderHandler(logger, storage),
-		Skill:    handlers.NewSkillHandler(logger, storage),
-		Channel:  handlers.NewChannelHandler(logger, storage),
-		Param:    handlers.NewParamHandler(logger, storage),
-		Tool:     handlers.NewToolHandler(logger, storage),
-		Binding:  handlers.NewBindingHandler(logger, storage),
-		Chat:     handlers.NewChatHandler(logger, storage, wsManager, bus, agentLoop, agentRegistry),
-	}
-}
-
 // RegisterRoutes 注册所有 CRUD 路由
 func RegisterRoutes(r chi.Router, h *Handlers) {
 	// 健康检查
@@ -81,13 +55,13 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 
 	// Chat 路由
 	r.Route("/api/v1/chat", func(r chi.Router) {
-		r.Post("/", h.Chat.HandleChat)                    // HTTP 聊天
-		r.Post("/stream", h.Chat.HandleChatStream)        // SSE 流式聊天
-		r.Get("/status", h.Chat.GetConnectionStatus)      // 连接状态
-		r.Get("/queue", h.Chat.GetQueueStatus)            // 队列状态
-		r.Post("/queue/max", h.Chat.SetMaxConcurrent)     // 设置最大并发
-		r.Get("/agents", h.Chat.GetAgentStatus)           // Agent 状态
-		r.Post("/agents/max", h.Chat.SetMaxAgents)        // 设置最大 Agent 数
+		r.Post("/", h.Chat.HandleChat)                // HTTP 聊天
+		r.Post("/stream", h.Chat.HandleChatStream)    // SSE 流式聊天
+		r.Get("/status", h.Chat.GetConnectionStatus)  // 连接状态
+		r.Get("/queue", h.Chat.GetQueueStatus)        // 队列状态
+		r.Post("/queue/max", h.Chat.SetMaxConcurrent) // 设置最大并发
+		r.Get("/agents", h.Chat.GetAgentStatus)       // Agent 状态
+		r.Post("/agents/max", h.Chat.SetMaxAgents)    // 设置最大 Agent 数
 	})
 
 	// Session 路由

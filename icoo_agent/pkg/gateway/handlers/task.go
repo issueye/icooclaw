@@ -5,16 +5,18 @@ import (
 	"net/http"
 
 	"icooclaw/pkg/gateway/models"
+	"icooclaw/pkg/scheduler"
 	"icooclaw/pkg/storage"
 )
 
 type TaskHandler struct {
-	logger  *slog.Logger
-	storage *storage.Storage
+	logger   *slog.Logger
+	storage  *storage.Storage
+	schedule *scheduler.Scheduler
 }
 
-func NewTaskHandler(logger *slog.Logger, storage *storage.Storage) *TaskHandler {
-	return &TaskHandler{logger: logger, storage: storage}
+func NewTaskHandler(logger *slog.Logger, storage *storage.Storage, schedule *scheduler.Scheduler) *TaskHandler {
+	return &TaskHandler{logger: logger, storage: storage, schedule: schedule}
 }
 
 func (h *TaskHandler) Page(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +41,7 @@ func (h *TaskHandler) Page(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Save doc 保存任务
 func (h *TaskHandler) Save(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*storage.Task](r)
 	if err != nil {
@@ -76,6 +79,16 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 添加到调度器
+	task := &scheduler.Task{
+		ID:          req.ID,
+		Name:        req.Name,
+		Schedule:    req.CronExpr,
+		Enabled:     req.Enabled,
+		Description: req.Description,
+	}
+	h.schedule.AddTask(task)
+
 	models.WriteData(w, models.BaseResponse[*storage.Task]{
 		Code:    http.StatusOK,
 		Message: "任务创建成功",
@@ -98,6 +111,18 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 更新调度器任务
+	task := &scheduler.Task{
+		ID:          req.ID,
+		Name:        req.Name,
+		Schedule:    req.CronExpr,
+		Enabled:     req.Enabled,
+		Description: req.Description,
+	}
+	// 先删除旧任务，再添加新任务
+	h.schedule.RemoveTask(req.ID)
+	h.schedule.AddTask(task)
+
 	models.WriteData(w, models.BaseResponse[*storage.Task]{
 		Code:    http.StatusOK,
 		Message: "任务更新成功",
@@ -119,6 +144,9 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "删除任务失败", http.StatusInternalServerError)
 		return
 	}
+
+	// 删除调度器任务
+	h.schedule.RemoveTask(id)
 
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,
@@ -148,6 +176,7 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ToggleEnabled 切换任务状态
 func (h *TaskHandler) ToggleEnabled(w http.ResponseWriter, r *http.Request) {
 	id, err := models.BindID(r)
 	if err != nil {
@@ -162,6 +191,8 @@ func (h *TaskHandler) ToggleEnabled(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "切换任务状态失败", http.StatusInternalServerError)
 		return
 	}
+
+	// 切换调度器任务状态
 
 	models.WriteData(w, models.BaseResponse[any]{
 		Code:    http.StatusOK,

@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// WriteFileAtomic atomically writes data to a file using a temp file + rename pattern.
+// WriteFileAtomic 写入文件到目标路径，确保原子性。
 //
 // This guarantees that the target file is either:
 // - Completely written with the new data

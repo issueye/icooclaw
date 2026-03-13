@@ -204,7 +204,12 @@ func (a *App) InitGateway() {
 	}
 
 	// 创建网关服务器
-	a.Gw = gateway.NewServer(serverCfg, a.Storage, slog.Default()).
+	a.Gw = gateway.NewServer(
+		serverCfg,
+		slog.Default(),
+		a.Storage,
+		a.Scheduler,
+	).
 		WithWebSocket(websocket.DefaultManagerConfig()).
 		WithSSE().
 		WithBus(a.MessageBus).

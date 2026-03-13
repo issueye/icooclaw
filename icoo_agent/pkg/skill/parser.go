@@ -29,7 +29,7 @@ const (
 	MaxContentLength     = 100 * 1024 // 100KB
 )
 
-// ParsedSkill represents a fully parsed skill with all metadata and content.
+// ParsedSkill 解析后的技能，包含元数据和内容。
 type ParsedSkill struct {
 	Name        string `json:"name"`
 	Version     string `json:"version,omitempty"`
@@ -39,7 +39,7 @@ type ParsedSkill struct {
 	FilePath    string `json:"file_path,omitempty"`
 }
 
-// SkillFrontmatter represents the metadata extracted from skill file frontmatter.
+// SkillFrontmatter 抽取技能文件的元数据。
 type SkillFrontmatter struct {
 	Name        string `json:"name" yaml:"name"`
 	Version     string `json:"version,omitempty" yaml:"version"`
@@ -47,7 +47,7 @@ type SkillFrontmatter struct {
 	Author      string `json:"author,omitempty" yaml:"author"`
 }
 
-// ParseError represents an error during skill parsing.
+// ParseError 解析技能时的错误。
 type ParseError struct {
 	Field   string
 	Message string
@@ -60,15 +60,15 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("skill parse error: %s", e.Message)
 }
 
-// SkillParser parses skill files.
+// SkillParser 解析技能文件。
 type SkillParser struct{}
 
-// NewParser creates a new skill parser.
+// NewParser 创建一个新的技能解析器。
 func NewParser() *SkillParser {
 	return &SkillParser{}
 }
 
-// ParseFile parses a skill file at the given path.
+// ParseFile 解析给定路径的技能文件。
 func (p *SkillParser) ParseFile(path string) (*ParsedSkill, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -88,7 +88,7 @@ func (p *SkillParser) ParseFile(path string) (*ParsedSkill, error) {
 	return skill, nil
 }
 
-// Parse parses skill content (frontmatter + body).
+// Parse 解析技能内容，包含元数据和主体。
 func (p *SkillParser) Parse(content string) (*ParsedSkill, error) {
 	frontmatter, body := p.extractFrontmatter(content)
 
@@ -120,7 +120,7 @@ func (p *SkillParser) Parse(content string) (*ParsedSkill, error) {
 	return skill, nil
 }
 
-// ParseFrontmatterOnly parses only the frontmatter from content.
+// ParseFrontmatterOnly 解析技能内容的元数据。
 func (p *SkillParser) ParseFrontmatterOnly(content string) (*SkillFrontmatter, error) {
 	frontmatter, _ := p.extractFrontmatter(content)
 	if frontmatter == "" {
@@ -129,7 +129,7 @@ func (p *SkillParser) ParseFrontmatterOnly(content string) (*SkillFrontmatter, e
 	return p.parseFrontmatter(frontmatter)
 }
 
-// Validate validates a parsed skill.
+// Validate 验证解析后的技能是否有效。
 func (p *SkillParser) Validate(skill *ParsedSkill) error {
 	var errs error
 
@@ -165,7 +165,7 @@ func (p *SkillParser) Validate(skill *ParsedSkill) error {
 	return errs
 }
 
-// extractFrontmatter extracts frontmatter and body from content.
+// extractFrontmatter 提取技能内容的元数据和主体。
 func (p *SkillParser) extractFrontmatter(content string) (frontmatter, body string) {
 	match := reFrontmatter.FindStringSubmatch(content)
 	if len(match) > 1 {
@@ -175,7 +175,7 @@ func (p *SkillParser) extractFrontmatter(content string) (frontmatter, body stri
 	return
 }
 
-// parseFrontmatter parses frontmatter content (supports JSON and simple YAML).
+// parseFrontmatter 解析技能文件的元数据。
 func (p *SkillParser) parseFrontmatter(content string) (*SkillFrontmatter, error) {
 	content = strings.TrimSpace(content)
 
@@ -192,7 +192,7 @@ func (p *SkillParser) parseFrontmatter(content string) (*SkillFrontmatter, error
 	return p.parseSimpleYAML(content), nil
 }
 
-// parseSimpleYAML parses simple key: value YAML format.
+// parseSimpleYAML 解析简单的 YAML 格式。
 func (p *SkillParser) parseSimpleYAML(content string) *SkillFrontmatter {
 	meta := &SkillFrontmatter{}
 
@@ -232,7 +232,7 @@ func (p *SkillParser) parseSimpleYAML(content string) *SkillFrontmatter {
 	return meta
 }
 
-// CreateSkillFile creates a new skill file with the given metadata and content.
+// CreateSkillFile 创建一个新的技能文件。
 func (p *SkillParser) CreateSkillFile(dir string, skill *ParsedSkill) error {
 	if err := p.Validate(skill); err != nil {
 		return err

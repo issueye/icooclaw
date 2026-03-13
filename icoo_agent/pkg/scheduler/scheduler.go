@@ -14,7 +14,7 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// Task represents a scheduled task.
+// Task 定时任务.
 type Task struct {
 	ID          string
 	Name        string
@@ -27,7 +27,7 @@ type Task struct {
 	EntryID     cron.EntryID
 }
 
-// TaskResult represents the result of a task execution.
+// TaskResult 任务执行结果。
 type TaskResult struct {
 	TaskID    string
 	StartTime time.Time
@@ -35,7 +35,7 @@ type TaskResult struct {
 	Error     error
 }
 
-// Scheduler manages scheduled tasks.
+// Scheduler 定时任务调度器.
 type Scheduler struct {
 	cron    *cron.Cron
 	tasks   map[string]*Task
@@ -47,7 +47,7 @@ type Scheduler struct {
 	running bool
 }
 
-// NewScheduler creates a new scheduler.
+// NewScheduler 创建定时任务调度器.
 func NewScheduler(storage *storage.TaskStorage, bus *bus.MessageBus, logger *slog.Logger) *Scheduler {
 	if logger == nil {
 		logger = slog.Default()
@@ -63,7 +63,7 @@ func NewScheduler(storage *storage.TaskStorage, bus *bus.MessageBus, logger *slo
 	}
 }
 
-// AddTask adds a new scheduled task.
+// AddTask 添加定时任务.
 func (s *Scheduler) AddTask(task *Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -91,7 +91,7 @@ func (s *Scheduler) AddTask(task *Task) error {
 	return nil
 }
 
-// RemoveTask removes a scheduled task.
+// RemoveTask 删除定时任务.
 func (s *Scheduler) RemoveTask(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -108,7 +108,7 @@ func (s *Scheduler) RemoveTask(id string) error {
 	return nil
 }
 
-// EnableTask enables a task.
+// EnableTask 启用定时任务.
 func (s *Scheduler) EnableTask(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -123,7 +123,7 @@ func (s *Scheduler) EnableTask(id string) error {
 	return nil
 }
 
-// DisableTask disables a task.
+// DisableTask 禁用定时任务.
 func (s *Scheduler) DisableTask(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -138,7 +138,7 @@ func (s *Scheduler) DisableTask(id string) error {
 	return nil
 }
 
-// GetTask gets a task by ID.
+// GetTask 获取定时任务详情.
 func (s *Scheduler) GetTask(id string) (*Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -157,7 +157,7 @@ func (s *Scheduler) GetTask(id string) (*Task, error) {
 	return task, nil
 }
 
-// ListTasks lists all tasks.
+// ListTasks 列出所有定时任务.
 func (s *Scheduler) ListTasks() []*Task {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -174,7 +174,7 @@ func (s *Scheduler) ListTasks() []*Task {
 	return tasks
 }
 
-// RunTask executes a task immediately.
+// RunTask 立即执行定时任务.
 func (s *Scheduler) RunTask(id string) error {
 	s.mu.RLock()
 	task, exists := s.tasks[id]
@@ -222,7 +222,7 @@ func (s *Scheduler) LoadTasks() error {
 	return nil
 }
 
-// Start starts the scheduler.
+// Start 启动定时任务调度器.
 func (s *Scheduler) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -236,7 +236,7 @@ func (s *Scheduler) Start() {
 	s.logger.Info("调度器已启动")
 }
 
-// Stop stops the scheduler.
+// Stop 停止定时任务调度器.
 func (s *Scheduler) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -251,19 +251,19 @@ func (s *Scheduler) Stop() {
 	s.logger.Info("调度器已停止")
 }
 
-// Results returns the results channel.
+// Results 返回任务执行结果通道.
 func (s *Scheduler) Results() <-chan TaskResult {
 	return s.results
 }
 
-// IsRunning returns true if the scheduler is running.
+// IsRunning 是否正在运行.
 func (s *Scheduler) IsRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.running
 }
 
-// executeTask executes a task.
+// executeTask 执行定时任务.
 func (s *Scheduler) executeTask(task *Task) {
 	if !task.Enabled {
 		return
@@ -284,7 +284,7 @@ func (s *Scheduler) executeTask(task *Task) {
 		task.NextRun = entry.Next
 	}
 
-	// Send result
+	// Send result to channel
 	result := TaskResult{
 		TaskID:    task.ID,
 		StartTime: startTime,
@@ -305,7 +305,7 @@ func (s *Scheduler) executeTask(task *Task) {
 	}
 }
 
-// Common task schedules
+// Common 定时任务调度.
 const (
 	EveryMinute    = "* * * * *"    // 每分钟执行一次
 	Every5Minutes  = "*/5 * * * *"  // 每5分钟执行一次
@@ -320,7 +320,7 @@ const (
 	EveryMonth     = "0 0 1 * *"    // 每月1号执行一次
 )
 
-// ParseDuration parses a duration string and returns a cron schedule.
+// ParseDuration 解析持续时间字符串并返回定时任务调度表达式.
 func ParseDuration(d string) (string, error) {
 	duration, err := time.ParseDuration(d)
 	if err != nil {

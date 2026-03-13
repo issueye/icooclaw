@@ -44,16 +44,16 @@ type ToolFunctionDefinition struct {
 
 // Tool represents a tool that can be executed by the agent.
 type Tool interface {
-	// Name returns the tool name.
+	// Name 返回工具名称.
 	Name() string
 
-	// Description returns the tool description.
+	// Description 返回工具描述.
 	Description() string
 
-	// Parameters returns the tool parameters schema.
+	// Parameters 返回工具参数模式.
 	Parameters() map[string]any
 
-	// Execute executes the tool with given arguments.
+	// Execute 执行工具.
 	Execute(ctx context.Context, args map[string]any) *Result
 }
 

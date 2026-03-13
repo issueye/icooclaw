@@ -6,6 +6,7 @@ import (
 
 	"icooclaw/pkg/tools"
 	"icooclaw/pkg/tools/builtin/file"
+	"icooclaw/pkg/tools/builtin/shell"
 	"icooclaw/pkg/tools/builtin/web"
 )
 
@@ -30,4 +31,10 @@ func RegisterBuiltinTools(registry *tools.Registry) {
 	registry.Register(file.NewWriteFileTool(workDir))
 	registry.Register(file.NewListDirTool(workDir))
 	registry.Register(file.NewCopyFileTool(workDir))
+
+	// 注册 shell 命令工具
+	registry.Register(shell.NewShellCommandTool(
+		shell.WithWorkDir(workDir),
+		shell.WithTimeout(60),
+	))
 }

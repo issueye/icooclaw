@@ -15,7 +15,7 @@ import (
 	"icooclaw/pkg/tools"
 )
 
-// SchedulerTool provides a tool for managing scheduled tasks.
+// Tool 定时任务工具提供管理定时任务的功能.
 type Tool struct {
 	scheduler *scheduler.Scheduler
 	store     *storage.TaskStorage
@@ -23,7 +23,7 @@ type Tool struct {
 	bus       *bus.MessageBus
 }
 
-// NewTool creates a new scheduler tool.
+// NewTool 创建定时任务工具.
 func NewTool(store *storage.TaskStorage, scheduler *scheduler.Scheduler, bus *bus.MessageBus, logger *slog.Logger) *Tool {
 	if logger == nil {
 		logger = slog.Default()
@@ -36,12 +36,12 @@ func NewTool(store *storage.TaskStorage, scheduler *scheduler.Scheduler, bus *bu
 	}
 }
 
-// Name returns the tool name.
+// Name 工具名称.
 func (t *Tool) Name() string {
 	return "scheduler"
 }
 
-// Description returns the tool description.
+// Description 工具描述.
 func (t *Tool) Description() string {
 	return `管理定时任务。支持以下操作：
 - list: 列出所有任务
@@ -54,7 +54,7 @@ func (t *Tool) Description() string {
 - disable: 禁用任务`
 }
 
-// Parameters returns the tool parameters.
+// Parameters 工具参数.
 func (t *Tool) Parameters() map[string]any {
 	return map[string]any{
 		"action": map[string]any{
@@ -106,7 +106,7 @@ func (t *Tool) Parameters() map[string]any {
 	}
 }
 
-// Execute executes the scheduler tool.
+// Execute 执行定时任务工具.
 func (t *Tool) Execute(ctx context.Context, args map[string]any) *tools.Result {
 	action, _ := args["action"].(string)
 	if action == "" {
@@ -135,7 +135,7 @@ func (t *Tool) Execute(ctx context.Context, args map[string]any) *tools.Result {
 	}
 }
 
-// listTasks lists all tasks with optional pagination.
+// listTasks 列出所有定时任务.
 func (t *Tool) listTasks(args map[string]any) *tools.Result {
 	page, _ := args["page"].(float64)
 	pageSize, _ := args["page_size"].(float64)
@@ -191,7 +191,7 @@ func (t *Tool) listTasks(args map[string]any) *tools.Result {
 	return tools.SuccessResult(output)
 }
 
-// getTask gets a single task by ID.
+// getTask 获取单个定时任务详情.
 func (t *Tool) getTask(args map[string]any) *tools.Result {
 	taskID, _ := args["task_id"].(string)
 	if taskID == "" {
@@ -230,7 +230,7 @@ func (t *Tool) getTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(output)
 }
 
-// createTask creates a new task.
+// createTask 创建新定时任务.
 func (t *Tool) createTask(args map[string]any) *tools.Result {
 	name, _ := args["name"].(string)
 	if name == "" {
@@ -320,7 +320,7 @@ func (t *Tool) createTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(output)
 }
 
-// updateTask updates an existing task.
+// updateTask 更新定时任务.
 func (t *Tool) updateTask(args map[string]any) *tools.Result {
 	taskID, _ := args["task_id"].(string)
 	if taskID == "" {
@@ -397,7 +397,7 @@ func (t *Tool) updateTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(output)
 }
 
-// deleteTask deletes a task.
+// deleteTask 删除定时任务.
 func (t *Tool) deleteTask(args map[string]any) *tools.Result {
 	taskID, _ := args["task_id"].(string)
 	if taskID == "" {
@@ -424,7 +424,7 @@ func (t *Tool) deleteTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(output)
 }
 
-// runTask executes a task immediately.
+// runTask 立即执行定时任务.
 func (t *Tool) runTask(args map[string]any) *tools.Result {
 	taskID, _ := args["task_id"].(string)
 	if taskID == "" {
@@ -442,7 +442,7 @@ func (t *Tool) runTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(fmt.Sprintf("✅ 任务 %s 已触发执行", taskID))
 }
 
-// enableTask enables a task.
+// enableTask 启用定时任务.
 func (t *Tool) enableTask(args map[string]any) *tools.Result {
 	taskID, _ := args["task_id"].(string)
 	if taskID == "" {
@@ -473,7 +473,7 @@ func (t *Tool) enableTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(fmt.Sprintf("✅ 任务 %s 已启用", taskID))
 }
 
-// disableTask disables a task.
+// disableTask 禁用定时任务.
 func (t *Tool) disableTask(args map[string]any) *tools.Result {
 	taskID, _ := args["task_id"].(string)
 	if taskID == "" {
@@ -504,7 +504,7 @@ func (t *Tool) disableTask(args map[string]any) *tools.Result {
 	return tools.SuccessResult(fmt.Sprintf("✅ 任务 %s 已禁用", taskID))
 }
 
-// validateCronExpr validates a cron expression.
+// validateCronExpr 验证 Cron 表达式是否有效.
 func (t *Tool) validateCronExpr(expr string) error {
 	// Common cron expressions
 	commonExprs := map[string]bool{
@@ -536,7 +536,7 @@ func (t *Tool) validateCronExpr(expr string) error {
 	return err
 }
 
-// parseCron is a helper to validate cron expressions.
+// parseCron 验证 Cron 表达式是否有效.
 func parseCron(expr string) (interface{}, error) {
 	// Import cron parser inline
 	// Standard 5-field cron: minute hour day month weekday

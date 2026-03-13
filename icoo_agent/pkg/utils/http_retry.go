@@ -16,6 +16,7 @@ func shouldRetry(statusCode int) bool {
 		statusCode >= 500
 }
 
+// DoRequestWithRetry 使用重试机制执行 HTTP 请求。
 func DoRequestWithRetry(client *http.Client, req *http.Request) (*http.Response, error) {
 	var resp *http.Response
 	var err error
@@ -47,6 +48,7 @@ func DoRequestWithRetry(client *http.Client, req *http.Request) (*http.Response,
 	return resp, err
 }
 
+// sleepWithCtx 在上下文上下文执行睡眠。
 func sleepWithCtx(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
