@@ -88,6 +88,42 @@ func (s *MCPStorage) Delete(name string) error {
 	return result.Error
 }
 
+// DeleteByID deletes a MCP by ID.
+func (s *MCPStorage) DeleteByID(id string) error {
+	result := s.db.Where("id = ?", id).Delete(&MCPConfig{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete mcp config: %w", result.Error)
+	}
+	return nil
+}
+
+// GetByID gets a MCP by ID.
+func (s *MCPStorage) GetByID(id string) (*MCPConfig, error) {
+	var m MCPConfig
+	result := s.db.Where("id = ?", id).First(&m)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("mcp config not found")
+		}
+		return nil, fmt.Errorf("failed to get mcp config: %w", result.Error)
+	}
+	return &m, nil
+}
+
+// Update updates a MCP configuration.
+func (s *MCPStorage) Update(m *MCPConfig) error {
+	result := s.db.Save(m)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update mcp config: %w", result.Error)
+	}
+	return nil
+}
+
+// Create creates a new MCP configuration.
+func (s *MCPStorage) Create(m *MCPConfig) error {
+	return s.db.Create(m).Error
+}
+
 type QueryMCP struct {
 	Page    Page    `json:"page"`
 	KeyWord string  `json:"key_word"`

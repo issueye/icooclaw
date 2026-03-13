@@ -70,7 +70,7 @@ func (h *MCPHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.MCP().Save(req)
+	err = h.storage.MCP().Create(req)
 	if err != nil {
 		h.logger.Error("创建MCP配置失败", "error", err)
 		http.Error(w, "创建MCP配置失败", http.StatusInternalServerError)
@@ -92,7 +92,7 @@ func (h *MCPHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.MCP().Save(req)
+	err = h.storage.MCP().Update(req)
 	if err != nil {
 		h.logger.Error("更新MCP配置失败", "error", err)
 		http.Error(w, "更新MCP配置失败", http.StatusInternalServerError)
@@ -114,7 +114,7 @@ func (h *MCPHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.storage.MCP().Delete(id)
+	err = h.storage.MCP().DeleteByID(id)
 	if err != nil {
 		h.logger.Error("删除MCP配置失败", "error", err)
 		http.Error(w, "删除MCP配置失败", http.StatusInternalServerError)
@@ -135,7 +135,7 @@ func (h *MCPHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config, err := h.storage.MCP().Get(id)
+	config, err := h.storage.MCP().GetByID(id)
 	if err != nil {
 		h.logger.Error("获取MCP配置失败", "error", err)
 		http.Error(w, "获取MCP配置失败", http.StatusInternalServerError)

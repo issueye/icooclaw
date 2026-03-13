@@ -43,7 +43,8 @@
               </div>
               <div>
                 <h3 class="font-medium">{{ task.name }}</h3>
-                <p class="text-text-secondary text-sm">{{ task.cron }}</p>
+                <p class="text-text-secondary text-sm">{{ task.cron_expr }}</p>
+                <p v-if="task.description" class="text-text-muted text-xs mt-1">{{ task.description }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -82,7 +83,7 @@
       :title="editingTask ? '编辑任务' : '新建任务'"
       size="md"
       :loading="saving"
-      :confirm-disabled="!taskForm.name || !taskForm.cron || !taskForm.content"
+      :confirm-disabled="!taskForm.name || !taskForm.cron_expr || !taskForm.handler"
       confirm-text="保存"
       loading-text="保存中..."
       @confirm="saveTask"
@@ -99,9 +100,19 @@
         </div>
 
         <div>
+          <label class="block text-sm text-text-secondary mb-2">任务描述</label>
+          <input
+            v-model="taskForm.description"
+            type="text"
+            placeholder="请输入任务描述（可选）"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+          />
+        </div>
+
+        <div>
           <label class="block text-sm text-text-secondary mb-2">Cron 表达式</label>
           <input
-            v-model="taskForm.cron"
+            v-model="taskForm.cron_expr"
             type="text"
             placeholder="* * * * * (分 时 日 月 周)"
             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors font-mono"
@@ -110,11 +121,21 @@
         </div>
 
         <div>
-          <label class="block text-sm text-text-secondary mb-2">执行内容</label>
+          <label class="block text-sm text-text-secondary mb-2">处理器</label>
+          <input
+            v-model="taskForm.handler"
+            type="text"
+            placeholder="请输入处理器名称"
+            class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm text-text-secondary mb-2">参数 (JSON格式)</label>
           <textarea
-            v-model="taskForm.content"
-            rows="4"
-            placeholder="请输入要执行的命令或内容"
+            v-model="taskForm.params"
+            rows="3"
+            placeholder='{"key": "value"}'
             class="w-full px-4 py-2.5 bg-bg-tertiary border border-border rounded-lg focus:outline-none focus:border-accent transition-colors font-mono resize-none"
           ></textarea>
         </div>
@@ -142,6 +163,13 @@ import {
   Trash as TrashIcon,
 } from "lucide-vue-next";
 import ModalDialog from "@/components/ModalDialog.vue";
+import { 
+  getTasks, 
+  createTask, 
+  updateTask, 
+  deleteTask as apiDeleteTask,
+  toggleTask as apiToggleTask 
+} from "@/services/api.js";
 
 const loading = ref(true);
 const tasks = ref([]);
@@ -151,8 +179,10 @@ const saving = ref(false);
 
 const taskForm = reactive({
   name: "",
-  cron: "",
-  content: "",
+  description: "",
+  cron_expr: "",
+  handler: "",
+  params: "",
   enabled: true,
 });
 
@@ -168,94 +198,153 @@ onMounted(() => {
   loadTasks();
 });
 
+/**
+ * 加载任务列表
+ */
 async function loadTasks() {
   loading.value = true;
   try {
-    const savedTasks = localStorage.getItem("icooclaw_tasks");
-    if (savedTasks) {
-      tasks.value = JSON.parse(savedTasks);
-    } else {
-      tasks.value = [];
-    }
+    const response = await getTasks();
+    // 后端返回格式: { code, message, data: [...] }
+    const data = response.data || response;
+    tasks.value = Array.isArray(data) ? data : [];
   } catch (e) {
     console.error("加载任务失败:", e);
     tasks.value = [];
+    alert("加载任务列表失败: " + (e.message || "未知错误"));
   }
   loading.value = false;
 }
 
-function saveTasksToStorage() {
-  localStorage.setItem("icooclaw_tasks", JSON.stringify(tasks.value));
-}
-
+/**
+ * 打开添加任务对话框
+ */
 function openAddDialog() {
   editingTask.value = null;
   resetForm();
   showAddDialog.value = true;
 }
 
+/**
+ * 编辑任务
+ */
 function editTask(task) {
   editingTask.value = task;
-  taskForm.name = task.name;
-  taskForm.cron = task.cron;
-  taskForm.content = task.content;
-  taskForm.enabled = task.enabled;
+  taskForm.name = task.name || "";
+  taskForm.description = task.description || "";
+  taskForm.cron_expr = task.cron_expr || "";
+  taskForm.handler = task.handler || "";
+  taskForm.params = task.params || "";
+  taskForm.enabled = task.enabled !== false;
   showAddDialog.value = true;
 }
 
+/**
+ * 重置表单
+ */
 function resetForm() {
   taskForm.name = "";
-  taskForm.cron = "";
-  taskForm.content = "";
+  taskForm.description = "";
+  taskForm.cron_expr = "";
+  taskForm.handler = "";
+  taskForm.params = "";
   taskForm.enabled = true;
 }
 
-function toggleTask(task) {
-  task.enabled = !task.enabled;
-  saveTasksToStorage();
-}
-
-function deleteTask(id) {
-  if (confirm("确定要删除这个任务吗？")) {
-    tasks.value = tasks.value.filter(t => t.id !== id);
-    saveTasksToStorage();
+/**
+ * 切换任务启用状态
+ */
+async function toggleTask(task) {
+  try {
+    await apiToggleTask(task.id);
+    // 更新本地状态
+    task.enabled = !task.enabled;
+  } catch (e) {
+    console.error("切换任务状态失败:", e);
+    alert("切换任务状态失败: " + (e.message || "未知错误"));
   }
 }
 
+/**
+ * 删除任务
+ */
+async function deleteTask(id) {
+  if (!confirm("确定要删除这个任务吗？")) {
+    return;
+  }
+  
+  try {
+    await apiDeleteTask(id);
+    // 从本地列表中移除
+    tasks.value = tasks.value.filter(t => t.id !== id);
+  } catch (e) {
+    console.error("删除任务失败:", e);
+    alert("删除任务失败: " + (e.message || "未知错误"));
+  }
+}
+
+/**
+ * 关闭对话框
+ */
 function closeDialog() {
   showAddDialog.value = false;
   editingTask.value = null;
   resetForm();
 }
 
+/**
+ * 保存任务
+ */
 async function saveTask() {
-  if (!taskForm.name || !taskForm.cron || !taskForm.content) {
-    alert("请填写完整信息");
+  if (!taskForm.name || !taskForm.cron_expr || !taskForm.handler) {
+    alert("请填写完整信息（任务名称、Cron表达式、处理器为必填项）");
     return;
+  }
+
+  // 验证 JSON 参数格式
+  if (taskForm.params) {
+    try {
+      JSON.parse(taskForm.params);
+    } catch (e) {
+      alert("参数格式错误，请输入有效的 JSON 格式");
+      return;
+    }
   }
 
   saving.value = true;
 
   try {
+    const taskData = {
+      name: taskForm.name,
+      description: taskForm.description,
+      cron_expr: taskForm.cron_expr,
+      handler: taskForm.handler,
+      params: taskForm.params,
+      enabled: taskForm.enabled,
+    };
+
     if (editingTask.value) {
+      // 更新现有任务
+      taskData.id = editingTask.value.id;
+      const response = await updateTask(taskData);
+      const updatedTask = response.data || taskData;
+      
+      // 更新本地列表
       const index = tasks.value.findIndex(t => t.id === editingTask.value.id);
       if (index !== -1) {
-        tasks.value[index] = {
-          ...editingTask.value,
-          ...taskForm,
-        };
+        tasks.value[index] = { ...tasks.value[index], ...updatedTask };
       }
     } else {
-      tasks.value.push({
-        id: Date.now().toString(),
-        ...taskForm,
-      });
+      // 创建新任务
+      const response = await createTask(taskData);
+      const newTask = response.data || taskData;
+      tasks.value.push(newTask);
     }
-    saveTasksToStorage();
+    
     closeDialog();
   } catch (e) {
     console.error("保存任务失败:", e);
-    alert("保存失败");
+    alert("保存任务失败: " + (e.message || "未知错误"));
   }
 
   saving.value = false;
