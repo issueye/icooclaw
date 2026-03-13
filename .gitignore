@@ -1,5 +1,9 @@
 .vscode/*
 *.log
 *.exe
-agent/cmd/icooclaw/workspace/data/*
 *.bak
+
+
+icoo_agent/workspace/data/*
+icoo_agent/workspace/temp/*
+

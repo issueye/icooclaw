@@ -227,7 +227,8 @@ func (t *ShellCommandTool) runCommand(ctx context.Context, command, workDir stri
 			result["error"] = fmt.Sprintf("命令执行超时（%d秒）", int(duration.Seconds()))
 		} else if exitErr, ok := err.(*exec.ExitError); ok {
 			result["exit_code"] = exitErr.ExitCode()
-			result["error"] = fmt.Sprintf("命令执行失败，退出码: %d", exitErr.ExitCode())
+			// 命令执行失败但输出仍然有效，不设置 error 字段
+			// 让调用者根据 exit_code 和 output 判断
 		} else {
 			result["error"] = err.Error()
 		}
@@ -242,9 +243,16 @@ func (t *ShellCommandTool) runCommand(ctx context.Context, command, workDir stri
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 
+	// 工具执行成功（即使命令返回非零退出码）
+	// 只有超时或无法执行命令时才返回错误
+	toolErr := error(nil)
+	if ctx.Err() == context.DeadlineExceeded {
+		toolErr = fmt.Errorf("命令执行超时")
+	}
+
 	return &tools.Result{
-		Success: err == nil,
+		Success: toolErr == nil,
 		Content: string(resultJSON),
-		Error:   err,
+		Error:   toolErr,
 	}
 }

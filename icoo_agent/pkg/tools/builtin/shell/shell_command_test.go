@@ -133,7 +133,9 @@ func TestShellCommandTool_ExecuteTimeout(t *testing.T) {
 		command = "sleep 10"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	// 创建一个已经超时的上下文
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	time.Sleep(2 * time.Millisecond) // 等待超时
 	defer cancel()
 
 	result := tool.Execute(ctx, map[string]any{
