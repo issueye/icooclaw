@@ -8,9 +8,22 @@ import (
 	"icooclaw/pkg/providers"
 )
 
-// Chat 发送消息
-func (a *ReActAgent) Chat(ctx context.Context, msg bus.InboundMessage) (string, int, error) {
+// StreamChunk 表示流式响应的一个数据块。
+type StreamChunk struct {
+	Content    string `json:"content,omitempty"`     // 内容
+	Reasoning  string `json:"reasoning,omitempty"`   // 推理过程
+	ToolName   string `json:"tool_name,omitempty"`   // 工具名称
+	ToolResult string `json:"tool_result,omitempty"` // 工具结果
+	Iteration  int    `json:"iteration,omitempty"`   // 迭代次数
+	Done       bool   `json:"done,omitempty"`        // 是否完成
+	Error      error  `json:"error,omitempty"`       // 错误信息
+}
 
+// StreamCallback 流式响应的回调函数。
+type StreamCallback func(chunk StreamChunk) error
+
+// Chat 发送消息（非流式）
+func (a *ReActAgent) Chat(ctx context.Context, msg bus.InboundMessage) (string, int, error) {
 	// 会话键
 	sessionKey := consts.GetSessionKey(msg.Channel, msg.SessionID)
 
@@ -32,16 +45,23 @@ func (a *ReActAgent) Chat(ctx context.Context, msg bus.InboundMessage) (string, 
 		return "", 0, err
 	}
 
+	// 4. 保存助手消息到记忆
+	if a.memory != nil && content != "" {
+		if err := a.memory.Save(ctx, sessionKey, consts.RoleAssistant.ToString(), content); err != nil {
+			a.logger.With("name", "【智能体】").Warn("保存助手消息失败", "error", err)
+		}
+	}
+
 	return content, iteration, nil
 }
 
-// RunLLM 运行LLM模型
+// RunLLM 运行LLM模型（非流式）
 func (a *ReActAgent) RunLLM(
-	ctx context.Context, // 上下文
-	modelName string, // 模型名称
-	provider providers.Provider, // 提供商
-	messages []providers.ChatMessage, // 消息列表
-	msg bus.InboundMessage, // 原始消息
+	ctx context.Context,
+	modelName string,
+	provider providers.Provider,
+	messages []providers.ChatMessage,
+	msg bus.InboundMessage,
 ) (string, int, error) {
 	iteration := 0
 	currentMessages := messages
@@ -55,7 +75,7 @@ func (a *ReActAgent) RunLLM(
 		}
 	}
 
-	// 1. 迭代调用LLM
+	// 迭代调用LLM
 	for iteration < a.maxToolIterations {
 		iteration++
 
@@ -66,7 +86,6 @@ func (a *ReActAgent) RunLLM(
 		}
 
 		// 2. 处理工具调用
-		// 添加工具调用如果可用
 		toolDefs := a.tools.ToProviderDefs()
 		if len(toolDefs) > 0 {
 			req.Tools = a.convertToolDefinitions(toolDefs)
@@ -80,13 +99,12 @@ func (a *ReActAgent) RunLLM(
 
 		// 4. 处理工具调用响应
 		if len(resp.ToolCalls) > 0 {
-			// 处理工具调用响应
+			// 添加助手消息
 			assistantMsg := providers.ChatMessage{
 				Role:      consts.RoleAssistant.ToString(),
 				Content:   resp.Content,
 				ToolCalls: resp.ToolCalls,
 			}
-
 			currentMessages = append(currentMessages, assistantMsg)
 
 			// 5. 执行每个工具调用
@@ -103,9 +121,9 @@ func (a *ReActAgent) RunLLM(
 					Content:    toolResult,
 					ToolCallID: tc.ID,
 				})
-
-				continue
 			}
+
+			continue
 		}
 
 		// 6. 返回响应内容

@@ -244,3 +244,105 @@ func (a *ReActAgent) executeToolCall(ctx context.Context, tc providers.ToolCall,
 
 	return result.Content, nil
 }
+
+// mergeToolCalls 合并流式响应中的工具调用
+func (a *ReActAgent) mergeToolCalls(toolCalls []providers.ToolCall) []providers.ToolCall {
+	if len(toolCalls) == 0 {
+		return nil
+	}
+
+	// 按 index 分组
+	indexToCall := make(map[int]*providers.ToolCall)
+	realIDToIndex := make(map[string]int)
+	nextIndex := 0
+
+	for _, tc := range toolCalls {
+		var idx int
+		var found bool
+
+		// 检查是否为流式索引ID
+		if isStreamIndexID(tc.ID) {
+			fmt.Sscanf(tc.ID, "stream_index:%d", &idx)
+			found = true
+		} else if tc.ID != "" {
+			if i, ok := realIDToIndex[tc.ID]; ok {
+				idx = i
+				found = true
+			} else {
+				idx = nextIndex
+				nextIndex++
+				realIDToIndex[tc.ID] = idx
+				found = true
+			}
+		}
+
+		if !found {
+			continue
+		}
+
+		if existing, ok := indexToCall[idx]; ok {
+			// 合并内容
+			if tc.Function.Name != "" {
+				existing.Function.Name = tc.Function.Name
+			}
+			if tc.Function.Arguments != "" {
+				existing.Function.Arguments += tc.Function.Arguments
+			}
+			if tc.ID != "" && !isStreamIndexID(tc.ID) {
+				existing.ID = tc.ID
+			}
+		} else {
+			// 创建新条目
+			copy := tc
+			indexToCall[idx] = &copy
+		}
+	}
+
+	// 转换为结果
+	result := make([]providers.ToolCall, 0, len(indexToCall))
+	for _, tc := range indexToCall {
+		if tc.Function.Name == "" {
+			continue
+		}
+		result = append(result, providers.ToolCall{
+			ID:   tc.ID,
+			Type: "function",
+			Function: struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			}{
+				Name:      tc.Function.Name,
+				Arguments: tc.Function.Arguments,
+			},
+		})
+	}
+
+	return result
+}
+
+// validateToolCalls 验证工具调用是否有效
+func (a *ReActAgent) validateToolCalls(toolCalls []providers.ToolCall) []providers.ToolCall {
+	valid := make([]providers.ToolCall, 0, len(toolCalls))
+
+	for _, tc := range toolCalls {
+		// 跳过空名称的工具调用
+		if tc.Function.Name == "" {
+			a.logger.Warn("跳过无效工具调用：缺少工具名称", "id", tc.ID)
+			continue
+		}
+
+		// 确保参数是有效的JSON或空对象
+		if tc.Function.Arguments == "" {
+			tc.Function.Arguments = "{}"
+		}
+
+		valid = append(valid, tc)
+	}
+
+	return valid
+}
+
+// isStreamIndexID 检查 ID 是否为临时的流式索引 ID
+func isStreamIndexID(id string) bool {
+	return len(id) > 12 && id[:12] == "stream_index"
+}
