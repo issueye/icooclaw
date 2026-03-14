@@ -70,6 +70,18 @@ func WithBus(b *bus.MessageBus) Option {
 	}
 }
 
+func WithProviderFactory(f *providers.Factory) Option {
+	return func(a *ReActAgent) {
+		a.providerFactory = f
+	}
+}
+
+func WithStorage(s *storage.Storage) Option {
+	return func(a *ReActAgent) {
+		a.storage = s
+	}
+}
+
 func WithMaxToolIterations(max int) Option {
 	return func(a *ReActAgent) {
 		a.maxToolIterations = max

@@ -19,14 +19,12 @@ import (
 
 // Server represents the gateway HTTP server.
 type Server struct {
-	router   chi.Router
-	server   *http.Server
-	storage  *storage.Storage
-	logger   *slog.Logger
-	handlers *Handlers
-	schedule *scheduler.Scheduler
-
-	// New components
+	router       chi.Router
+	server       *http.Server
+	storage      *storage.Storage
+	logger       *slog.Logger
+	handlers     *Handlers
+	schedule     *scheduler.Scheduler
 	wsManager    *websocket.Manager
 	sseBroker    *sse.Broker
 	bus          *bus.MessageBus
@@ -56,11 +54,11 @@ func DefaultServerConfig() *ServerConfig {
 // NewServer creates a new gateway server.
 func NewServer(
 	cfg *ServerConfig,
-	wsCfg *websocket.ManagerConfig,
 	logger *slog.Logger,
 	store *storage.Storage,
 	schedule *scheduler.Scheduler,
 	bus *bus.MessageBus,
+	wsManager *websocket.Manager,
 	agentManager *agent.AgentManager,
 ) *Server {
 	if logger == nil {
@@ -75,10 +73,8 @@ func NewServer(
 		schedule:     schedule,
 		bus:          bus,
 		agentManager: agentManager,
+		wsManager:    wsManager,
 	}
-
-	// Create WebSocket manager
-	s.WithWebSocket(wsCfg)
 
 	// Create handlers
 	s.handlers = NewHandlers(
@@ -109,11 +105,8 @@ func NewServer(
 }
 
 // WithWebSocket enables WebSocket support.
-func (s *Server) WithWebSocket(cfg *websocket.ManagerConfig) *Server {
-	if cfg == nil {
-		cfg = websocket.DefaultManagerConfig()
-	}
-	s.wsManager = websocket.NewManager(cfg, s.logger)
+func (s *Server) WithWebSocket(wsManager *websocket.Manager) *Server {
+	s.wsManager = wsManager
 	return s
 }
 

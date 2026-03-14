@@ -337,6 +337,7 @@ func (m *Manager) ProcessStreamMessage(ctx context.Context, client *Client, msg 
 		Timestamp: time.Now(),
 	}
 
+	// 运行智能体流式处理
 	err := m.agentManager.RunAgentStream(inbound, func(chunk react.StreamChunk) error {
 		if chunk.Content != "" || chunk.Reasoning != "" {
 			data := map[string]interface{}{

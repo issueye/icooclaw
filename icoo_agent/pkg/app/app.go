@@ -187,14 +187,21 @@ func (a *App) InitGateway() {
 		serverCfg.Addr = fmt.Sprintf(":%d", a.Cfg.Gateway.Port)
 	}
 
+	// 创建 WebSocket 管理器
+	wsManager := websocket.NewManager(
+		websocket.DefaultManagerConfig(),
+		a.Logger,
+	)
+	wsManager.WithAgentManager(a.AgentManager)
+
 	// 创建网关服务器
 	a.Gw = gateway.NewServer(
 		serverCfg,
-		websocket.DefaultManagerConfig(),
 		slog.Default(),
 		a.Storage,
 		a.Scheduler,
 		a.MessageBus,
+		wsManager,
 		a.AgentManager,
 	).WithSSE().Setup()
 }
@@ -234,7 +241,9 @@ func (a *App) Init(path string) error {
 		WithBus(a.MessageBus).
 		WithMemory(a.MemoryLoader).
 		WithTools(a.ToolRegistry).
-		WithSkills(a.SkillLoader)
+		WithSkills(a.SkillLoader).
+		WithStorage(a.Storage)
+
 	// 初始化网关服务器
 	a.InitGateway()
 	return nil

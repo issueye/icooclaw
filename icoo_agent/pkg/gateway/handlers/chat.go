@@ -36,13 +36,15 @@ func NewChatHandler(
 
 func (h *ChatHandler) WithAgentManager(m *agent.AgentManager) *ChatHandler {
 	h.agentManager = m
+	if h.wsManager != nil {
+		h.wsManager.WithAgentManager(m)
+	}
 	return h
 }
 
 // WithWebSocketManager sets the WebSocket manager.
 func (h *ChatHandler) WithWebSocketManager(m *websocket.Manager) *ChatHandler {
 	h.wsManager = m
-	h.wsManager.WithAgentManager(h.agentManager)
 	return h
 }
 

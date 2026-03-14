@@ -9,6 +9,7 @@ import (
 	"icooclaw/pkg/memory"
 	"icooclaw/pkg/providers"
 	"icooclaw/pkg/skill"
+	"icooclaw/pkg/storage"
 	"icooclaw/pkg/tools"
 	"log/slog"
 	"sync/atomic"
@@ -41,6 +42,8 @@ type AgentManager struct {
 	hooks react.ReactHooks
 	// 提供商工厂
 	providerFactory *providers.Factory
+	// 存储加载器
+	storage *storage.Storage
 	// 智能体示例map
 	agentsMap map[string]*react.ReActAgent
 }
@@ -87,6 +90,11 @@ func (m *AgentManager) WithTools(reg *tools.Registry) *AgentManager {
 
 func (m *AgentManager) WithSkills(skills skill.Loader) *AgentManager {
 	m.skills = skills
+	return m
+}
+
+func (m *AgentManager) WithStorage(s *storage.Storage) *AgentManager {
+	m.storage = s
 	return m
 }
 
@@ -183,6 +191,8 @@ func (m *AgentManager) RunAgent(msg bus.InboundMessage) (string, error) {
 			react.WithMemory(m.memory),
 			react.WithSkills(m.skills),
 			react.WithTools(m.tools),
+			react.WithProviderFactory(m.providerFactory),
+			react.WithStorage(m.storage),
 		)
 	}
 
@@ -225,6 +235,8 @@ func (m *AgentManager) RunAgentStream(msg bus.InboundMessage, callback react.Str
 			react.WithMemory(m.memory),
 			react.WithSkills(m.skills),
 			react.WithTools(m.tools),
+			react.WithProviderFactory(m.providerFactory),
+			react.WithStorage(m.storage),
 		)
 	}
 
