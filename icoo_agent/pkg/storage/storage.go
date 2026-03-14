@@ -75,7 +75,7 @@ func (s *Storage) Workspace() *WorkspaceStorage {
 }
 
 // New creates a new Storage instance.
-func New(mode string, path string) (*Storage, error) {
+func New(workspace string, mode string, path string) (*Storage, error) {
 	db, err := gorm.Open(sqlite.Open(path+"?_journal_mode=WAL&_busy_timeout=5000"), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -108,7 +108,7 @@ func New(mode string, path string) (*Storage, error) {
 		channel:   NewChannelStorage(db),
 		param:     NewParamStorage(db),
 		task:      NewTaskStorage(db),
-		workspace: NewWorkspaceStorage(path),
+		workspace: NewWorkspaceStorage(workspace),
 	}
 
 	if err := s.autoMigrate(); err != nil {

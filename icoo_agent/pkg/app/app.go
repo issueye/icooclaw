@@ -114,7 +114,7 @@ func (a *App) InitSkill() {
 // InitStorage 初始化存储
 func (a *App) InitStorage() {
 	dbPath, _ := a.Cfg.GetDatabasePath()
-	store, err := storage.New(a.Cfg.Mode, dbPath)
+	store, err := storage.New(a.Cfg.Agent.Workspace, a.Cfg.Mode, dbPath)
 	if err != nil {
 		slog.Error("初始化存储失败", "error", err)
 		os.Exit(1)
