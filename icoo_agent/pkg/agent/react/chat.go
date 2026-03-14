@@ -8,20 +8,6 @@ import (
 	"icooclaw/pkg/providers"
 )
 
-// StreamChunk 表示流式响应的一个数据块。
-type StreamChunk struct {
-	Content    string `json:"content,omitempty"`     // 内容
-	Reasoning  string `json:"reasoning,omitempty"`   // 推理过程
-	ToolName   string `json:"tool_name,omitempty"`   // 工具名称
-	ToolResult string `json:"tool_result,omitempty"` // 工具结果
-	Iteration  int    `json:"iteration,omitempty"`   // 迭代次数
-	Done       bool   `json:"done,omitempty"`        // 是否完成
-	Error      error  `json:"error,omitempty"`       // 错误信息
-}
-
-// StreamCallback 流式响应的回调函数。
-type StreamCallback func(chunk StreamChunk) error
-
 // Chat 发送消息（非流式）
 func (a *ReActAgent) Chat(ctx context.Context, msg bus.InboundMessage) (string, int, error) {
 	// 会话键
@@ -33,7 +19,7 @@ func (a *ReActAgent) Chat(ctx context.Context, msg bus.InboundMessage) (string, 
 		return "", 0, err
 	}
 
-	// 2. 构建消息
+	// 2. 构建消息列表
 	messages, err := a.buildMessages(ctx, sessionKey, msg)
 	if err != nil {
 		return "", 0, err
@@ -69,7 +55,7 @@ func (a *ReActAgent) RunLLM(
 
 	// 调用钩子运行LLM模型前
 	if a.hooks != nil {
-		currentMessages, err = a.hooks.RunLLMBefore(ctx, msg, currentMessages)
+		currentMessages, err = a.hooks.OnRunLLMBefore(ctx, msg, currentMessages)
 		if err != nil {
 			return "", iteration, err
 		}

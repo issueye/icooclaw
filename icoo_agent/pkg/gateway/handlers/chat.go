@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"icooclaw/pkg/agent"
+	"icooclaw/pkg/agent/react"
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels/consts"
 	"icooclaw/pkg/gateway/models"
@@ -17,36 +17,32 @@ import (
 
 // ChatHandler handles chat-related HTTP and WebSocket requests.
 type ChatHandler struct {
-	logger        *slog.Logger
-	storage       *storage.Storage
-	wsManager     *websocket.Manager
-	bus           *bus.MessageBus
-	agentLoop     *agent.Loop
-	agentRegistry *agent.AgentRegistry
+	logger       *slog.Logger
+	storage      *storage.Storage
+	wsManager    *websocket.Manager
+	bus          *bus.MessageBus
+	agentManager *agent.AgentManager
 }
 
 // NewChatHandler creates a new ChatHandler.
 func NewChatHandler(
 	logger *slog.Logger,
 	storage *storage.Storage,
-	wsManager *websocket.Manager,
-	bus *bus.MessageBus,
-	agentLoop *agent.Loop,
-	agentRegistry *agent.AgentRegistry,
 ) *ChatHandler {
 	return &ChatHandler{
-		logger:        logger,
-		storage:       storage,
-		wsManager:     wsManager,
-		bus:           bus,
-		agentLoop:     agentLoop,
-		agentRegistry: agentRegistry,
+		logger: logger,
 	}
+}
+
+func (h *ChatHandler) WithAgentManager(m *agent.AgentManager) *ChatHandler {
+	h.agentManager = m
+	return h
 }
 
 // WithWebSocketManager sets the WebSocket manager.
 func (h *ChatHandler) WithWebSocketManager(m *websocket.Manager) *ChatHandler {
 	h.wsManager = m
+	h.wsManager.WithAgentManager(h.agentManager)
 	return h
 }
 
@@ -56,15 +52,8 @@ func (h *ChatHandler) WithBus(b *bus.MessageBus) *ChatHandler {
 	return h
 }
 
-// WithAgentLoop sets the agent loop.
-func (h *ChatHandler) WithAgentLoop(l *agent.Loop) *ChatHandler {
-	h.agentLoop = l
-	return h
-}
-
-// WithAgentRegistry sets the agent registry.
-func (h *ChatHandler) WithAgentRegistry(r *agent.AgentRegistry) *ChatHandler {
-	h.agentRegistry = r
+func (h *ChatHandler) WithStorage(s *storage.Storage) *ChatHandler {
+	h.storage = s
 	return h
 }
 
@@ -134,17 +123,17 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process with agent loop
-	if h.agentLoop != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-		defer cancel()
+	if h.agentManager != nil {
+		inbound := bus.InboundMessage{
+			Channel:   consts.WEBSOCKET,
+			SessionID: req.SessionID,
+			Sender:    bus.SenderInfo{ID: "http", Name: "HTTP Client"},
+			Text:      req.Content,
+			Timestamp: time.Now(),
+		}
 
-		response, err := h.agentLoop.ProcessDirectWithChannel(
-			ctx,
-			req.Content,
-			req.SessionID,
-			consts.WEBSOCKET,
-			req.SessionID,
-		)
+		finalResponse, err := h.agentManager.RunAgent(inbound)
+
 		if err != nil {
 			h.logger.With("name", "【网关服务】").Error("处理聊天失败", "error", err)
 			http.Error(w, "【网关服务】处理聊天失败", http.StatusInternalServerError)
@@ -156,38 +145,8 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 			Message: "success",
 			Data: &ChatResponse{
 				SessionID: req.SessionID,
-				Content:   response,
+				Content:   finalResponse,
 				Timestamp: time.Now().Unix(),
-			},
-		})
-		return
-	}
-
-	// Fallback: publish to bus
-	if h.bus != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		msg := bus.InboundMessage{
-			Channel:   consts.WEBSOCKET,
-			SessionID: req.SessionID,
-			Sender:    bus.SenderInfo{ID: "http", Name: "HTTP Client"},
-			Text:      req.Content,
-			Timestamp: time.Now(),
-		}
-
-		if err := h.bus.PublishInbound(ctx, msg); err != nil {
-			h.logger.With("name", "【网关服务】").Error("发布消息失败", "error", err)
-			http.Error(w, "【网关服务】发布消息失败", http.StatusInternalServerError)
-			return
-		}
-
-		models.WriteData(w, models.BaseResponse[any]{
-			Code:    http.StatusOK,
-			Message: "message queued",
-			Data: map[string]string{
-				"session_id": req.SessionID,
-				"status":     "queued",
 			},
 		})
 		return
@@ -237,36 +196,45 @@ func (h *ChatHandler) HandleChatStream(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	// Process with agent loop
-	if h.agentLoop != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
-		defer cancel()
+	if h.agentManager != nil {
+		inbound := bus.InboundMessage{
+			Channel:   consts.WEBSOCKET,
+			SessionID: req.SessionID,
+			Sender:    bus.SenderInfo{ID: "http", Name: "HTTP Client"},
+			Text:      req.Content,
+			Timestamp: time.Now(),
+		}
 
-		response, err := h.agentLoop.ProcessDirectWithChannel(
-			ctx,
-			req.Content,
-			req.SessionID,
-			"http-stream",
-			req.SessionID,
-		)
+		err := h.agentManager.RunAgentStream(inbound, func(chunk react.StreamChunk) error {
+			// 发送流式内容事件
+			h.writeSSE(w, "content", map[string]string{
+				"session_id": req.SessionID,
+				"content":    chunk.Content,
+			})
+
+			flusher.Flush()
+			return nil
+		})
+
 		if err != nil {
 			h.writeSSE(w, "error", map[string]string{"error": "处理消息失败: " + err.Error()})
 			flusher.Flush()
 			return
 		}
 
-		// Send content event
 		h.writeSSE(w, "content", map[string]string{
 			"session_id": req.SessionID,
-			"content":    response,
+			"type":       "end",
 		})
+
 		flusher.Flush()
 	} else {
-		// No agent loop configured
+		// 没有配置智能体循环
 		h.writeSSE(w, "error", map[string]string{"error": "服务未配置：缺少智能体"})
 		flusher.Flush()
 	}
 
-	// Send end event
+	// 发送结束事件事件
 	h.writeSSE(w, "end", map[string]string{"session_id": req.SessionID})
 	flusher.Flush()
 }
@@ -343,51 +311,12 @@ type AgentStatus struct {
 	ChatCount int    `json:"chat_count,omitempty"`
 }
 
-// GetAgentStatus returns the status of all agents.
-func (h *ChatHandler) GetAgentStatus(w http.ResponseWriter, r *http.Request) {
-	if h.agentRegistry == nil {
-		models.WriteData(w, models.BaseResponse[any]{
-			Code:    http.StatusOK,
-			Message: "【网关服务】智能体注册未配置成功",
-			Data:    nil,
-		})
-		return
-	}
-
-	agentNames := h.agentRegistry.List()
-	statuses := make([]*AgentStatus, 0, len(agentNames))
-
-	for _, name := range agentNames {
-		ag, ok := h.agentRegistry.Get(name)
-		if !ok {
-			continue
-		}
-
-		status := &AgentStatus{
-			Name:     name,
-			IsActive: true,
-		}
-
-		if ag != nil {
-			status.Model = ag.Config().Model
-		}
-
-		statuses = append(statuses, status)
-	}
-
-	models.WriteData(w, models.BaseResponse[[]*AgentStatus]{
-		Code:    http.StatusOK,
-		Message: "【网关服务】智能体状态获取成功",
-		Data:    statuses,
-	})
-}
-
-// SetMaxAgentsRequest represents a request to set max agents.
+// SetMaxAgentsRequest 设置最大智能体数
 type SetMaxAgentsRequest struct {
 	Max int `json:"max"`
 }
 
-// SetMaxAgents sets the maximum number of agents.
+// SetMaxAgents 设置最大智能体数
 func (h *ChatHandler) SetMaxAgents(w http.ResponseWriter, r *http.Request) {
 	req, err := models.Bind[*SetMaxAgentsRequest](r)
 	if err != nil {
@@ -411,13 +340,13 @@ func (h *ChatHandler) SetMaxAgents(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ConnectionStatus represents the WebSocket connection status.
+// ConnectionStatus WebSocket 连接状态
 type ConnectionStatus struct {
 	TotalConnections int `json:"total_connections"`
 	MaxConcurrent    int `json:"max_concurrent"`
 }
 
-// GetConnectionStatus returns the WebSocket connection status.
+// GetConnectionStatus WebSocket 连接状态
 func (h *ChatHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
 	if h.wsManager == nil {
 		models.WriteData(w, models.BaseResponse[*ConnectionStatus]{

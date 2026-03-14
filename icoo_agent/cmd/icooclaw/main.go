@@ -2,23 +2,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
-	"icooclaw/pkg/agent"
 	"icooclaw/pkg/app"
-	"icooclaw/pkg/bus"
 	"icooclaw/pkg/config"
-	"icooclaw/pkg/memory"
-	"icooclaw/pkg/providers"
-	"icooclaw/pkg/storage"
-	"icooclaw/pkg/tools"
 
 	// Import channel implementations to register their factories
 	_ "icooclaw/pkg/channels/dingtalk"
@@ -72,113 +63,113 @@ func init() {
 
 func runStart(cmd *cobra.Command, args []string) {
 	// Load config
-	cfg, err := config.Load(cfgFile)
-	if err != nil {
-		slog.Error("加载配置失败", "error", err)
-		os.Exit(1)
-	}
+	// cfg, err := config.Load(cfgFile)
+	// if err != nil {
+	// 	slog.Error("加载配置失败", "error", err)
+	// 	os.Exit(1)
+	// }
 
-	// Ensure directories exist
-	if err := cfg.EnsureWorkspace(); err != nil {
-		slog.Error("创建工作目录失败", "error", err)
-		os.Exit(1)
-	}
-	if err := cfg.EnsureDatabasePath(); err != nil {
-		slog.Error("创建数据库目录失败", "error", err)
-		os.Exit(1)
-	}
+	// // Ensure directories exist
+	// if err := cfg.EnsureWorkspace(); err != nil {
+	// 	slog.Error("创建工作目录失败", "error", err)
+	// 	os.Exit(1)
+	// }
+	// if err := cfg.EnsureDatabasePath(); err != nil {
+	// 	slog.Error("创建数据库目录失败", "error", err)
+	// 	os.Exit(1)
+	// }
 
-	// Setup logging
-	setupLogging(cfg)
+	// // Setup logging
+	// setupLogging(cfg)
 
-	slog.Info("正在启动 icooclaw", "version", version)
+	// slog.Info("正在启动 icooclaw", "version", version)
 
-	// Initialize storage
-	dbPath, _ := cfg.GetDatabasePath()
-	store, err := storage.New(cfg.Mode, dbPath)
-	if err != nil {
-		slog.Error("初始化存储失败", "error", err)
-		os.Exit(1)
-	}
-	defer store.Close()
+	// // Initialize storage
+	// dbPath, _ := cfg.GetDatabasePath()
+	// store, err := storage.New(cfg.Mode, dbPath)
+	// if err != nil {
+	// 	slog.Error("初始化存储失败", "error", err)
+	// 	os.Exit(1)
+	// }
+	// defer store.Close()
 
-	// Initialize message bus
-	messageBus := bus.NewMessageBus(bus.DefaultConfig())
+	// // Initialize message bus
+	// messageBus := bus.NewMessageBus(bus.DefaultConfig())
 
-	// Initialize provider factory
-	providerFactory := providers.NewFactory(store)
+	// // Initialize provider factory
+	// providerFactory := providers.NewFactory(store)
 
-	// Initialize tools registry
-	toolRegistry := tools.NewRegistry()
+	// // Initialize tools registry
+	// toolRegistry := tools.NewRegistry()
 
-	// Initialize memory loader
-	memLoader := memory.NewLoader(store, 100, slog.Default())
+	// // Initialize memory loader
+	// memLoader := memory.NewLoader(store, 100, slog.Default())
 
-	// Get default provider
-	var defaultProvider providers.Provider
-	defaultProvider, err = providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
-	if err != nil {
-		slog.Warn("未找到默认提供商，需要配置", "provider", cfg.Agent.DefaultProvider)
-	}
+	// // Get default provider
+	// var defaultProvider providers.Provider
+	// defaultProvider, err = providerFactory.Get(cfg.Agent.DefaultProvider.ToString())
+	// if err != nil {
+	// 	slog.Warn("未找到默认提供商，需要配置", "provider", cfg.Agent.DefaultProvider)
+	// }
 
 	// Initialize agent instance
-	agentInstance := agent.NewInstance(agent.AgentConfig{
-		Name:              "default",
-		Model:             cfg.Agent.DefaultModel,
-		MaxToolIterations: 20,
-	},
-		agent.WithBus(messageBus),
-		agent.WithStorage(store),
-		agent.WithTools(toolRegistry),
-		agent.WithMemory(memLoader),
-		agent.WithLogger(slog.Default()),
-	)
+	// agentInstance := agent.NewInstance(agent.AgentConfig{
+	// 	Name:              "default",
+	// 	Model:             cfg.Agent.DefaultModel,
+	// 	MaxToolIterations: 20,
+	// },
+	// 	agent.WithBus(messageBus),
+	// 	agent.WithStorage(store),
+	// 	agent.WithTools(toolRegistry),
+	// 	agent.WithMemory(memLoader),
+	// 	agent.WithLogger(slog.Default()),
+	// )
 
-	if defaultProvider != nil {
-		agentInstance = agent.NewInstance(agent.AgentConfig{
-			Name:              "default",
-			Model:             cfg.Agent.DefaultModel,
-			MaxToolIterations: 20,
-		},
-			agent.WithBus(messageBus),
-			agent.WithStorage(store),
-			agent.WithTools(toolRegistry),
-			agent.WithMemory(memLoader),
-			agent.WithProvider(defaultProvider),
-			agent.WithLogger(slog.Default()),
-		)
-	}
+	// if defaultProvider != nil {
+	// 	agentInstance = agent.NewInstance(agent.AgentConfig{
+	// 		Name:              "default",
+	// 		Model:             cfg.Agent.DefaultModel,
+	// 		MaxToolIterations: 20,
+	// 	},
+	// 		agent.WithBus(messageBus),
+	// 		agent.WithStorage(store),
+	// 		agent.WithTools(toolRegistry),
+	// 		agent.WithMemory(memLoader),
+	// 		agent.WithProvider(defaultProvider),
+	// 		agent.WithLogger(slog.Default()),
+	// 	)
+	// }
 
 	// Initialize agent loop
-	loop := agent.NewLoop(
-		agent.WithLoopBus(messageBus),
-		agent.WithLoopProvider(defaultProvider),
-		agent.WithLoopTools(toolRegistry),
-		agent.WithLoopMemory(memLoader),
-		agent.WithLoopStorage(store),
-		agent.WithLoopLogger(slog.Default()),
-	)
+	// loop := agent.NewLoop(
+	// 	agent.WithLoopBus(messageBus),
+	// 	agent.WithLoopProvider(defaultProvider),
+	// 	agent.WithLoopTools(toolRegistry),
+	// 	agent.WithLoopMemory(memLoader),
+	// 	agent.WithLoopStorage(store),
+	// 	agent.WithLoopLogger(slog.Default()),
+	// )
 
 	// Setup context with cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
-	// Handle shutdown signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// // Handle shutdown signals
+	// sigChan := make(chan os.Signal, 1)
+	// signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-sigChan
-		slog.Info("正在关闭...")
-		cancel()
-	}()
+	// go func() {
+	// 	<-sigChan
+	// 	slog.Info("正在关闭...")
+	// 	cancel()
+	// }()
 
-	// Start agent loop
-	slog.Info("代理已启动", "name", agentInstance.Name())
-	if err := loop.Run(ctx); err != nil && err != context.Canceled {
-		slog.Error("代理运行错误", "error", err)
-		os.Exit(1)
-	}
+	// // Start agent loop
+	// slog.Info("代理已启动", "name", agentInstance.Name())
+	// if err := loop.Run(ctx); err != nil && err != context.Canceled {
+	// 	slog.Error("代理运行错误", "error", err)
+	// 	os.Exit(1)
+	// }
 
 	slog.Info("代理已停止")
 }

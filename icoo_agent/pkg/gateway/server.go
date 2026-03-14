@@ -27,11 +27,10 @@ type Server struct {
 	schedule *scheduler.Scheduler
 
 	// New components
-	wsManager     *websocket.Manager
-	sseBroker     *sse.Broker
-	bus           *bus.MessageBus
-	agentLoop     *agent.Loop
-	agentRegistry *agent.AgentRegistry
+	wsManager    *websocket.Manager
+	sseBroker    *sse.Broker
+	bus          *bus.MessageBus
+	agentManager *agent.AgentManager
 }
 
 // ServerConfig holds the server configuration.
@@ -57,9 +56,12 @@ func DefaultServerConfig() *ServerConfig {
 // NewServer creates a new gateway server.
 func NewServer(
 	cfg *ServerConfig,
+	wsCfg *websocket.ManagerConfig,
 	logger *slog.Logger,
 	store *storage.Storage,
 	schedule *scheduler.Scheduler,
+	bus *bus.MessageBus,
+	agentManager *agent.AgentManager,
 ) *Server {
 	if logger == nil {
 		logger = slog.Default()
@@ -67,14 +69,26 @@ func NewServer(
 
 	r := chi.NewRouter()
 	s := &Server{
-		router:   r,
-		storage:  store,
-		logger:   logger,
-		schedule: schedule,
+		router:       r,
+		storage:      store,
+		logger:       logger,
+		schedule:     schedule,
+		bus:          bus,
+		agentManager: agentManager,
 	}
 
+	// Create WebSocket manager
+	s.WithWebSocket(wsCfg)
+
 	// Create handlers
-	s.handlers = NewHandlers(logger, store, schedule)
+	s.handlers = NewHandlers(
+		logger,
+		store,
+		schedule,
+		s.agentManager,
+		s.bus,
+		s.wsManager,
+	)
 
 	// Setup middleware
 	s.setupMiddleware()
@@ -118,20 +132,10 @@ func (s *Server) WithBus(b *bus.MessageBus) *Server {
 	return s
 }
 
-// WithAgentLoop sets the agent loop.
-func (s *Server) WithAgentLoop(l *agent.Loop) *Server {
-	s.agentLoop = l
+func (s *Server) WithAgentManager(m *agent.AgentManager) *Server {
+	s.agentManager = m
 	if s.wsManager != nil {
-		s.wsManager.WithAgentLoop(l)
-	}
-	return s
-}
-
-// WithAgentRegistry sets the agent registry.
-func (s *Server) WithAgentRegistry(r *agent.AgentRegistry) *Server {
-	s.agentRegistry = r
-	if s.wsManager != nil {
-		s.wsManager.WithAgentRegistry(r)
+		s.wsManager.WithAgentManager(m)
 	}
 	return s
 }
@@ -142,9 +146,7 @@ func (s *Server) Setup() *Server {
 	if s.handlers.Chat != nil {
 		s.handlers.Chat = s.handlers.Chat.
 			WithWebSocketManager(s.wsManager).
-			WithBus(s.bus).
-			WithAgentLoop(s.agentLoop).
-			WithAgentRegistry(s.agentRegistry)
+			WithBus(s.bus)
 	}
 
 	// Re-register routes with updated handlers
@@ -263,14 +265,4 @@ func (s *Server) SSEBroker() *sse.Broker {
 // Bus returns the message bus.
 func (s *Server) Bus() *bus.MessageBus {
 	return s.bus
-}
-
-// AgentLoop returns the agent loop.
-func (s *Server) AgentLoop() *agent.Loop {
-	return s.agentLoop
-}
-
-// AgentRegistry returns the agent registry.
-func (s *Server) AgentRegistry() *agent.AgentRegistry {
-	return s.agentRegistry
 }

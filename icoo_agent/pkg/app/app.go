@@ -40,7 +40,7 @@ type App struct {
 	ToolRegistry    *tools.Registry      // 工具注册表
 	MemoryLoader    memory.Loader        // 记忆加载器
 	SkillLoader     skill.Loader         // skill 加载加载器
-	AgentLoop       *agent.Loop          // 代理循环
+	AgentManager    *agent.AgentManager  // 代理管理器
 	AgentRegistry   *agent.AgentRegistry // 代理注册表
 	ChannelManager  *channels.Manager    // 渠道管理器
 	Gw              *gateway.Server      // 网关服务器
@@ -167,25 +167,6 @@ func (a *App) InitLog() *slog.Logger {
 	return logger
 }
 
-// InitAgent 初始化智能体循环
-func (a *App) InitAgent() {
-	// 初始化代理循环
-	agentLoop := agent.NewLoop(
-		agent.WithLoopBus(a.MessageBus),
-		agent.WithLoopProvider(a.DefaultProvider),
-		agent.WithLoopProviderFactory(a.ProviderFactory),
-		agent.WithLoopTools(a.ToolRegistry),
-		agent.WithLoopMemory(a.MemoryLoader),
-		agent.WithLoopSkills(a.SkillLoader),
-		agent.WithLoopStorage(a.Storage),
-		agent.WithLoopLogger(a.Logger),
-	)
-
-	// 初始化代理注册表
-	a.AgentRegistry = agent.NewAgentRegistry(a.Logger)
-	a.AgentLoop = agentLoop
-}
-
 // InitChannel 初始化渠道
 func (a *App) InitChannel() {
 	// 初始化渠道管理器
@@ -209,16 +190,13 @@ func (a *App) InitGateway() {
 	// 创建网关服务器
 	a.Gw = gateway.NewServer(
 		serverCfg,
+		websocket.DefaultManagerConfig(),
 		slog.Default(),
 		a.Storage,
 		a.Scheduler,
-	).
-		WithWebSocket(websocket.DefaultManagerConfig()).
-		WithSSE().
-		WithBus(a.MessageBus).
-		WithAgentLoop(a.AgentLoop).
-		WithAgentRegistry(a.AgentRegistry).
-		Setup()
+		a.MessageBus,
+		a.AgentManager,
+	).WithSSE().Setup()
 }
 
 func (a *App) Init(path string) error {
@@ -235,7 +213,11 @@ func (a *App) Init(path string) error {
 	// 初始化消息总线
 	a.InitBus()
 	// 初始化任务调度器
-	a.Scheduler = scheduler.NewScheduler(a.Storage.Task(), a.MessageBus, a.Logger)
+	a.Scheduler = scheduler.NewScheduler(
+		a.Storage.Task(),
+		a.MessageBus,
+		a.Logger,
+	)
 	// 初始化工具
 	a.InitTool()
 	// 初始化记忆加载器
@@ -246,11 +228,15 @@ func (a *App) Init(path string) error {
 	a.InitProvider()
 	// 初始化渠道
 	a.InitChannel()
-	// 初始化代理
-	a.InitAgent()
+	// 初始化智能体管理器
+	a.AgentManager = agent.NewAgentManager(a.Ctx, a.Logger).
+		WithProviderFactory(a.ProviderFactory).
+		WithBus(a.MessageBus).
+		WithMemory(a.MemoryLoader).
+		WithTools(a.ToolRegistry).
+		WithSkills(a.SkillLoader)
 	// 初始化网关服务器
 	a.InitGateway()
-
 	return nil
 }
 
@@ -271,6 +257,13 @@ func (a *App) RunGateway() {
 	err := a.Gw.Start()
 	if err != nil && err != http.ErrServerClosed {
 		slog.Error("网关服务错误", "error", err)
+		os.Exit(1)
+	}
+
+	// 启动智能体管理器
+	err = a.AgentManager.Start()
+	if err != nil {
+		slog.Error("智能体管理器启动失败", "error", err)
 		os.Exit(1)
 	}
 
@@ -299,13 +292,6 @@ func (a *App) RunGateway() {
 		// 取消上下文
 		a.Cancel()
 	}()
-
-	// 在后台启动代理循环
-	go func() {
-		if err := a.AgentLoop.Run(a.Ctx); err != nil && err != context.Canceled {
-			slog.Error("代理循环错误", "error", err)
-		}
-	}()
 }
 
 func (a *App) Close() {
@@ -318,6 +304,12 @@ func (a *App) Close() {
 	if a.Storage != nil {
 		a.Storage.Close()
 	}
+
+	// 关闭智能体管理器
+	if a.AgentManager != nil {
+		a.AgentManager.Stop()
+	}
+	a.AgentManager = nil
 }
 
 func parseLogLevel(level string) slog.Level {

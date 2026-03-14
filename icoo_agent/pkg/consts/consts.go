@@ -33,6 +33,8 @@ const DEFAULT_MODEL_KEY = "agent.default_model"
 
 const SKILL_DIR = "skills"
 
+const DEFAULT_TOOL_ITERATIONS = 30
+
 // ProviderType represents a provider type.
 type ProviderType string
 

@@ -3,7 +3,10 @@ package gateway
 import (
 	"log/slog"
 
+	"icooclaw/pkg/agent"
+	"icooclaw/pkg/bus"
 	"icooclaw/pkg/gateway/handlers"
+	"icooclaw/pkg/gateway/websocket"
 	"icooclaw/pkg/scheduler"
 	"icooclaw/pkg/storage"
 
@@ -29,7 +32,19 @@ type Handlers struct {
 }
 
 // NewHandlers 创建所有处理器
-func NewHandlers(logger *slog.Logger, storage *storage.Storage, schedule *scheduler.Scheduler) *Handlers {
+func NewHandlers(
+	logger *slog.Logger,
+	storage *storage.Storage,
+	schedule *scheduler.Scheduler,
+	agentManager *agent.AgentManager,
+	bus *bus.MessageBus,
+	wsManager *websocket.Manager,
+) *Handlers {
+	chatHandler := handlers.NewChatHandler(logger, storage).
+		WithAgentManager(agentManager).
+		WithWebSocketManager(wsManager).
+		WithBus(bus)
+
 	return &Handlers{
 		Schedule: schedule,
 		Common:   handlers.NewCommonHandler(logger),
@@ -44,7 +59,7 @@ func NewHandlers(logger *slog.Logger, storage *storage.Storage, schedule *schedu
 		Param:    handlers.NewParamHandler(logger, storage),
 		Tool:     handlers.NewToolHandler(logger, storage),
 		Binding:  handlers.NewBindingHandler(logger, storage),
-		Chat:     handlers.NewChatHandler(logger, storage, nil, nil, nil, nil),
+		Chat:     chatHandler,
 	}
 }
 
@@ -60,7 +75,6 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Get("/status", h.Chat.GetConnectionStatus)  // 连接状态
 		r.Get("/queue", h.Chat.GetQueueStatus)        // 队列状态
 		r.Post("/queue/max", h.Chat.SetMaxConcurrent) // 设置最大并发
-		r.Get("/agents", h.Chat.GetAgentStatus)       // Agent 状态
 		r.Post("/agents/max", h.Chat.SetMaxAgents)    // 设置最大 Agent 数
 	})
 
@@ -186,19 +200,4 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 		r.Post("/get", h.Binding.GetByID)
 		r.Get("/all", h.Binding.GetAll)
 	})
-}
-
-// HandleCRUD 通用 CRUD 处理函数，用于 AI Skill 调用
-type CRUDRequest struct {
-	Resource string         `json:"resource"` // sessions, messages, mcp, memories, tasks, providers, skills, channels
-	Action   string         `json:"action"`   // page, create, update, delete, get, get-all, etc.
-	Data     map[string]any `json:"data"`     // 请求数据
-}
-
-// CRUDResponse 通用 CRUD 响应
-type CRUDResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
 }

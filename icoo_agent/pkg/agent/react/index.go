@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"icooclaw/pkg/agent/hooks"
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/consts"
 	"icooclaw/pkg/memory"
@@ -17,6 +16,20 @@ import (
 	"strings"
 )
 
+// StreamChunk 表示流式响应的一个数据块。
+type StreamChunk struct {
+	Content    string `json:"content,omitempty"`     // 内容
+	Reasoning  string `json:"reasoning,omitempty"`   // 推理过程
+	ToolName   string `json:"tool_name,omitempty"`   // 工具名称
+	ToolResult string `json:"tool_result,omitempty"` // 工具结果
+	Iteration  int    `json:"iteration,omitempty"`   // 迭代次数
+	Done       bool   `json:"done,omitempty"`        // 是否完成
+	Error      error  `json:"error,omitempty"`       // 错误信息
+}
+
+// StreamCallback 流式响应的回调函数。
+type StreamCallback func(chunk StreamChunk) error
+
 type ReActAgent struct {
 	tools           *tools.Registry    // 工具注册表
 	memory          memory.Loader      // 内存加载器
@@ -25,7 +38,7 @@ type ReActAgent struct {
 	bus             *bus.MessageBus    // 消息总线
 	providerFactory *providers.Factory // 提供商工厂
 	logger          *slog.Logger       // 日志记录器
-	hooks           hooks.ReactHooks   // React钩子接口
+	hooks           ReactHooks         // React钩子接口
 
 	// Configuration 配置项
 	maxToolIterations int // 最大工具迭代次数
@@ -57,8 +70,28 @@ func WithBus(b *bus.MessageBus) Option {
 	}
 }
 
-func NewReActAgent() *ReActAgent {
-	return &ReActAgent{}
+func WithMaxToolIterations(max int) Option {
+	return func(a *ReActAgent) {
+		a.maxToolIterations = max
+	}
+}
+
+func NewReActAgent(ctx context.Context, hooks ReactHooks, opts ...Option) (*ReActAgent, error) {
+	a := &ReActAgent{hooks: hooks}
+	for _, opt := range opts {
+		opt(a)
+
+	}
+
+	var err error
+	if a.hooks != nil {
+		a, err = a.hooks.OnCreateAgent(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return a, nil
 }
 
 // GetDynamicProvider 从存储配置动态获取提供商。
@@ -90,7 +123,7 @@ func (a *ReActAgent) GetDynamicProvider(ctx context.Context) (providers.Provider
 
 	// 调用钩子获取提供商实例
 	if a.hooks != nil {
-		provider, modelName, err = a.hooks.GetProvider(ctx, providerName, a.storage.Provider())
+		provider, modelName, err = a.hooks.OnGetProvider(ctx, providerName, a.storage.Provider())
 		if err != nil {
 			return nil, "", err
 		}
@@ -109,7 +142,7 @@ func (a *ReActAgent) buildMessages(ctx context.Context, sessionKey string, msg b
 
 	// 1. Add hooks 添加钩子消息。
 	if a.hooks != nil {
-		messages, err = a.hooks.BuildMessagesBefore(ctx, sessionKey, msg, messages)
+		messages, err = a.hooks.OnBuildMessagesBefore(ctx, sessionKey, msg, messages)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +195,7 @@ func (a *ReActAgent) buildMessages(ctx context.Context, sessionKey string, msg b
 
 	// 5. Add hooks 添加钩子消息。
 	if a.hooks != nil {
-		messages, err = a.hooks.BuildMessagesAfter(ctx, sessionKey, msg, messages)
+		messages, err = a.hooks.OnBuildMessagesAfter(ctx, sessionKey, msg, messages)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +235,7 @@ func (a *ReActAgent) executeToolCall(ctx context.Context, tc providers.ToolCall,
 
 	// 调用钩子工具调用前
 	if a.hooks != nil {
-		tc, err = a.hooks.ToolCallBefore(ctx, toolName, tc, msg)
+		tc, err = a.hooks.OnToolCallBefore(ctx, toolName, tc, msg)
 		if err != nil {
 			return "", err
 		}
@@ -213,7 +246,7 @@ func (a *ReActAgent) executeToolCall(ctx context.Context, tc providers.ToolCall,
 	if tc.Function.Arguments != "" {
 		// 调用钩子工具参数解析
 		if a.hooks != nil {
-			args, err = a.hooks.ToolParseArguments(ctx, toolName, tc, msg)
+			args, err = a.hooks.OnToolParseArguments(ctx, toolName, tc, msg)
 			if err != nil {
 				return "", err
 			}
@@ -236,7 +269,7 @@ func (a *ReActAgent) executeToolCall(ctx context.Context, tc providers.ToolCall,
 
 	// 调用钩子工具调用后
 	if a.hooks != nil {
-		err = a.hooks.ToolCallAfter(ctx, toolName, msg, result)
+		err = a.hooks.OnToolCallAfter(ctx, toolName, msg, result)
 		if err != nil {
 			return "", err
 		}

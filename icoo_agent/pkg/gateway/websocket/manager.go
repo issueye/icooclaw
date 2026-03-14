@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"icooclaw/pkg/agent"
+	"icooclaw/pkg/agent/react"
 	"icooclaw/pkg/bus"
 	"icooclaw/pkg/channels/consts"
 
@@ -19,10 +20,9 @@ import (
 
 // Manager manages WebSocket connections and message routing.
 type Manager struct {
-	hub           *Hub
-	bus           *bus.MessageBus
-	agentLoop     *agent.Loop
-	agentRegistry *agent.AgentRegistry
+	hub          *Hub
+	bus          *bus.MessageBus
+	agentManager *agent.AgentManager
 
 	// Configuration
 	maxConcurrent int
@@ -89,15 +89,8 @@ func (m *Manager) WithBus(b *bus.MessageBus) *Manager {
 	return m
 }
 
-// WithAgentLoop sets the agent loop.
-func (m *Manager) WithAgentLoop(l *agent.Loop) *Manager {
-	m.agentLoop = l
-	return m
-}
-
-// WithAgentRegistry sets the agent registry.
-func (m *Manager) WithAgentRegistry(r *agent.AgentRegistry) *Manager {
-	m.agentRegistry = r
+func (m *Manager) WithAgentManager(am *agent.AgentManager) *Manager {
+	m.agentManager = am
 	return m
 }
 
@@ -268,53 +261,18 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 		"session_id", msg.SessionID,
 		"content_length", len(msg.Content))
 
-	// Helper function to send error response
+	// 发送错误响应消息
 	sendErrorResponse := func(errMsg string) {
-		client.SendJSON(map[string]interface{}{
+		client.SendJSON(map[string]any{
 			"type":      "error",
 			"error":     map[string]string{"message": errMsg},
 			"timestamp": time.Now().Unix(),
 		})
 	}
 
-	// If we have an agent loop, process the message
-	if m.agentLoop != nil {
-		// Process directly and get response
-		response, err := m.agentLoop.ProcessDirectWithChannel(
-			ctx,
-			msg.Content,
-			msg.SessionID,
-			consts.WEBSOCKET,
-			msg.SessionID,
-		)
-		if err != nil {
-			m.logger.With("name", "【网关服务】").Error("处理消息失败",
-				"error", err,
-				"client_id", client.ID,
-				"session_id", msg.SessionID)
-			sendErrorResponse("处理消息失败: " + err.Error())
-			return err
-		}
-
-		// Send chunk message (matching frontend expected format)
-		client.SendJSON(map[string]interface{}{
-			"type": "chunk",
-			"data": map[string]string{
-				"content": response,
-			},
-			"timestamp": time.Now().Unix(),
-		})
-
-		// Send end message
-		client.SendJSON(map[string]interface{}{
-			"type":      "end",
-			"timestamp": time.Now().Unix(),
-		})
-		return nil
-	}
-
-	// If we have a bus, publish the message
-	if m.bus != nil {
+	// 如果有智能体管理器，直接处理消息
+	if m.agentManager != nil {
+		// 直接处理消息
 		inbound := bus.InboundMessage{
 			Channel:   consts.WEBSOCKET,
 			SessionID: msg.SessionID,
@@ -322,87 +280,88 @@ func (m *Manager) ProcessMessage(ctx context.Context, client *Client, msg *ChatM
 			Text:      msg.Content,
 			Timestamp: time.Now(),
 		}
-
-		if err := m.bus.PublishInbound(ctx, inbound); err != nil {
-			m.logger.With("name", "【网关服务】").Error("发布消息失败",
-				"error", err,
-				"client_id", client.ID,
-				"session_id", msg.SessionID)
-			sendErrorResponse("发布消息失败: " + err.Error())
+		// 运行智能体
+		finallyContent, err := m.agentManager.RunAgent(inbound)
+		if err != nil {
 			return err
 		}
 
-		// Send acknowledgment response
-		client.SendJSON(map[string]interface{}{
-			"type": "chunk",
-			"data": map[string]string{
-				"content": "消息已接收，正在处理中",
-			},
+		// 发送 chunk 消息
+		data := map[string]any{
+			"content": finallyContent,
+		}
+		client.SendJSON(map[string]any{
+			"type":      "chunk",
+			"data":      data,
+			"timestamp": time.Now().Unix(),
+		})
+
+		// 发送结束消息
+		client.SendJSON(map[string]any{
+			"type":      "end",
 			"timestamp": time.Now().Unix(),
 		})
 		return nil
 	}
 
-	// No agent loop or bus configured
+	// 没有智能体管理器，发送错误响应消息
 	sendErrorResponse("服务未配置：缺少智能体或消息总线")
 	return nil
 }
 
-// ProcessStreamMessage processes a message with streaming response.
+// ProcessStreamMessage 处理流式消息
 func (m *Manager) ProcessStreamMessage(ctx context.Context, client *Client, msg *ChatMessage) error {
-	m.logger.Debug("processing stream message",
+	m.logger.With("name", "【网关服务】").Debug("【WebSocket】处理流式消息",
 		"client_id", client.ID,
 		"session_id", msg.SessionID)
 
 	// Helper function to send stream error event
 	sendStreamError := func(errMsg string) {
-		client.SendJSON(map[string]interface{}{
+		client.SendJSON(map[string]any{
 			"type":      "error",
 			"error":     map[string]string{"message": errMsg},
 			"timestamp": time.Now().Unix(),
 		})
 	}
 
-	// Check if agent loop is available
-	if m.agentLoop == nil {
-		sendStreamError("服务未配置：缺少智能体")
+	if m.agentManager == nil {
+		sendStreamError("服务未配置：缺少智能体管理器")
 		return nil
 	}
 
-	// Use the new streaming method from agent loop
-	err := m.agentLoop.ProcessStreamWithChannel(
-		ctx,
-		msg.Content,
-		msg.SessionID,
-		consts.WEBSOCKET,
-		msg.SessionID,
-		func(chunk agent.StreamChunk) error {
-			// Send chunk message to client
-			if chunk.Content != "" || chunk.Reasoning != "" {
-				data := map[string]interface{}{
-					"content": chunk.Content,
-				}
-				if chunk.Reasoning != "" {
-					data["reasoning"] = chunk.Reasoning
-				}
-				client.SendJSON(map[string]interface{}{
-					"type":      "chunk",
-					"data":      data,
-					"timestamp": time.Now().Unix(),
-				})
-			}
+	inbound := bus.InboundMessage{
+		Channel:   consts.WEBSOCKET,
+		SessionID: msg.SessionID,
+		Sender:    bus.SenderInfo{ID: client.userID, Name: client.userID},
+		Text:      msg.Content,
+		Timestamp: time.Now(),
+	}
 
-			// Send end message when done
-			if chunk.Done {
-				client.SendJSON(map[string]interface{}{
-					"type":      "end",
-					"timestamp": time.Now().Unix(),
-				})
+	err := m.agentManager.RunAgentStream(inbound, func(chunk react.StreamChunk) error {
+		if chunk.Content != "" || chunk.Reasoning != "" {
+			data := map[string]interface{}{
+				"content": chunk.Content,
 			}
+			if chunk.Reasoning != "" {
+				data["reasoning"] = chunk.Reasoning
+			}
+			client.SendJSON(map[string]interface{}{
+				"type":      "chunk",
+				"data":      data,
+				"timestamp": time.Now().Unix(),
+			})
+		}
 
-			return nil
-		},
-	)
+		// Send end message when done
+		if chunk.Done {
+			client.SendJSON(map[string]interface{}{
+				"type":      "end",
+				"timestamp": time.Now().Unix(),
+			})
+		}
+
+		return nil
+	})
 
 	if err != nil {
 		m.logger.With("name", "【网关服务】").Error("流式处理消息失败",

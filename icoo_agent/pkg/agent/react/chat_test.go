@@ -205,7 +205,10 @@ func TestValidateToolCalls(t *testing.T) {
 }
 
 func TestReActAgent_ChatStream_NoProvider(t *testing.T) {
-	agent := NewReActAgent()
+	agent, err := NewReActAgent(context.Background(), nil)
+	if err != nil {
+		t.Error("failed to create agent")
+	}
 
 	var receivedChunks []StreamChunk
 	callback := func(chunk StreamChunk) error {
@@ -219,7 +222,7 @@ func TestReActAgent_ChatStream_NoProvider(t *testing.T) {
 		Text:      "hello",
 	}
 
-	_, _, err := agent.ChatStream(context.Background(), msg, callback)
+	_, _, err = agent.ChatStream(context.Background(), msg, callback)
 	if err == nil {
 		t.Error("expected error without provider")
 	}

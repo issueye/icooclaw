@@ -62,7 +62,7 @@ func (a *ReActAgent) RunLLMStream(
 
 	// 调用钩子运行LLM模型前
 	if a.hooks != nil {
-		currentMessages, err = a.hooks.RunLLMBefore(ctx, msg, currentMessages)
+		currentMessages, err = a.hooks.OnRunLLMBefore(ctx, msg, currentMessages)
 		if err != nil {
 			return "", iteration, err
 		}
@@ -89,7 +89,7 @@ func (a *ReActAgent) RunLLMStream(
 		var collectedReasoning string
 		var collectedToolCalls []providers.ToolCall
 
-		err := provider.ChatStream(ctx, req, func(chunk string, reasoning string, toolCalls []providers.ToolCall, done bool) error {
+		err = provider.ChatStream(ctx, req, func(chunk string, reasoning string, toolCalls []providers.ToolCall, done bool) error {
 			// 收集内容
 			collectedContent += chunk
 			collectedReasoning += reasoning
@@ -103,7 +103,7 @@ func (a *ReActAgent) RunLLMStream(
 			if callback != nil {
 				// 发送推理过程
 				if reasoning != "" {
-					if err := callback(StreamChunk{
+					if err = callback(StreamChunk{
 						Reasoning: reasoning,
 						Iteration: iteration,
 					}); err != nil {
@@ -113,10 +113,8 @@ func (a *ReActAgent) RunLLMStream(
 
 				// 发送内容
 				if chunk != "" {
-					if err := callback(StreamChunk{
-						Content:   chunk,
-						Iteration: iteration,
-					}); err != nil {
+					err = callback(StreamChunk{Content: chunk, Iteration: iteration})
+					if err != nil {
 						return err
 					}
 				}
