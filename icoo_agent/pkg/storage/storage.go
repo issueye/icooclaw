@@ -10,19 +10,20 @@ import (
 
 // Storage provides SQLite-based storage using GORM.
 type Storage struct {
-	db       *gorm.DB
-	path     string
-	skill    *SkillStorage
-	binding  *BindingStorage
-	session  *SessionStorage
-	message  *MessageStorage
-	memory   *MemoryStorage
-	tool     *ToolStorage
-	provider *ProviderStorage
-	mcp      *MCPStorage
-	channel  *ChannelStorage
-	param    *ParamStorage
-	task     *TaskStorage
+	db        *gorm.DB
+	path      string
+	skill     *SkillStorage
+	binding   *BindingStorage
+	session   *SessionStorage
+	message   *MessageStorage
+	memory    *MemoryStorage
+	tool      *ToolStorage
+	provider  *ProviderStorage
+	mcp       *MCPStorage
+	channel   *ChannelStorage
+	param     *ParamStorage
+	task      *TaskStorage
+	workspace *WorkspaceStorage
 }
 
 func (s *Storage) Skill() *SkillStorage {
@@ -69,6 +70,10 @@ func (s *Storage) Task() *TaskStorage {
 	return s.task
 }
 
+func (s *Storage) Workspace() *WorkspaceStorage {
+	return s.workspace
+}
+
 // New creates a new Storage instance.
 func New(mode string, path string) (*Storage, error) {
 	db, err := gorm.Open(sqlite.Open(path+"?_journal_mode=WAL&_busy_timeout=5000"), &gorm.Config{})
@@ -90,19 +95,20 @@ func New(mode string, path string) (*Storage, error) {
 	sqlDB.SetMaxIdleConns(1)
 
 	s := &Storage{
-		db:       db,
-		path:     path,
-		skill:    NewSkillStorage(db),
-		binding:  NewBindingStorage(db),
-		session:  NewSessionStorage(db),
-		message:  NewMessageStorage(db),
-		memory:   NewMemoryStorage(db),
-		tool:     NewToolStorage(db),
-		provider: NewProviderStorage(db),
-		mcp:      NewMCPStorage(db),
-		channel:  NewChannelStorage(db),
-		param:    NewParamStorage(db),
-		task:     NewTaskStorage(db),
+		db:        db,
+		path:      path,
+		skill:     NewSkillStorage(db),
+		binding:   NewBindingStorage(db),
+		session:   NewSessionStorage(db),
+		message:   NewMessageStorage(db),
+		memory:    NewMemoryStorage(db),
+		tool:      NewToolStorage(db),
+		provider:  NewProviderStorage(db),
+		mcp:       NewMCPStorage(db),
+		channel:   NewChannelStorage(db),
+		param:     NewParamStorage(db),
+		task:      NewTaskStorage(db),
+		workspace: NewWorkspaceStorage(path),
 	}
 
 	if err := s.autoMigrate(); err != nil {
